@@ -44,11 +44,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     let alive = true;
-    void fetchPanelMe().then((me) => {
-      if (!alive) return;
-      if (me?.loggedIn) router.replace(afterAuth());
-      else setChecking(false);
-    });
+    void fetchPanelMe()
+      .then((me) => {
+        if (!alive) return;
+        if (me?.loggedIn) router.replace(afterAuth());
+        else setChecking(false);
+      })
+      // tudo24: se a checagem falhar, sai do spinner em vez de travar nele.
+      .catch(() => {
+        if (alive) setChecking(false);
+      });
     return () => {
       alive = false;
     };

@@ -16,6 +16,9 @@ services:
       # Cache de capas em disco (/api/img): sobrevive a redeploys/restarts,
       # então a inicial não volta a buscar as capas nos hosts lentos do painel.
       - img-cache:/app/.img-cache
+      # Cache de metadados do TMDB (/api/tmdb-resolve): sobrevive a
+      # redeploys/restarts, então os títulos não voltam ao TMDB.
+      - tmdb-cache:/app/.tmdb-cache
     depends_on:
       - php
       - db
@@ -60,3 +63,4 @@ volumes:
   db-data:
   php-cache:
   img-cache:
+  tmdb-cache:

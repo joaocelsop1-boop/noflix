@@ -66,7 +66,7 @@ function TmdbHome() {
       <main>
         <Billboard />
 
-        <div className="relative z-10 -mt-[9vh] pb-10">
+        <div className="relative z-10 pb-10">
           <ContinueRow slugs={keepKidsSafe(continueSlugs)} />
 
           {myList.length > 0 && (
@@ -146,7 +146,7 @@ export function HomePage() {
               <div className="mt-7 h-12 w-36 rounded bg-white/10" />
             </div>
           </div>
-          <div className="relative z-10 -mt-[9vh] pb-10">
+          <div className="relative z-10 pb-10">
             <p className="px-4 pb-2 pt-4 text-[13px] text-white/50 md:px-12">
               Carregando seu catálogo…
             </p>

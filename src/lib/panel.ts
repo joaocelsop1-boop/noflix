@@ -221,9 +221,15 @@ export async function fetchPanelInfo(
   type: "movie" | "series",
   id: number,
 ): Promise<Record<string, unknown> | null> {
-  const res = await fetch(apiUrl(`/api/panel/info?type=${type}&id=${id}`), { cache: "no-store" });
-  if (!res.ok) return null;
-  return await readJson<Record<string, unknown>>(res);
+  // tudo24: sem try/catch, uma falha de rede deixava a promise rejeitada e
+  // os metadados do detalhe (sinopse/gêneros) sumiam sem explicação.
+  try {
+    const res = await fetch(apiUrl(`/api/panel/info?type=${type}&id=${id}`), { cache: "no-store" });
+    if (!res.ok) return null;
+    return await readJson<Record<string, unknown>>(res);
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchPanelEpg(streamId: number): Promise<PanelEpgProgramme[]> {

@@ -13,6 +13,7 @@ node_modules
 # cache
 .cache/
 .img-cache/
+.tmdb-cache/
 
 # misc
 .DS_Store

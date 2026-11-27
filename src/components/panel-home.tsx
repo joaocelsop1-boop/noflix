@@ -6,6 +6,9 @@ import Link from "next/link";
 import { artUrl } from "@/lib/img";
 import {apiUrl, appUrl} from "@/lib/paths";
 import { fetchPanelMe } from "@/lib/panel";
+import { cleanTitle } from "@/lib/title-clean";
+import { useTmdbMeta, useTmdbMetas } from "@/lib/tmdb-client";
+import type { TmdbMeta } from "@/lib/tmdb-types";
 import { cn } from "@/lib/cn";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
@@ -53,7 +56,7 @@ function HeroThumb({
     <button
       type="button"
       onClick={onSelect}
-      aria-label={`Mostrar ${entry.name}`}
+      aria-label={`Mostrar ${cleanTitle(entry.name).title}`}
       aria-current={active}
       className={cn(
         "h-11 w-11 shrink-0 overflow-hidden rounded-full transition md:h-[52px] md:w-[52px]",
@@ -218,8 +221,12 @@ function panelPlayUrl(entry: CatalogueEntry): string {
   const id = entry.panel?.id ?? entry.tmdbId;
   // tudo22: leva o ano do catálogo na URL — sem ele a página de detalhe
   // começava com o ano atual (2026) e piscava ao corrigir para o do painel.
-  const yearParam = entry.year ? `&year=${entry.year}` : "";
-  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}${yearParam}`);
+  // tudo24: leva o título LIMPO ([Lançamento] e "(AAAA)" fora) — o detalhe
+  // e o TMDB recebem o nome certo de primeira.
+  const cleaned = cleanTitle(entry.name);
+  const year = entry.year ?? cleaned.year;
+  const yearParam = year ? `&year=${year}` : "";
+  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(cleaned.title)}${yearParam}`);
 }
 
 /**
@@ -236,8 +243,19 @@ function PanelPosterCard({
   showCaption?: boolean;
 }) {
   const router = useRouter();
-  const img = artUrl(entry.poster);
-  const initial = (entry.name.trim()[0] ?? "?").toUpperCase();
+  /* tudo24: dados de exibição do TMDB (capa, nota) por cima do painel —
+     o cartão mostra a arte do TMDB quando há match, senão a do painel. */
+  const meta: TmdbMeta | null | undefined = useTmdbMeta({
+    key: entry.key,
+    title: entry.name,
+    year: entry.year,
+    kind: entry.kind,
+  });
+  const displayName = cleanTitle(entry.name).title;
+  const img = artUrl(meta?.poster ?? entry.poster);
+  const rating = meta?.rating ?? entry.rating;
+  const year = entry.year ?? meta?.year;
+  const initial = (displayName.trim()[0] ?? "?").toUpperCase();
   /* capa morta no servidor de imagens: mostra o fallback na hora, sem
      esperar o erro de rede segurar a fileira */
   const [broken, setBroken] = useState(false);
@@ -255,7 +273,7 @@ function PanelPosterCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img}
-            alt={entry.name}
+            alt={displayName}
             loading="lazy"
             decoding="async"
             onError={() => setBroken(true)}
@@ -266,20 +284,20 @@ function PanelPosterCard({
             <span>
               <span className="block text-[44px] font-bold leading-none neon-text">{initial}</span>
               <span className="mt-2 block text-[11px] font-medium leading-tight text-white/80">
-                {entry.name}
+                {displayName}
               </span>
             </span>
           </span>
         )}
+        {/* tudo24: o overlay do hover mostra só os metadados — o nome já
+            está na legenda visível abaixo do pôster (antes aparecia duas
+            vezes ao passar o mouse). */}
         <span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/95 via-black/55 to-transparent p-2 pt-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <span className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-white">
-            {entry.name}
-          </span>
           <span className="flex items-center gap-1 text-[9.5px] text-white/55">
-            {entry.rating ? (
-              <span className="font-semibold text-[#ffc107]">★ {entry.rating.toFixed(1)}</span>
+            {rating ? (
+              <span className="font-semibold text-[#ffc107]">★ {rating.toFixed(1)}</span>
             ) : null}
-            {entry.year ? <span>· {entry.year}</span> : null}
+            {year ? <span>· {year}</span> : null}
             <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
           </span>
         </span>
@@ -287,16 +305,16 @@ function PanelPosterCard({
       {showCaption && (
         <div className="mt-2 min-w-0 px-0.5">
           <p className="truncate text-[12.5px] font-medium leading-tight text-white/90">
-            {entry.name}
+            {displayName}
           </p>
           <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/50">
-            {entry.rating ? (
+            {rating ? (
               <span className="flex items-center gap-0.5 font-semibold text-white/75">
                 <span className="text-[#ffc107]">★</span>
-                {entry.rating.toFixed(1)}
+                {rating.toFixed(1)}
               </span>
             ) : null}
-            {entry.year ? <span>· {entry.year}</span> : null}
+            {year ? <span>· {year}</span> : null}
             <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
           </p>
         </div>
@@ -384,7 +402,9 @@ function PanelTop10Row({
       </div>
       <ShelfStrip label={title}>
         {entries.map((entry, i) => (
-          <div key={entry.key} className="relative flex snap-start items-end">
+          /* tudo24: respiro à esquerda — o "1" gigante ficava cortado na
+             borda da tela. */
+          <div key={entry.key} className="relative flex snap-start items-end pl-2 md:pl-3">
             <span
               aria-hidden
               className="rank-numeral pointer-events-none -mr-4 w-[64px] shrink-0 select-none text-[92px] md:-mr-6 md:w-[86px] md:text-[122px]"
@@ -412,10 +432,9 @@ const HERO_ROTATE_MS = 15000;
  */
 function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
   const router = useRouter();
-  const candidates = useMemo(
-    () => entries.filter((e) => e.backdrop || e.poster),
-    [entries],
-  );
+  /* tudo24: sem filtrar por arte do painel — um título sem capa no painel
+     pode ter backdrop no TMDB. O filtro de mortos vive no `slides`. */
+  const candidates = useMemo(() => entries, [entries]);
   const [dead, setDead] = useState<ReadonlySet<string>>(new Set());
   // Pré-carrega os cartazes dos 12 primeiros candidatos e tira da lista os
   // que não carregam — sem travar a inicial: o primeiro slide aparece na
@@ -442,11 +461,24 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
       alive = false;
     };
   }, [candidates]);
+  /* tudo24: dados de exibição do TMDB dos 12 primeiros candidatos —
+     backdrop, sinopse, nota e gêneros por cima dos dados do painel. */
+  const metas = useTmdbMetas(
+    candidates.slice(0, 12).map((e) => ({ key: e.key, title: e.name, year: e.year, kind: e.kind })),
+  );
   const slides = useMemo(() => {
-    const valid = candidates.filter((e) => !dead.has(e.key));
+    /* Cartaz do painel morto só tira o slide da lista quando o TMDB
+       também não tem nada para ele (resolvido sem match). Enquanto o
+       TMDB ainda está resolvendo, o slide fica — o backdrop do TMDB
+       pode salvá-lo. Sem arte em lugar nenhum, o slide sai. */
+    const valid = candidates.filter((e) => {
+      const resolvedNull = metas.has(e.key) && metas.get(e.key) === null;
+      if (!resolvedNull) return true;
+      return Boolean(e.backdrop || e.poster) && !dead.has(e.key);
+    });
     // Tudo morto? Mostra o primeiro candidato com o fallback gradiente.
     return valid.length > 0 ? valid.slice(0, 6) : candidates.slice(0, 1);
-  }, [candidates, dead]);
+  }, [candidates, dead, metas]);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -459,23 +491,46 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
   }, [index, slides.length]);
 
   const active = slides[Math.min(index, slides.length - 1)] ?? slides[0];
-  const [bgBroken, setBgBroken] = useState(false);
-  useEffect(() => setBgBroken(false), [active?.key]);
+  const activeMeta: TmdbMeta | null | undefined = active ? metas.get(active.key) : undefined;
+  /* tudo24: cadeia de fallback do backdrop — TMDB primeiro, painel depois.
+     Se uma URL quebrar, tenta a próxima; só tira o slide quando acabarem. */
+  const bgCandidates = useMemo(() => {
+    if (!active) return [] as string[];
+    const urls = [
+      activeMeta?.backdrop,
+      activeMeta?.poster,
+      active.backdrop,
+      active.poster,
+    ]
+      .map((u) => (u ? artUrl(u) : undefined))
+      .filter((u): u is string => Boolean(u));
+    return Array.from(new Set(urls));
+  }, [active, activeMeta]);
+  const [bgIdx, setBgIdx] = useState(0);
+  useEffect(() => setBgIdx(0), [active?.key]);
+  const bg = bgCandidates[Math.min(bgIdx, bgCandidates.length - 1)];
   if (!active) return null;
-  const bg = artUrl(active.backdrop ?? active.poster);
+  const displayName = cleanTitle(active.name).title;
+  const displayRating = activeMeta?.rating ?? active.rating;
+  const displayYear = activeMeta?.year ?? active.year;
+  const displayOverview = activeMeta?.overview ?? active.overview;
+  const displayGenres =
+    activeMeta && activeMeta.genres.length > 0 ? activeMeta.genres : heroGenres(active);
 
   return (
-    <section className="relative h-[74svh] min-h-[440px] w-full overflow-hidden md:h-[88svh] md:min-h-[560px]">
-      {bg && !bgBroken && (
+    <section className="relative h-[80svh] min-h-[520px] w-full overflow-hidden md:h-[88svh] md:min-h-[560px]">
+      {bg && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`bg-${active.key}`}
           src={bg}
           alt=""
           onError={() => {
-            setBgBroken(true);
-            // Cartaz morto no slide ativo: tira ele da lista e o próximo
-            // válido assume (o índice fica, a lista encolhe).
+            if (bgIdx < bgCandidates.length - 1) {
+              setBgIdx((i) => i + 1);
+              return;
+            }
+            // Acabaram as capas: tira o slide da lista e o próximo válido assume.
             setDead((prev) => {
               if (prev.has(active.key)) return prev;
               const next = new Set(prev);
@@ -490,25 +545,25 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
       <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/55 to-transparent" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
 
-      <div className="absolute inset-x-0 bottom-[21%] z-10 px-4 md:px-12">
+      <div className="absolute inset-x-0 bottom-[18%] z-10 px-4 md:bottom-[21%] md:px-12">
         <div key={`copy-${active.key}`} className="max-w-[640px]">
           <div className="mb-3">
             <span className="rounded-sm bg-[#e50914] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
               {active.kind === "series" ? "Série" : "Filme"}
             </span>
           </div>
-          <h1 className="font-display text-[clamp(2.4rem,6vw,5.2rem)] leading-[0.92] tracking-[0.01em] text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]">
-            {active.name}
+          <h1 className="font-display text-[clamp(1.9rem,6vw,5.2rem)] leading-[0.92] tracking-[0.01em] text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]">
+            {displayName}
           </h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-white/85">
-            {active.rating ? (
+            {displayRating ? (
               <span className="flex items-center gap-1 font-semibold text-white">
                 <span className="text-[#ffc107]">★</span>
-                {active.rating.toFixed(1)}
+                {displayRating.toFixed(1)}
               </span>
             ) : null}
-            {active.year ? <span>{active.year}</span> : null}
-            {heroGenres(active).map((g) => (
+            {displayYear ? <span>{displayYear}</span> : null}
+            {displayGenres.map((g) => (
               <span
                 key={g}
                 className="rounded-full border border-white/25 bg-black/30 px-2.5 py-0.5 text-[11px] font-medium text-white/85"
@@ -520,9 +575,9 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
               HD
             </span>
           </div>
-          {active.overview ? (
-            <p className="mt-4 line-clamp-2 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]">
-              {active.overview}
+          {displayOverview ? (
+            <p className="mt-4 line-clamp-2 hidden max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] sm:block md:text-[15px]">
+              {displayOverview}
             </p>
           ) : null}
           <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -541,12 +596,15 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
       </div>
 
       {slides.length > 1 && (
-        <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center md:bottom-5">
+        /* tudo24: z-20 + espaço próprio — a fileira de baixo (que sobe com
+           -mt) cobria as bolinhas e roubava o clique. Sem o -mt, elas ficam
+           dentro do herói, clicáveis. */
+        <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center md:bottom-5">
           <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto px-4 md:gap-3">
             {slides.map((s, i) => (
               <HeroThumb
                 key={s.key}
-                entry={s}
+                entry={{ ...s, poster: metas.get(s.key)?.poster ?? s.poster }}
                 active={i === index}
                 onSelect={() => setIndex(i)}
               />
@@ -598,7 +656,11 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
       <main>
         <PanelHero entries={heroEntries} />
 
-        <div className="relative z-10 -mt-[9vh] pb-10">
+        {/* tudo24: sem o -mt-[9vh] — a fileira subia por cima do herói e
+            cobria as bolinhas circulares (o clique não chegava nelas e
+            elas tampavam o topo do Top 10). As fileiras começam abaixo
+            do herói; as bolinhas têm espaço próprio dentro dele. */}
+        <div className="relative z-10 pb-10">
           <PanelTop10Row title="Top 10 Filmes" href={appUrl("/movies")} entries={visible.topMovies} />
           <PanelTop10Row title="Top 10 Séries" href={appUrl("/tv-shows")} entries={visible.topSeries} />
 

@@ -68,7 +68,7 @@ export function Billboard() {
   const saved = inList(active.slug);
 
   return (
-    <section className="relative h-[74svh] min-h-[440px] w-full overflow-hidden md:h-[88svh] md:min-h-[560px]">
+    <section className="relative h-[80svh] min-h-[520px] w-full overflow-hidden md:h-[88svh] md:min-h-[560px]">
       {/* per-slide backdrop — cross-fades, never leaves a black hole */}
       <AnimatePresence initial={false}>
         <motion.div
@@ -113,7 +113,7 @@ export function Billboard() {
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
 
       {/* content — one keyed block, so backdrop and copy always agree */}
-      <div className="absolute inset-x-0 bottom-[21%] z-10 px-4 md:px-12">
+      <div className="absolute inset-x-0 bottom-[18%] z-10 px-4 md:bottom-[21%] md:px-12">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={`copy-${active.slug}`}
@@ -137,7 +137,7 @@ export function Billboard() {
 
               <motion.h1
                 variants={rise}
-                className="font-display text-[clamp(2.4rem,6vw,5.2rem)] leading-[0.92] tracking-[0.01em] text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]"
+                className="font-display text-[clamp(1.9rem,6vw,5.2rem)] leading-[0.92] tracking-[0.01em] text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]"
               >
                 {active.name}
               </motion.h1>
@@ -165,7 +165,7 @@ export function Billboard() {
 
               <motion.p
                 variants={rise}
-                className="mt-4 line-clamp-3 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]"
+                className="mt-4 line-clamp-3 hidden max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] sm:block md:text-[15px]"
               >
                 {active.overview}
               </motion.p>
@@ -220,8 +220,9 @@ export function Billboard() {
       </div>
 
       {/* miniaturas circulares dos destaques (estilo Pobreflix) — elas SAO a
-          navegacao do carrossel: a ativa ganha anel branco, clicar troca na hora */}
-      <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center md:bottom-5">
+          navegacao do carrossel: a ativa ganha anel branco, clicar troca na hora.
+          tudo24: z-20 — nada pode cobrir as bolinhas e roubar o clique. */}
+      <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center md:bottom-5">
         <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto px-4 md:gap-3">
           {features.map((f, i) => (
             <button

@@ -14,6 +14,8 @@ import {
   SubtitlesIcon,
 } from "@/components/icons";
 import { useStore } from "@/components/store";
+import { cleanTitle } from "@/lib/title-clean";
+import { useTmdbMeta } from "@/lib/tmdb-client";
 import { Wordmark } from "@/components/wordmark";
 import { Artwork } from "@/components/artwork";
 import { shortMeta } from "@/lib/catalog";
@@ -294,9 +296,27 @@ export function Player({
   /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
 
-  /* visão de detalhe (tudo20): sinopse/ano/gênero — do painel quando há,
-     senão o que o título já traz; nunca inventa texto. */
+  /* tudo24: dados de exibição do TMDB para títulos do painel (details=true
+     traz a duração) — capa, backdrop, sinopse, nota e gêneros por cima dos
+     dados do painel, que viram fallback. Sem match, tudo continua do painel. */
+  const tmdbDetail = useTmdbMeta(
+    isPanelTitle
+      ? {
+          key: title.slug,
+          title: title.name,
+          year: title.year > 0 ? title.year : undefined,
+          kind: title.kind === "series" ? "series" : "movie",
+          details: true,
+        }
+      : null,
+  );
+
+  /* visão de detalhe (tudo20): sinopse/ano/gênero — do TMDB quando há,
+     do painel quando não há, senão o que o título já traz; nunca inventa
+     texto. A sinopse do TMDB (com cache) acaba com a intermitência do
+     get_vod_info do painel, que às vezes vinha vazia. */
   const detailSynopsis =
+    tmdbDetail?.overview ??
     panelMeta.plot ??
     movieMeta.plot ??
     (title.overview && !title.overview.includes("transmitindo do seu painel")
@@ -304,18 +324,24 @@ export function Player({
       : undefined);
   // tudo22: 0 = ano desconhecido (nunca mostra o ano atual como chute) —
   // o ano só aparece quando é o do painel ou o da URL, nunca 2026 piscando.
-  const detailYear = panelMeta.year ?? movieMeta.year ?? (title.year > 0 ? title.year : undefined);
+  const detailYear =
+    panelMeta.year ?? movieMeta.year ?? tmdbDetail?.year ?? (title.year > 0 ? title.year : undefined);
   const detailGenre =
+    (tmdbDetail && tmdbDetail.genres.length > 0 ? tmdbDetail.genres.join(" · ") : undefined) ??
     panelMeta.genre ??
     movieMeta.genre ??
     (title.genres?.length ? title.genres.join(" · ") : undefined);
-  const detailDuration = movieMeta.duration;
-  /** capa da visão de detalhe e do poster do player: do painel quando há. */
-  const detailCover = panelMeta.cover ?? movieMeta.cover;
+  const detailDuration = tmdbDetail?.runtime ?? movieMeta.duration;
+  const detailRating = tmdbDetail?.rating;
+  /** capa da visão de detalhe e do poster do player: TMDB primeiro (backdrop
+     16:9), painel depois. */
+  const detailCover = tmdbDetail?.backdrop ?? tmdbDetail?.poster ?? panelMeta.cover ?? movieMeta.cover;
   /** poster do player (backdrop grande como fundo enquanto carrega). */
   const playerPoster = detailCover
     ? apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)
     : undefined;
+  /** título limpo na exibição ([Lançamento] e "(AAAA)" fora). */
+  const displayName = cleanTitle(title.name).title;
 
   /* Sessão única (tudo20): confere de 30 em 30s se esta sessão continua
      válida — se outro aparelho entrou, a sessão cai e o usuário vê a
@@ -338,6 +364,11 @@ export function Player({
   /* tudo23: abas da visão de detalhe (Episódios / Saiba mais) e "Ler mais" da sinopse */
   const [detailTab, setDetailTab] = useState<"episodios" | "saiba">("episodios");
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
+  /* tudo24: capa do detalhe quebrada (o proxy devolve 404 quando o host do
+     painel está morto) — cai para o placeholder estilizado em vez de
+     mostrar o texto alternativo cru sobre preto. */
+  const [coverBroken, setCoverBroken] = useState(false);
+  useEffect(() => setCoverBroken(false), [title.slug]);
   /* temporada exibida no sheet (null = segue a temporada que está tocando) */
   const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
@@ -977,21 +1008,26 @@ export function Player({
         <div className="absolute inset-0 z-40 overflow-y-auto bg-black">
           {/* Hero: capa/backdrop da série */}
           <div className="relative h-[42vh] min-h-[260px] w-full overflow-hidden sm:h-[54vh]">
-            {detailCover ? (
+            {detailCover && !coverBroken ? (
               <img
                 src={apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)}
-                alt={title.name}
+                alt={displayName}
+                onError={() => setCoverBroken(true)}
                 className="h-full w-full object-cover"
               />
             ) : (
-              <Artwork
-                slug={title.slug}
-                name={title.name}
-                kind="backdrop"
-                accent={title.accent}
-                priority
-                sizes="100vw"
-              />
+              /* tudo24: sem imagem em lugar nenhum — placeholder estilizado
+                 com o título, nunca o texto alternativo cru sobre preto. */
+              <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1a1033] via-[#0d1526] to-black px-6">
+                <div className="text-center">
+                  <span className="block text-[64px] font-bold leading-none text-white/20">
+                    {(displayName.trim()[0] ?? "?").toUpperCase()}
+                  </span>
+                  <span className="mt-3 block text-lg font-semibold text-white/70">
+                    {displayName}
+                  </span>
+                </div>
+              </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
@@ -1011,10 +1047,16 @@ export function Player({
               {title.kind === "series" ? "Série" : "Filme"}
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[1.1]">
-              {title.name}
+              {displayName}
             </h1>
             <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/60">
               {detailYear ? <span>{detailYear}</span> : null}
+              {detailRating ? (
+                <span className="flex items-center gap-1 font-semibold text-white">
+                  <span className="text-[#ffc107]">★</span>
+                  {detailRating.toFixed(1)}
+                </span>
+              ) : null}
               {detailGenre ? <span>{detailGenre}</span> : null}
               {detailDuration ? <span>{detailDuration} min</span> : null}
               {title.kind === "series" && allSeasons.length > 0 && (
