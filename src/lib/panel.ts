@@ -23,6 +23,8 @@ export type PanelMe = {
   loggedIn: boolean;
   user: PanelUser | null;
   canWatch: boolean;
+  /** Sessão única (tudo20): outro aparelho entrou e esta sessão foi encerrada. */
+  sessionEnded?: boolean;
   /** Contato de suporte configurado no admin (aba Servidor Sigma, seção Suporte). */
   support?: {
     whatsapp?: string | null;

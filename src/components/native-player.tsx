@@ -154,6 +154,15 @@ export function NativePlayer({
   });
   const failedRef = useRef(false);
   const onErrorRef = useRef(onError);
+  /* tudo20: o watchdog do intervalo roda numa closure antiga, então espelha
+     sourceIndex/playable em refs para ele ver a fonte atual. hlsTrial marca
+     que a fonte HLS atual veio do watchdog (trava no meio do MP4) — se ela
+     falhar, o escalonamento volta para o MP4 em vez de mostrar erro. */
+  const sourceIndexRef = useRef(0);
+  /* inicializa vazio (playable é declarado abaixo) — o useEffect de
+     sincronização o preenche antes de qualquer trava acontecer. */
+  const playableRef = useRef<NativeSource[]>([]);
+  const hlsTrialRef = useRef(false);
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
@@ -239,6 +248,7 @@ export function NativePlayer({
   useEffect(() => {
     setSourceIndex(0);
     setAttempt(0);
+    hlsTrialRef.current = false;
     resumeOverride.current = null;
     stallRef.current = {
       lastTime: 0,
@@ -307,6 +317,19 @@ export function NativePlayer({
     const escalate = () => {
       if (recovery.current.escalated) return;
       recovery.current.escalated = true;
+      /* tudo20: o HLS atual veio do watchdog (trava no meio do MP4) e não
+         carregou — volta para o MP4 na posição atual em vez de mostrar
+         erro. O MP4 é o caminho confiável; o HLS é só um bônus. */
+      if (hlsTrialRef.current) {
+        hlsTrialRef.current = false;
+        const video = videoRef.current;
+        if (video && Number.isFinite(video.currentTime)) {
+          resumeOverride.current = video.currentTime;
+        }
+        setAttempt(0);
+        setSourceIndex(0);
+        return;
+      }
       if (attempt + 1 < (attempts[sourceIndex]?.length ?? 1)) {
         setAttempt(attempt + 1);
         return;
@@ -621,6 +644,14 @@ export function NativePlayer({
     failedRef.current = failed;
   }, [failed]);
 
+  /* espelha a fonte atual para o watchdog (closure do intervalo) */
+  useEffect(() => {
+    sourceIndexRef.current = sourceIndex;
+  }, [sourceIndex]);
+  useEffect(() => {
+    playableRef.current = playable;
+  }, [playable]);
+
   /** reload the same source at the last known position (stall recovery) */
   const recoverStall = useCallback(() => {
     const video = videoRef.current;
@@ -631,10 +662,35 @@ export function NativePlayer({
   }, []);
 
   /**
-   * Mid-playback stall watchdog: if currentTime freezes for ~12s while the
-   * video should be playing, reload the same source at the last position
-   * (up to 3 automatic recoveries, with a 15s cooldown after each so the
-   * reload has time to start). After that, surface the failure UI.
+   * tudo20: trava no MEIO do MP4 — troca para a fonte HLS (segmentada, com
+   * retry) na posição atual. Devolve false se não houver HLS para tentar.
+   */
+  const switchStallToHls = useCallback(() => {
+    const list = playableRef.current;
+    const current = list[sourceIndexRef.current];
+    const hlsIndex = list.findIndex(
+      (entry, i) => i > sourceIndexRef.current && entry.type === "hls",
+    );
+    if (!current || current.type !== "mp4" || hlsIndex < 0) return false;
+    const video = videoRef.current;
+    if (video && Number.isFinite(video.currentTime)) {
+      resumeOverride.current = video.currentTime;
+    }
+    hlsTrialRef.current = true;
+    setAttempt(0);
+    setSourceIndex(hlsIndex);
+    setGeneration((value) => value + 1);
+    return true;
+  }, []);
+
+  /**
+   * Mid-playback stall watchdog (tudo20): se currentTime congela ~8s
+   * enquanto o vídeo deveria tocar, a 1ª vez recarrega a mesma fonte na
+   * última posição; na 2ª trava (MP4 lento de novo) troca para o HLS, que é
+   * segmentado e retenta os pedaços — o MP4 progressivo congela de novo
+   * porque o painel/proxy não entrega rápido o suficiente. Até 3
+   * recuperações automáticas, com 15s de cooldown entre elas; depois disso,
+   * mostra a tela de falha.
    */
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -657,11 +713,16 @@ export function NativePlayer({
         stallRef.current.stalledSince = now;
         return;
       }
-      if (now - stallRef.current.stalledSince >= 12_000) {
+      if (now - stallRef.current.stalledSince >= 8_000) {
         if (stallRef.current.recoveries < 3) {
           stallRef.current.recoveries += 1;
           stallRef.current.stalledSince = null;
           stallRef.current.cooldownUntil = now + 15_000;
+          /* 2ª trava em diante no MP4: tenta o HLS (segmentado). Se não
+             houver HLS, recarrega a mesma fonte como antes. */
+          if (stallRef.current.recoveries >= 2 && switchStallToHls()) {
+            return;
+          }
           recoverStall();
         } else {
           stallRef.current.stalledSince = null;
@@ -672,7 +733,7 @@ export function NativePlayer({
       }
     }, 2000);
     return () => window.clearInterval(id);
-  }, [recoverStall]);
+  }, [recoverStall, switchStallToHls]);
 
   /* user picks a quality / caption track → apply it to the engine */
   useEffect(() => {
@@ -895,7 +956,7 @@ export function NativePlayer({
       <video
         ref={videoEl}
         playsInline
-        preload="metadata"
+        preload="auto"
         className="h-full w-full bg-black object-contain"
       />
 

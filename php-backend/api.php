@@ -37,11 +37,16 @@ function api_error($msg, $code = 403) {
 }
 
 function api_require_login() {
-    if (!is_logged_in()) api_error('Login necessário.', 401);
+    // Sessão única (tudo20): current_user() já invalida a sessão quando
+    // outro aparelho entrou depois — uma sessão encerrada não passa aqui.
+    global $pdo;
+    if (!current_user($pdo)) api_error('Login necessário.', 401);
 }
 
 function api_require_admin() {
-    if (!is_admin()) api_error('Acesso restrito ao administrador.', 403);
+    global $pdo;
+    $u = current_user($pdo);
+    if (!$u || ($u['role'] ?? '') !== 'admin') api_error('Acesso restrito ao administrador.', 403);
 }
 
 // ---------- helpers das actions NOFLIX (me / login / logout / plans / register) ----------
@@ -882,6 +887,10 @@ switch ($action) {
         $meUser = current_user($pdo);
         echo json_encode([
             'loggedIn' => $meUser !== null,
+            // Sessão única (tudo20): a sessão tinha user_id mas o token não
+            // bateu com o do banco — outro aparelho entrou depois e esta
+            // sessão foi encerrada. O app mostra a mensagem e volta ao login.
+            'sessionEnded' => !empty($GLOBALS['session_token_mismatch']),
             'user' => $meUser ? api_public_user($pdo, $meUser) : null,
             'canWatch' => user_can_watch($meUser),
             // Suporte (contato do admin): público, é o botão "Suporte" do app.
@@ -923,6 +932,9 @@ switch ($action) {
             $_SESSION['user_name'] = $loginUser['name'];
             $_SESSION['user_email'] = $loginUser['email'];
             $_SESSION['user_role'] = $loginUser['role'];
+            // Sessão única (tudo20): este login invalida qualquer sessão
+            // antiga da mesma conta (outro aparelho).
+            $_SESSION['session_token'] = mint_session_token($pdo, (int)$loginUser['id']);
             unset($_SESSION['profile_id'], $_SESSION['profile_name'], $_SESSION['profile_kids'], $_SESSION['adult_ok']);
             $loginPayload = api_public_user($pdo, $loginUser);
             $loginCanWatch = user_can_watch($loginUser);
@@ -1020,6 +1032,7 @@ switch ($action) {
         $_SESSION['user_name'] = $regName;
         $_SESSION['user_email'] = $regEmail;
         $_SESSION['user_role'] = 'client';
+        $_SESSION['session_token'] = mint_session_token($pdo, (int)$newId);
         unset($_SESSION['profile_id'], $_SESSION['profile_name'], $_SESSION['profile_kids'], $_SESSION['adult_ok']);
         $regPayload = api_public_user($pdo, $newUser);
         $regCanWatch = user_can_watch($newUser);

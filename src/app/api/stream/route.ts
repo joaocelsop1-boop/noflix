@@ -177,6 +177,12 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
   if (me === null) {
     return NextResponse.json({ ok: false, reason: "panel-unavailable", sources: [] }, { status: 503, headers: noStore });
   }
+  // Sessão única (tudo20): outro aparelho entrou e esta sessão foi
+  // encerrada — o player mostra a mensagem e volta ao login (não é falta
+  // de plano, então não cai no gate de plano).
+  if (me.sessionEnded) {
+    return NextResponse.json({ ok: false, reason: "session-ended", sources: [] }, { status: 403, headers: noStore });
+  }
   if (!me.canWatch) {
     return NextResponse.json({ ok: false, reason: "plan-required", sources: [] }, { status: 403, headers: noStore });
   }

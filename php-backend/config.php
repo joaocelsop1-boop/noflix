@@ -67,6 +67,7 @@ function get_settings($pdo) {
         'support_telegram' => '',
     ];
     ensure_payment_columns($pdo);
+    ensure_user_columns($pdo);
     $stmt = $pdo->query("SELECT * FROM settings WHERE id = 1 LIMIT 1");
     $row = $stmt->fetch();
     if (!$row) return $defaults;
@@ -110,6 +111,33 @@ function ensure_payment_columns($pdo) {
     }
 }
 
+// Sessão única (tudo20 — um acesso por vez): a coluna session_token
+// guarda o token da sessão ATUAL do usuário. O login grava um token novo;
+// qualquer sessão antiga (outro aparelho) deixa de bater e é desconectada.
+// Mesmo padrão de auto-ALTER do ensure_payment_columns.
+function ensure_user_columns($pdo) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $exists = $pdo->query("SHOW COLUMNS FROM users LIKE 'session_token'")->fetch();
+        if (!$exists) $pdo->exec("ALTER TABLE users ADD COLUMN session_token VARCHAR(64) NOT NULL DEFAULT ''");
+    } catch (Throwable $e) {
+        error_log('ensure_user_columns: ' . $e->getMessage());
+    }
+}
+
+// Gera um token novo, grava na conta e devolve. Chamado no login.
+function mint_session_token($pdo, $userId) {
+    $token = bin2hex(random_bytes(32));
+    try {
+        $pdo->prepare("UPDATE users SET session_token = ? WHERE id = ?")->execute([$token, intval($userId)]);
+    } catch (Throwable $e) {
+        error_log('mint_session_token: ' . $e->getMessage());
+    }
+    return $token;
+}
+
 // Normaliza a URL do painel: aceita o que o usuário colar (URL completa do
 // M3U, URL com /player_api.php, sem esquema, com barra no fim) e devolve só
 // esquema://host:porta — que é o que o player_api.php e o stream precisam.
@@ -145,12 +173,36 @@ function panel_base_url($settings) {
     return normalize_panel_url($settings['sigma_url'] ?? '');
 }
 
-// Usuário logado (cliente ou admin) — retorna a linha da tabela users ou null
+// Usuário logado (cliente ou admin) — retorna a linha da tabela users ou null.
+// Sessão única (tudo20): se a conta tem um session_token e ele não bate com
+// o da sessão atual, ESTA sessão foi encerrada por um login em outro aparelho
+// — retorna null (o usuário é tratado como deslogado em tudo: me, stream,
+// catálogo, admin). $GLOBALS['session_token_mismatch'] sinaliza o motivo
+// para a ação `me` devolver sessionEnded e o app mostrar a mensagem certa.
 function current_user($pdo) {
     if (empty($_SESSION['user_id'])) return null;
+    // Garante a coluna antes de ler/gravar o token: o stream.php chama
+    // current_user() antes de get_settings(), então não dá para depender
+    // só do ensure de lá. O static $done faz isso custar 1 consulta por
+    // requisição, no máximo.
+    ensure_user_columns($pdo);
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
     $stmt->execute([intval($_SESSION['user_id'])]);
-    return $stmt->fetch() ?: null;
+    $user = $stmt->fetch() ?: null;
+    if (!$user) return null;
+    $dbToken = (string)($user['session_token'] ?? '');
+    $sessToken = (string)($_SESSION['session_token'] ?? '');
+    if ($dbToken === '') {
+        // Conta criada antes do tudo20 (sem token): emite um token para
+        // esta sessão e segue — o próximo login em outro aparelho a invalida.
+        $_SESSION['session_token'] = mint_session_token($pdo, (int)$user['id']);
+        return $user;
+    }
+    if ($sessToken === '' || !hash_equals($dbToken, $sessToken)) {
+        $GLOBALS['session_token_mismatch'] = true;
+        return null;
+    }
+    return $user;
 }
 
 // O usuário pode assistir? status active ou trial E dentro da validade
@@ -173,14 +225,17 @@ function is_admin() {
 }
 
 function require_admin() {
-    if (!is_admin()) {
+    global $pdo;
+    $u = current_user($pdo);
+    if (!$u || ($u['role'] ?? '') !== 'admin') {
         header("Location: admin_login.php");
         exit;
     }
 }
 
 function require_login() {
-    if (!is_logged_in()) {
+    global $pdo;
+    if (!current_user($pdo)) {
         header("Location: login.php");
         exit;
     }

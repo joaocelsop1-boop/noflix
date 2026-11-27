@@ -24,6 +24,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /* Sessão única (tudo20): o middleware manda para cá com ?session=ended
+     quando outro aparelho entrou e esta sessão foi encerrada. */
+  const [sessionNotice, setSessionNotice] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -32,6 +35,12 @@ export default function LoginPage() {
     const plano = new URLSearchParams(window.location.search).get("plano");
     return plano ? appUrl(`/planos?plano=${encodeURIComponent(plano)}`) : appUrl("/browse");
   };
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("session") === "ended") {
+      setSessionNotice(true);
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -129,6 +138,13 @@ export default function LoginPage() {
             </button>
           ))}
         </div>
+
+        {sessionNotice && (
+          <div className="mt-6 rounded-md border border-[#22e6ff]/40 bg-[#22e6ff]/10 px-4 py-3 text-[13px] leading-relaxed text-white/85">
+            Sua sessão foi encerrada porque você entrou em outro aparelho. Entre
+            novamente para continuar assistindo.
+          </div>
+        )}
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           {mode === "register" && (

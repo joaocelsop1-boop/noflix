@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['user_name'] = $u['name'];
         $_SESSION['user_email'] = $u['email'];
         $_SESSION['user_role'] = 'admin';
+        $_SESSION['session_token'] = mint_session_token($pdo, (int)$u['id']);
         unset($_SESSION['profile_id'], $_SESSION['profile_name'], $_SESSION['profile_kids'], $_SESSION['adult_ok']);
         header('Location: admin.php');
         exit;

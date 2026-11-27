@@ -113,6 +113,10 @@ if (strpos($path, 'player_api.php') === false) {
     curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
     curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 60);
 }
+// tudo20: buffer de leitura maior (256 KB em vez do padrão de 16 KB) —
+// mais vazão do painel para o navegador, o que ajuda o buffer do player a
+// não esvaziar no meio do filme.
+curl_setopt($ch, CURLOPT_BUFFERSIZE, 262144);
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 // Repassa o cabeçalho Range (pular/adiantar o vídeo) e o método/corpo.

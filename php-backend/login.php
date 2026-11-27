@@ -89,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_name'] = $u['name'];
             $_SESSION['user_email'] = $u['email'];
             $_SESSION['user_role'] = $u['role'];
+            // Sessão única (tudo20): este login invalida qualquer sessão
+            // antiga da mesma conta (outro aparelho).
+            $_SESSION['session_token'] = mint_session_token($pdo, (int)$u['id']);
             unset($_SESSION['profile_id'], $_SESSION['profile_name'], $_SESSION['profile_kids'], $_SESSION['adult_ok']);
             if ($u['role'] === 'admin') {
                 header('Location: admin.php');
@@ -141,6 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_name'] = $name;
                 $_SESSION['user_email'] = $email;
                 $_SESSION['user_role'] = 'client';
+                $_SESSION['session_token'] = mint_session_token($pdo, $newId);
                 unset($_SESSION['profile_id'], $_SESSION['profile_name'], $_SESSION['profile_kids'], $_SESSION['adult_ok']);
                 header('Location: profiles.php');
                 exit;

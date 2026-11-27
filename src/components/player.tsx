@@ -159,6 +159,8 @@ export function Player({
   const [picked, setPicked] = useState(() => !needsPick);
   /** gate de plano: /api/panel/me disse canWatch=false ou o stream deu 403 */
   const [planBlocked, setPlanBlocked] = useState<string | null>(null);
+  /** sessão única (tudo20): outro aparelho entrou e esta sessão foi encerrada. */
+  const [sessionEnded, setSessionEnded] = useState(false);
   /** motivo do stream do painel ter falhado (ex.: série sem episódios) */
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelRetry, setPanelRetry] = useState(0);
@@ -184,8 +186,14 @@ export function Player({
      menu não mostrava nenhum seletor (sempre S01E01). */
   const [panelSeasons, setPanelSeasons] = useState<Season[]>([]);
   const [panelSeasonsLoaded, setPanelSeasonsLoaded] = useState(false);
-  /* tudo15: a série toca sozinha — dispara 1x quando a lista chega */
-  const autoPicked = useRef(false);
+  /* tudo20: metadados da série vindos do painel (capa, sinopse, gênero) —
+     alimentam a visão de detalhe estilo Netflix antes de tocar. */
+  const [panelMeta, setPanelMeta] = useState<{
+    cover?: string;
+    plot?: string;
+    genre?: string;
+    year?: number;
+  }>({});
   useEffect(() => {
     if (!isPanelTitle || title.panel?.type !== "series" || title.kind !== "series") return;
     let alive = true;
@@ -193,6 +201,16 @@ export function Player({
       if (!alive) return;
       setPanelSeasonsLoaded(true);
       if (!info) return;
+      /* metadados da série (get_series_info: info.cover / info.plot /
+         info.genre / info.releaseDate) — capa e sinopse da visão de detalhe. */
+      const meta = (info.info ?? {}) as Record<string, unknown>;
+      const relYear = Number(String(meta.releaseDate ?? "").slice(0, 4)) || undefined;
+      setPanelMeta({
+        cover: typeof meta.cover === "string" && meta.cover ? meta.cover : undefined,
+        plot: typeof meta.plot === "string" && meta.plot.trim() ? meta.plot.trim() : undefined,
+        genre: typeof meta.genre === "string" && meta.genre.trim() ? meta.genre.trim() : undefined,
+        year: relYear,
+      });
       const raw = (info.episodes ?? {}) as Record<string, unknown>;
       const list: Season[] = Object.keys(raw)
         .map((key) => {
@@ -220,22 +238,10 @@ export function Player({
         .filter((s) => s.number > 0 && s.episodes.length > 0)
         .sort((a, b) => a.number - b.number);
       setPanelSeasons(list);
-      // tudo15: com a lista carregada, a série começa sozinha no 1º
-      // episódio (menor temporada/episódio) — antes ela ficava parada na
-      // tela "Escolher episódio" e parecia que "não rodava nada". O seletor
-      // continua no menu do player (temporadas + episódios) para trocar
-      // quando quiser; sem episódios no painel, a tela de escolha continua
-      // aparecendo com o botão "Assistir · Temporada 1 · Episódio 1".
-      if (list.length > 0 && !autoPicked.current && !episodePicked) {
-        autoPicked.current = true;
-        const first = list[0];
-        const ep = first.episodes[0];
-        if (first && ep) {
-          setSeason(first.number);
-          setEpisode(ep.number);
-          setPicked(true);
-        }
-      }
+      /* tudo20: NÃO toca sozinho — a escolha acontece na visão de detalhe
+         estilo Netflix (capa, sinopse, temporada, episódios) antes de tocar.
+         Deep link com episódio explícito (?s=&e=) continua tocando direto
+         (episodePicked=true, picked já começa true). */
     });
     return () => {
       alive = false;
@@ -245,12 +251,36 @@ export function Player({
   /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
 
+  /* visão de detalhe (tudo20): sinopse/ano/gênero — do painel quando há,
+     senão o que o título já traz; nunca inventa texto. */
+  const detailSynopsis =
+    panelMeta.plot ??
+    (title.overview && !title.overview.includes("transmitindo do seu painel")
+      ? title.overview
+      : undefined);
+  const detailYear = panelMeta.year ?? title.year;
+  const detailGenre =
+    panelMeta.genre ??
+    (title.genres?.length ? title.genres.join(" · ") : undefined);
+
+  /* Sessão única (tudo20): confere de 30 em 30s se esta sessão continua
+     válida — se outro aparelho entrou, a sessão cai e o usuário vê a
+     mensagem (em vez de o vídeo só parar de funcionar sem explicação). */
+  useEffect(() => {
+    if (!isPanelTitle) return;
+    const id = window.setInterval(() => {
+      void fetchPanelMe().then((me) => {
+        if (me?.sessionEnded) setSessionEnded(true);
+      });
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [isPanelTitle]);
+
   const [menu, setMenu] = useState(false);
   /* tudo17: painel de episódios visível (bottom sheet) — o seletor não vive
      mais só dentro do menu "Painel": ele abre sozinho ao abrir a série e tem
      botão próprio e claro no topo do player. */
   const [episodesOpen, setEpisodesOpen] = useState(false);
-  const episodesAutoOpened = useRef(false);
   /* temporada exibida no sheet (null = segue a temporada que está tocando) */
   const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
@@ -359,7 +389,11 @@ export function Player({
             const data = (await res.json().catch(() => null)) as {
               reason?: string;
             } | null;
-            if (alive && data?.reason === "plan-required") {
+            // Sessão única (tudo20): outro aparelho entrou — não é falta de
+            // plano, é sessão encerrada: mostra a mensagem e volta ao login.
+            if (alive && data?.reason === "session-ended") {
+              setSessionEnded(true);
+            } else if (alive && data?.reason === "plan-required") {
               setPlanBlocked(
                 "Este conteúdo precisa de um plano ativo. Ative um plano para assistir.",
               );
@@ -556,23 +590,9 @@ export function Player({
   const sheetSeasonData =
     allSeasons.find((s) => s.number === (sheetSeason ?? season)) ?? allSeasons[0];
 
-  /* tudo17: ao abrir uma série, a lista de episódios aparece de cara (o
-     vídeo continua tocando atrás/embaixo do painel) — o usuário vê como
-     escolher sem precisar adivinhar nenhum menu. Só 1x por abertura de
-     página, e nunca em deep link com episódio explícito (?s=&e=). */
-  useEffect(() => {
-    if (
-      title.kind !== "series" ||
-      episodePicked ||
-      !picked ||
-      allSeasons.length === 0 ||
-      episodesAutoOpened.current
-    )
-      return;
-    episodesAutoOpened.current = true;
-    setSheetSeason(null);
-    setEpisodesOpen(true);
-  }, [title.kind, episodePicked, picked, allSeasons.length]);
+  /* tudo20: o sheet NÃO abre sozinho — a escolha principal acontece na
+     visão de detalhe, antes de tocar. Durante a reprodução ele abre só pelo
+     botão "Episódios" do topo (e fecha com ESC/X). */
 
   /* ---------------------------------------------------------------- source */
 
@@ -865,28 +885,102 @@ export function Player({
       {/* gate de plano: no lugar do player, CTA para /planos */}
       {planBlocked && <PlanGate reason={planBlocked} />}
 
-      {/* séries do painel sem episódio escolhido: seletor de temporada e
-          episódio ANTES de tocar — o vídeo só carrega depois da escolha. */}
+      {/* sessão única (tudo20): outro aparelho entrou e esta sessão foi
+          encerrada — mostra o motivo e volta ao login. */}
+      {sessionEnded && (
+        <div className="absolute inset-0 z-40 grid place-items-center bg-black px-6 text-center">
+          <div className="max-w-md">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
+              Você está assistindo · CinePlus
+            </p>
+            <h2 className="mt-3 text-2xl font-bold text-white md:text-3xl">
+              Sua sessão foi encerrada
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-white/60">
+              Você entrou em outro aparelho, então esta sessão foi encerrada.
+              Entre novamente para continuar assistindo.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push(appUrl("/login?session=ended"))}
+              className="mt-6 rounded-md btn-neon px-6 py-3 text-sm font-bold transition"
+            >
+              Entrar novamente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* tudo20: visão de detalhe estilo Netflix — capa, sinopse, temporada
+          e episódios ANTES de tocar. Substitui a antiga tela "Escolher episódio"
+          (que era só o seletor, sem capa nem sinopse). O vídeo só carrega
+          depois que o usuário escolhe um episódio. Não é um popup por cima
+          do vídeo. */}
       {!picked && !planBlocked && (
-        <div className="absolute inset-0 z-40 overflow-y-auto bg-[#0f1220] px-4 py-8 md:px-10">
-          <div className="mx-auto max-w-[880px]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
-              Escolher episódio
+        <div className="absolute inset-0 z-40 overflow-y-auto bg-black">
+          {/* Hero: capa/backdrop da série */}
+          <div className="relative h-[42vh] min-h-[260px] w-full overflow-hidden sm:h-[54vh]">
+            {panelMeta.cover ? (
+              <img
+                src={apiUrl(`/api/img?u=${encodeURIComponent(panelMeta.cover)}`)}
+                alt={title.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <Artwork
+                slug={title.slug}
+                name={title.name}
+                kind="backdrop"
+                accent={title.accent}
+                priority
+                sizes="100vw"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Voltar"
+              className="absolute left-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-black/60 text-white backdrop-blur-md transition hover:bg-black/80 md:left-6 md:top-5"
+            >
+              <ArrowLeftIcon width={18} height={18} />
+            </button>
+          </div>
+
+          {/* Conteúdo */}
+          <div className="relative mx-auto -mt-20 w-full max-w-[880px] px-4 pb-12 sm:-mt-24 md:px-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#22e6ff]">
+              Série
             </p>
-            <h1 className="mt-1 text-2xl font-bold leading-tight text-white md:text-3xl">{title.name}</h1>
-            <p className="mt-1 text-[13px] text-white/55">
-              Escolha a temporada e o episódio para assistir.
+            <h1 className="mt-1 text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[1.1]">
+              {title.name}
+            </h1>
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/60">
+              {detailYear ? <span>{detailYear}</span> : null}
+              {detailGenre ? <span>{detailGenre}</span> : null}
+              {allSeasons.length > 0 && (
+                <span>
+                  {allSeasons.length} {allSeasons.length === 1 ? "temporada" : "temporadas"}
+                </span>
+              )}
             </p>
+            {detailSynopsis ? (
+              <p className="mt-3 max-w-[640px] text-[14px] leading-relaxed text-white/75">
+                {detailSynopsis}
+              </p>
+            ) : null}
+
             {allSeasons.length === 0 ? (
               panelSeasonsLoaded ? (
-                <div className="mt-6">
+                <div className="mt-8">
                   <p className="text-[13px] text-white/55">
                     O painel não devolveu a lista de episódios desta série.
                   </p>
                   <button
                     type="button"
                     onClick={() => pickEpisode(1, 1)}
-                    className="mt-4 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-black transition hover:bg-white/85"
+                    className="mt-4 rounded-md bg-white px-6 py-3 text-[14px] font-bold text-black transition hover:bg-white/85"
                   >
                     Assistir · Temporada 1 · Episódio 1
                   </button>
@@ -894,13 +988,27 @@ export function Player({
               ) : (
                 <div className="mt-8 flex items-center gap-2.5">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
-                  <p className="text-[13px] font-medium text-white/55">Carregando temporadas e episódios…</p>
+                  <p className="text-[13px] font-medium text-white/55">
+                    Carregando temporadas e episódios…
+                  </p>
                 </div>
               )
             ) : (
               <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const first = pickerSeason?.episodes[0];
+                    if (pickerSeason && first) pickEpisode(pickerSeason.number, first.number);
+                  }}
+                  className="mt-6 flex items-center gap-2 rounded-md bg-white px-6 py-3 text-[14px] font-bold text-black transition hover:bg-white/85"
+                >
+                  <PlayIcon width={16} height={16} />
+                  Assistir
+                </button>
+
                 {allSeasons.length > 1 && (
-                  <div className="mt-5 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="mt-7 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {allSeasons.map((entry) => (
                       <button
                         key={entry.number}
@@ -909,28 +1017,31 @@ export function Player({
                         aria-pressed={entry.number === pickerSeason?.number}
                         className={
                           entry.number === pickerSeason?.number
-                            ? "shrink-0 rounded-full border border-white/70 bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white"
-                            : "shrink-0 rounded-full border border-white/10 px-3.5 py-1.5 text-[12.5px] text-white/60 transition hover:border-white/40 hover:text-white"
+                            ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
+                            : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                         }
                       >
-                        {entry.name && !/^Season \d+$/.test(entry.name) ? entry.name : `Temporada ${entry.number}`}
+                        {entry.name && !/^Season \d+$/.test(entry.name)
+                          ? entry.name
+                          : `Temporada ${entry.number}`}
                       </button>
                     ))}
                   </div>
                 )}
-                <p className="mt-4 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
+                <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
                   {pickerSeason?.name && !/^Season \d+$/.test(pickerSeason.name)
                     ? pickerSeason.name
                     : `Temporada ${pickerSeason?.number ?? season}`}
                   {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                 </p>
-                <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+                <div className="mt-1">
                   {(pickerSeason?.episodes ?? []).map((item) => (
-                    <Row
+                    <EpisodeRow
                       key={item.number}
-                      active={false}
-                      title={`E${item.number} · ${item.name}`}
-                      subtitle={item.runtime > 0 ? `${item.runtime} min` : undefined}
+                      number={item.number}
+                      name={item.name}
+                      runtime={item.runtime}
+                      overview={item.overview}
                       onClick={() => pickEpisode(pickerSeason?.number ?? season, item.number)}
                     />
                   ))}
@@ -1579,11 +1690,11 @@ export function Player({
         </AnimatePresence>
       </div>
 
-      {/* tudo17: seletor de episódios VISÍVEL — bottom sheet com temporadas e
-          episódios. Abre sozinho ao abrir a série (o vídeo continua tocando
-          acima) e pelo botão "Episódios" do topo. Tocar num episódio troca e
-          toca ele na hora; o episódio atual fica destacado. Filmes não têm
-          este painel. */}
+      {/* tudo20: lista de episódios durante a reprodução — bottom sheet de
+          verdade: ocupa só a parte de baixo da tela e deixa o vídeo visível
+          acima (nada de modal central cobrindo o vídeo). Abre só pelo botão
+          "Episódios" do topo; a escolha principal acontece na visão de
+          detalhe, antes de tocar. */}
       <AnimatePresence>
         {episodesOpen && title.kind === "series" && (
           <motion.div
@@ -1593,9 +1704,10 @@ export function Player({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             role="dialog"
             aria-label="Episódios"
-            className="absolute inset-x-0 bottom-0 z-40 mx-auto flex max-h-[68vh] w-full max-w-[880px] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-white/10 bg-[#0f1220]/[0.98] shadow-2xl backdrop-blur-xl"
+            className="absolute inset-x-0 bottom-0 z-40 flex max-h-[46vh] w-full flex-col overflow-hidden rounded-t-2xl border border-t border-white/10 bg-[#141414] shadow-[0_-12px_48px_rgba(0,0,0,0.6)] md:max-h-[52vh]"
           >
-            <div className="flex items-start justify-between gap-3 px-4 pb-1 pt-4 md:px-6">
+            <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/25" />
+            <div className="flex items-start justify-between gap-3 px-4 pb-1 pt-3 md:px-6">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
                   Episódios
@@ -1613,51 +1725,53 @@ export function Player({
                 type="button"
                 onClick={() => setEpisodesOpen(false)}
                 aria-label="Fechar episódios"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/70 transition hover:bg-white/15 hover:text-white"
               >
-                <CloseIcon width={16} height={16} />
+                <CloseIcon width={14} height={14} />
               </button>
             </div>
 
             {allSeasons.length === 0 ? (
-              panelSeasonsLoaded ? (
-                <div className="px-4 pb-6 pt-2 md:px-6">
-                  <p className="text-[13px] text-white/55">
-                    O painel não devolveu a lista de episódios desta série.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      pickEpisode(1, 1);
-                      setEpisodesOpen(false);
-                    }}
-                    className="mt-4 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-black transition hover:bg-white/85"
-                  >
-                    Assistir · Temporada 1 · Episódio 1
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2.5 px-4 py-6 md:px-6">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
-                  <p className="text-[13px] font-medium text-white/55">
-                    Carregando temporadas e episódios…
-                  </p>
-                </div>
-              )
+              <div className="grid flex-1 place-items-center px-4 pb-8">
+                {panelSeasonsLoaded ? (
+                  <div className="text-center">
+                    <p className="text-[13px] text-white/55">
+                      O painel não devolveu a lista de episódios desta série.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        goTo(1, 1);
+                        setEpisodesOpen(false);
+                      }}
+                      className="mt-4 rounded-md bg-white px-6 py-3 text-[14px] font-bold text-black transition hover:bg-white/85"
+                    >
+                      Assistir · Temporada 1 · Episódio 1
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
+                    <p className="text-[13px] font-medium text-white/55">
+                      Carregando temporadas e episódios…
+                    </p>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 {allSeasons.length > 1 && (
-                  <div className="mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden">
+                  <div className="mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden">
                     {allSeasons.map((entry) => (
                       <button
                         key={entry.number}
                         type="button"
                         onClick={() => setSheetSeason(entry.number)}
-                        aria-pressed={entry.number === (sheetSeasonData?.number ?? season)}
+                        aria-pressed={entry.number === sheetSeasonData?.number}
                         className={
-                          entry.number === (sheetSeasonData?.number ?? season)
-                            ? "shrink-0 rounded-full border border-white/70 bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white"
-                            : "shrink-0 rounded-full border border-white/10 px-3.5 py-1.5 text-[12.5px] text-white/60 transition hover:border-white/40 hover:text-white"
+                          entry.number === sheetSeasonData?.number
+                            ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
+                            : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                         }
                       >
                         {entry.name && !/^Season \d+$/.test(entry.name)
@@ -1673,54 +1787,23 @@ export function Player({
                     : `Temporada ${sheetSeasonData?.number ?? season}`}
                   {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                 </p>
-                <div className="mt-2 flex-1 overflow-y-auto px-2 pb-4 md:px-4">
+                <div className="mt-1 flex-1 overflow-y-auto px-2 pb-4 md:px-4">
                   {(sheetSeasonData?.episodes ?? []).map((item) => {
                     const active =
                       sheetSeasonData?.number === season && item.number === episode;
                     return (
-                      <button
+                      <EpisodeRow
                         key={item.number}
-                        type="button"
+                        number={item.number}
+                        name={item.name}
+                        runtime={item.runtime}
+                        overview={item.overview}
+                        active={active}
                         onClick={() => {
                           goTo(sheetSeasonData?.number ?? season, item.number);
                           setEpisodesOpen(false);
                         }}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition",
-                          active ? "bg-white/10" : "hover:bg-white/5",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "grid h-9 w-9 shrink-0 place-items-center rounded-md text-[12px] font-bold",
-                            active
-                              ? "bg-[var(--nf-accent)] text-white"
-                              : "bg-white/10 text-white/80",
-                          )}
-                        >
-                          {active ? <PlayIcon width={13} height={13} /> : `E${item.number}`}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              "block truncate text-[13px]",
-                              active ? "text-white" : "text-white/85",
-                            )}
-                          >
-                            E{item.number} · {item.name}
-                          </span>
-                          {item.runtime > 0 && (
-                            <span className="block text-[11px] text-white/40">
-                              {item.runtime} min
-                            </span>
-                          )}
-                        </span>
-                        {active && (
-                          <span className="shrink-0 rounded-sm bg-[#46d369] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black">
-                            Assistindo
-                          </span>
-                        )}
-                      </button>
+                      />
                     );
                   })}
                 </div>
@@ -1730,6 +1813,77 @@ export function Player({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * Linha de episódio estilo Netflix (tudo20): número grande, título, duração
+ * e sinopse; o episódio atual leva o selo "Assistindo" em ciano. Usada na
+ * visão de detalhe da série e no bottom sheet do player. Alvo grande para
+ * o dedo (linha inteira clicável, py-4) e sem texto cortado em telas pequenas.
+ */
+function EpisodeRow({
+  number,
+  name,
+  runtime,
+  overview,
+  active = false,
+  onClick,
+}: {
+  number: number;
+  name: string;
+  runtime?: number;
+  overview?: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group flex w-full items-start gap-3 border-b border-white/[0.06] px-2 py-4 text-left transition last:border-b-0 hover:bg-white/[0.04] md:gap-4 md:px-3",
+        active && "bg-white/[0.05]",
+      )}
+    >
+      <span
+        className={cn(
+          "w-8 shrink-0 pt-0.5 text-center text-[26px] font-bold leading-none md:w-10 md:text-[30px]",
+          active ? "text-white" : "text-white/30 group-hover:text-white/60",
+        )}
+      >
+        {number}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span
+            className={cn(
+              "text-[15px] font-semibold",
+              active ? "text-white" : "text-white/90",
+            )}
+          >
+            {name}
+          </span>
+          {(runtime ?? 0) > 0 && (
+            <span className="shrink-0 text-[12px] text-white/45">{runtime} min</span>
+          )}
+        </span>
+        {overview ? (
+          <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-white/55">
+            {overview}
+          </span>
+        ) : null}
+      </span>
+      {active ? (
+        <span className="mt-1 shrink-0 rounded-full bg-[var(--nf-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-black">
+          Assistindo
+        </span>
+      ) : (
+        <span className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/20 text-white/70 transition group-hover:border-white/60 group-hover:text-white">
+          <PlayIcon width={14} height={14} />
+        </span>
+      )}
+    </button>
   );
 }
 

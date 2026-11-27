@@ -96,6 +96,8 @@ export type PhpMe = {
   loggedIn: boolean;
   user: PhpUser | null;
   canWatch: boolean;
+  /** Sessão única (tudo20): outra sessão entrou depois e esta foi encerrada. */
+  sessionEnded?: boolean;
 };
 
 const LOGGED_OUT: PhpMe = { loggedIn: false, user: null, canWatch: false };
@@ -117,6 +119,7 @@ export async function phpMe(cookies?: string | null): Promise<PhpMe | null> {
     loggedIn: data.loggedIn,
     user: (data.user ?? null) as PhpUser | null,
     canWatch: data.canWatch === true,
+    sessionEnded: data.sessionEnded === true,
   };
 }
 
