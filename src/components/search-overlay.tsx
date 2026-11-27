@@ -11,7 +11,7 @@ import { fetchPanelMe } from "@/lib/panel";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const genreColors = [
-  "#e50914",
+  "#22e6ff",
   "#1f6feb",
   "#7a1fa2",
   "#0f9d58",
@@ -155,9 +155,9 @@ export function SearchOverlay() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[70] overflow-y-auto bg-[#141414]"
+          className="fixed inset-0 z-[70] overflow-y-auto bg-[#0f1220]"
         >
-          <div className="sticky top-0 z-10 border-b border-white/10 bg-[#141414]/95 backdrop-blur-xl">
+          <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0f1220]/95 backdrop-blur-xl">
             <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center gap-4 px-4 md:px-8">
               <SearchIcon className="shrink-0 text-white/70" width={22} height={22} />
               <input
@@ -192,7 +192,7 @@ export function SearchOverlay() {
                 <Link
                   href="/login"
                   onClick={() => setSearchOpen(false)}
-                  className="mt-5 inline-block rounded-md bg-[#e50914] px-5 py-2.5 text-[13.5px] font-semibold text-white transition hover:bg-[#f6121d]"
+                  className="mt-5 inline-block rounded-md btn-neon px-5 py-2.5 text-[13.5px] font-semibold transition"
                 >
                   Entrar / Criar conta
                 </Link>
@@ -304,7 +304,7 @@ export function SearchOverlay() {
                         ) : (
                           <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#2a2a2a] to-[#111] p-2 text-center">
                             <span>
-                              <span className="block text-[34px] font-bold leading-none text-[#e50914]">
+                              <span className="block text-[34px] font-bold leading-none neon-text">
                                 {(entry.name.trim()[0] ?? "?").toUpperCase()}
                               </span>
                               <span className="mt-2 block text-[11px] font-medium leading-tight text-white/80">

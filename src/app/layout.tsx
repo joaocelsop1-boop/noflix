@@ -30,13 +30,13 @@ export const viewport: Viewport = {
 const CRITICAL_CSS = `
 html,body{background:#141414;color:#fff;margin:0;min-height:100%}
 #nf-boot{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;background:#000;animation:nf-boot-out .5s ease-in 2.05s forwards}
-.nf-boot-glow{position:absolute;width:70vmin;height:70vmin;border-radius:9999px;background:rgba(229,9,20,.42);filter:blur(130px);opacity:0;animation:nf-boot-glow 2.4s ease-in-out forwards}
+.nf-boot-glow{position:absolute;width:70vmin;height:70vmin;border-radius:9999px;background:rgba(255,43,214,.35);filter:blur(130px);opacity:0;animation:nf-boot-glow 2.4s ease-in-out forwards}
 .nf-boot-bars{position:absolute;display:flex;align-items:center;gap:8px;height:120px}
-.nf-boot-bars i{display:block;width:14px;height:100%;border-radius:2px;background:#e50914;transform:scaleY(0);transform-origin:center;animation:nf-boot-bar 1.5s ease-in-out forwards}
+.nf-boot-bars i{display:block;width:14px;height:100%;border-radius:2px;background:#22e6ff;transform:scaleY(0);transform-origin:center;animation:nf-boot-bar 1.5s ease-in-out forwards}
 .nf-boot-bars i:nth-child(2){animation-delay:.06s}
 .nf-boot-bars i:nth-child(3){animation-delay:.12s}
 .nf-boot-word{position:absolute;margin-top:190px;font-family:var(--font-display);font-size:clamp(28px,6vw,54px);letter-spacing:.42em;text-indent:.42em;color:#fff;opacity:0;animation:nf-boot-word 2.4s cubic-bezier(.2,.8,.2,1) forwards}
-.nf-boot-rule{position:absolute;height:2px;width:0;background:linear-gradient(90deg,transparent,#e50914,transparent);animation:nf-boot-rule 1.6s ease-in-out .3s forwards}
+.nf-boot-rule{position:absolute;height:2px;width:0;background:linear-gradient(90deg,transparent,#22e6ff,transparent);animation:nf-boot-rule 1.6s ease-in-out .3s forwards}
 @keyframes nf-boot-bar{0%{transform:scaleY(0);opacity:0}32%{transform:scaleY(1);opacity:1}66%{transform:scaleY(1);opacity:1}100%{transform:scaleY(0);opacity:0}}
 @keyframes nf-boot-glow{0%{opacity:0;transform:scale(.6)}40%{opacity:.6}75%{opacity:.35;transform:scale(1.12)}100%{opacity:0;transform:scale(1.5)}}
 @keyframes nf-boot-word{0%{opacity:0;transform:translateY(16px) scale(.94)}36%{opacity:1;transform:translateY(0) scale(1)}76%{opacity:1;transform:scale(1.03)}100%{opacity:0;transform:scale(1.12)}}
@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             stylesheet, before hydration, before any script */}
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
       </head>
-      <body className="min-h-screen bg-[#141414] text-white antialiased">
+      <body className="min-h-screen bg-[#0f1220] text-white antialiased">
         {/* server-rendered so the title card is the first paint, never a flash */}
         <BootIntro />
         <StoreProvider>

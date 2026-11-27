@@ -9,8 +9,11 @@
  *   (POST) quando presentes — a URL testada é a digitada, não só a salva
  * - cache em arquivo cache/ (TTL 3600s) nas listas grandes; se o painel falhar,
  *   devolve o cache antigo, senão array vazio (nunca erro fatal)
- * - create_order: pedido pendente + Pix via Mercado Pago (se houver token)
- *   ou pagamento manual (pix_key do admin)
+ * - create_order: pedido pendente + Pix pelo gateway selecionado no admin
+ *   (Mercado Pago, LynxPix, Efí, Asaas) ou Pix fixo manual; o erro do
+ *   gateway volta legível ({ok:false, error}) e o pedido falho é cancelado
+ * - test_gateway: testa as credenciais do gateway (digitadas ou salvas)
+ *   sem criar cobrança — o admin confere a chave antes de qualquer cliente
  * - rate / my_rating: avaliações "SUA NOTA" (1 a 5)
  * - save_pix_key: chave Pix do usuário (Indique e Ganhe)
  * - adult_unlock: libera conteúdo adulto na sessão com a senha da conta
@@ -249,6 +252,153 @@ function mp_create_pix($token, $amount, $email, $description, $externalRef) {
     return ['error' => false, 'data' => $data['point_of_interaction']['transaction_data']];
 }
 
+// ---------- HTTP genérico p/ gateways (LynxPix / Efí / Asaas) ----------
+function gw_http($url, $method, $headers, $body = null, $certPath = '') {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($body) ? $body : json_encode($body, JSON_UNESCAPED_UNICODE));
+    if ($certPath !== '') {
+        // Efí (produção) exige mTLS com o certificado .p12 da conta.
+        curl_setopt($ch, CURLOPT_SSLCERT, $certPath);
+        curl_setopt($ch, CURLOPT_SSLCERTTYPE, 'P12');
+        curl_setopt($ch, CURLOPT_SSLCERTPASSWD, '');
+    }
+    $resp = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($err || $resp === false) return ['error' => true, 'code' => 0, 'message' => 'Sem resposta do gateway.'];
+    $data = json_decode($resp, true);
+    return ['error' => false, 'code' => $code, 'data' => is_array($data) ? $data : []];
+}
+
+// ---------- LynxPix: criar cobrança Pix ----------
+// API https://lynxpix.cc/api/v1 — Bearer <api_key>.
+// POST /pixQrCode/create {amountCents, description, expiresIn, metadata}
+// → {id, brCode, brCodeBase64, status, expiresAt}
+function lynx_create_pix($apiKey, $amount, $description, $metadata) {
+    if (trim($apiKey) === '') return ['error' => true, 'message' => 'LynxPix: chave de API não configurada no admin (aba Pagamentos).'];
+    $r = gw_http('https://lynxpix.cc/api/v1/pixQrCode/create', 'POST', [
+        'Authorization: Bearer ' . trim($apiKey),
+        'Content-Type: application/json',
+        'Accept: application/json',
+    ], ['amountCents' => (int)round($amount * 100), 'description' => mb_substr($description, 0, 140), 'expiresIn' => 3600, 'metadata' => $metadata]);
+    if ($r['error']) return ['error' => true, 'message' => 'LynxPix: ' . $r['message']];
+    if ($r['code'] === 401) return ['error' => true, 'message' => 'LynxPix: chave de API inválida ou revogada.'];
+    if ($r['code'] < 200 || $r['code'] >= 300) {
+        $d = $r['data'];
+        $m = (string)(($d['error']['message'] ?? $d['error'] ?? $d['message'] ?? ''));
+        return ['error' => true, 'message' => 'LynxPix recusou (HTTP ' . $r['code'] . ')' . ($m !== '' ? ': ' . mb_substr($m, 0, 120) : '.')];
+    }
+    $d = $r['data']['data'] ?? $r['data'];
+    if (empty($d['id']) || empty($d['brCode'])) return ['error' => true, 'message' => 'LynxPix não devolveu o QR Code.'];
+    $img = (string)($d['brCodeBase64'] ?? '');
+    if ($img !== '' && strpos($img, 'data:') !== 0) $img = 'data:image/png;base64,' . $img;
+    return ['error' => false, 'data' => ['qr_code' => (string)$d['brCode'], 'qr_code_base64' => $img, 'charge_id' => (string)$d['id']]];
+}
+
+// ---------- Efí (ex-Gerencianet): cobrança Pix ----------
+// OAuth client_id:client_secret → access_token; POST /v2/cob {calendario,
+// valor, chave (a chave Pix da conta Efí), solicitacaoPagador}; depois
+// GET /v2/loc/{id}/qrcode → {qrcode, imagemQrcode}. Em PRODUÇÃO a Efí
+// exige o certificado .p12 (mTLS) no caminho configurado no admin; sem
+// ele, a autenticação falha — a mensagem de erro avisa isso.
+function efi_create_pix($settings, $amount, $description) {
+    $cid = trim($settings['efi_client_id'] ?? '');
+    $csec = trim($settings['efi_client_secret'] ?? '');
+    if ($cid === '' || $csec === '') return ['error' => true, 'message' => 'Efí: client_id ou client_secret não configurados no admin (aba Pagamentos).'];
+    $pixKey = trim($settings['pix_key'] ?? '');
+    if ($pixKey === '') return ['error' => true, 'message' => 'Efí: preencha "Sua chave Pix" no admin — é a chave recebedora da conta Efí.'];
+    $cert = trim($settings['efi_cert_path'] ?? '');
+    $base = 'https://api.efipay.com.br';
+    $tok = gw_http($base . '/oauth/token', 'POST', [
+        'Authorization: Basic ' . base64_encode($cid . ':' . $csec),
+        'Content-Type: application/json',
+    ], ['grant_type' => 'client_credentials'], $cert);
+    if ($tok['error'] || $tok['code'] >= 400 || empty($tok['data']['access_token'])) {
+        $hint = $cert === '' ? ' Em produção a Efí exige o certificado .p12 — preencha o caminho dele no admin.' : ' Confira o certificado .p12 e as credenciais.';
+        return ['error' => true, 'message' => 'Efí: falha ao autenticar (HTTP ' . $tok['code'] . ').' . $hint];
+    }
+    $at = $tok['data']['access_token'];
+    $cob = gw_http($base . '/v2/cob', 'POST', [
+        'Authorization: Bearer ' . $at,
+        'Content-Type: application/json',
+    ], [
+        'calendario' => ['expiracao' => 3600],
+        'valor' => ['original' => number_format((float)$amount, 2, '.', '')],
+        'chave' => $pixKey,
+        'solicitacaoPagador' => mb_substr($description, 0, 140),
+    ], $cert);
+    if ($cob['error'] || $cob['code'] >= 400 || empty($cob['data']['loc']['id'])) {
+        $d = $cob['data'];
+        $m = (string)(($d['mensagem'] ?? $d['message'] ?? ''));
+        return ['error' => true, 'message' => 'Efí: não foi possível criar a cobrança (HTTP ' . $cob['code'] . ')' . ($m !== '' ? ': ' . mb_substr($m, 0, 120) : '.')];
+    }
+    $locId = (int)$cob['data']['loc']['id'];
+    $qr = gw_http($base . '/v2/loc/' . $locId . '/qrcode', 'GET', [
+        'Authorization: Bearer ' . $at,
+        'Content-Type: application/json',
+    ], null, $cert);
+    if ($qr['error'] || $qr['code'] >= 400 || empty($qr['data']['qrcode'])) {
+        return ['error' => true, 'message' => 'Efí: cobrança criada, mas o QR Code não voltou. Tente de novo.'];
+    }
+    return ['error' => false, 'data' => [
+        'qr_code' => (string)$qr['data']['qrcode'],
+        'qr_code_base64' => (string)($qr['data']['imagemQrcode'] ?? ''),
+        'charge_id' => (string)($cob['data']['txid'] ?? ''),
+    ]];
+}
+
+// ---------- Asaas: cobrança Pix ----------
+// API por token (header access_token). Precisa de um customer: busca por
+// e-mail e cria se não existir. POST /v3/payments {customer, billingType
+// PIX, value, dueDate, description, externalReference}; depois
+// GET /v3/payments/{id}/pixQrCode → {payload, encodedImage}.
+function asaas_create_pix($apiKey, $sandbox, $amount, $email, $name, $description, $externalRef) {
+    if (trim($apiKey) === '') return ['error' => true, 'message' => 'Asaas: chave de API não configurada no admin (aba Pagamentos).'];
+    $base = $sandbox ? 'https://api-sandbox.asaas.com' : 'https://api.asaas.com';
+    $h = ['access_token: ' . trim($apiKey), 'Content-Type: application/json'];
+    $fail = function ($r, $what) {
+        $d = $r['data'];
+        $errs = $d['errors'] ?? [];
+        $m = '';
+        if (is_array($errs) && !empty($errs[0]['description'])) $m = (string)$errs[0]['description'];
+        elseif (!empty($d['message'])) $m = (string)$d['message'];
+        return ['error' => true, 'message' => 'Asaas: ' . $what . ' (HTTP ' . $r['code'] . ')' . ($m !== '' ? ': ' . mb_substr($m, 0, 140) : '.')];
+    };
+    $found = gw_http($base . '/v3/customers?email=' . urlencode($email), 'GET', $h);
+    if ($found['error'] || $found['code'] >= 400) return $fail($found, 'não foi possível buscar o cliente');
+    $cusId = $found['data']['data'][0]['id'] ?? null;
+    if (!$cusId) {
+        $created = gw_http($base . '/v3/customers', 'POST', $h, ['name' => $name !== '' ? $name : $email, 'email' => $email]);
+        if ($created['error'] || $created['code'] >= 400 || empty($created['data']['id'])) return $fail($created, 'não foi possível criar o cliente');
+        $cusId = $created['data']['id'];
+    }
+    $pay = gw_http($base . '/v3/payments', 'POST', $h, [
+        'customer' => $cusId,
+        'billingType' => 'PIX',
+        'value' => (float)$amount,
+        'dueDate' => date('Y-m-d', strtotime('+1 day')),
+        'description' => mb_substr($description, 0, 140),
+        'externalReference' => $externalRef,
+    ]);
+    if ($pay['error'] || $pay['code'] >= 400 || empty($pay['data']['id'])) return $fail($pay, 'não foi possível criar a cobrança');
+    $qr = gw_http($base . '/v3/payments/' . rawurlencode((string)$pay['data']['id']) . '/pixQrCode', 'GET', $h);
+    if ($qr['error'] || $qr['code'] >= 400 || empty($qr['data']['payload'])) return $fail($qr, 'cobrança criada, mas o QR Code não voltou');
+    $img = (string)($qr['data']['encodedImage'] ?? '');
+    if ($img !== '' && strpos($img, 'data:') !== 0) $img = 'data:image/png;base64,' . $img;
+    return ['error' => false, 'data' => [
+        'qr_code' => (string)$qr['data']['payload'],
+        'qr_code_base64' => $img,
+        'charge_id' => (string)$pay['data']['id'],
+    ]];
+}
+
 // ---------- ações ----------
 switch ($action) {
     case 'test_connection':
@@ -362,48 +512,145 @@ switch ($action) {
         if ($wa !== '' && $wa !== ($user['whatsapp'] ?? '')) {
             $pdo->prepare("UPDATE users SET whatsapp = ? WHERE id = ?")->execute([$wa, $user['id']]);
         }
-        // Reaproveita pedido pendente recente do mesmo plano (evita duplicar QR)
-        $stmt = $pdo->prepare("SELECT * FROM orders WHERE user_id = ? AND plan_id = ? AND status = 'pending' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) ORDER BY id DESC LIMIT 1");
-        $stmt->execute([$user['id'], $planId]);
+        // Gateway selecionado no admin (aba Pagamentos). 'mp' sem token cai
+        // para manual (comportamento antigo); os outros sem credencial
+        // devolvem erro legível — nunca caem em silêncio para o manual.
+        $gw = (string)($settings['payment_gateway'] ?? 'mp');
+        if (!in_array($gw, ['mp', 'lynx', 'efi', 'asaas', 'manual'], true)) $gw = 'mp';
+        if ($gw === 'mp' && empty($settings['mp_access_token'])) $gw = 'manual';
+        // Reaproveita pedido pendente recente do MESMO plano e MESMO
+        // gateway (evita duplicar QR). Pedido manual não tem QR, então
+        // não entra aqui — cada clique gera um pedido novo p/ aprovar.
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE user_id = ? AND plan_id = ? AND status = 'pending' AND gateway = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$user['id'], $planId, $gw]);
         $existing = $stmt->fetch();
         if ($existing && !empty($existing['pix_code'])) {
-            // O pedido já tem QR do Mercado Pago: o modo é 'mp' pelo pedido,
-            // não pelo token atual (o token pode ter sido removido depois).
-            $mode = 'mp';
             echo json_encode([
-                'success' => true, 'mode' => $mode, 'order_id' => (int)$existing['id'],
+                'success' => true, 'ok' => true, 'mode' => $gw, 'order_id' => (int)$existing['id'],
                 'amount' => (float)$existing['amount'], 'plan_name' => $plan['name'],
                 'qr_code' => $existing['pix_code'], 'qr_code_base64' => $existing['pix_qr_url'] ?: null,
-                'pix_key' => ($settings['pix_key'] ?? '') ?: null
+                'pix_key' => ($settings['pix_key'] ?? '') ?: null,
+                'pix_fixed_code' => ($settings['pix_fixed_code'] ?? '') ?: null,
+                'pix_fixed_qr' => ($settings['pix_fixed_qr'] ?? '') ?: null,
+                'pix_beneficiary' => ($settings['pix_beneficiary'] ?? '') ?: null,
             ]);
             break;
         }
-        $pdo->prepare("INSERT INTO orders (user_id, plan_id, amount, status) VALUES (?, ?, ?, 'pending')")->execute([$user['id'], $planId, $plan['price']]);
+        $pdo->prepare("INSERT INTO orders (user_id, plan_id, amount, status, gateway) VALUES (?, ?, ?, 'pending', ?)")->execute([$user['id'], $planId, $plan['price'], $gw]);
         $orderId = (int)$pdo->lastInsertId();
-        if (!empty($settings['mp_access_token'])) {
-            $mp = mp_create_pix(($settings['mp_access_token'] ?? ''), (float)$plan['price'], $user['email'], 'CinePlus - Plano ' . $plan['name'], 'cineplus-order-' . $orderId);
-            if ($mp['error']) {
-                echo json_encode(['success' => false, 'message' => $mp['message']]);
-                break;
-            }
-            $qrCode = $mp['data']['qr_code'] ?? '';
-            $qrB64 = $mp['data']['qr_code_base64'] ?? '';
-            $pdo->prepare("UPDATE orders SET pix_code = ?, pix_qr_url = ? WHERE id = ?")->execute([$qrCode, $qrB64, $orderId]);
+        if ($gw === 'manual') {
+            // Pix fixo: o cliente paga com o QR/copia-e-cola do admin e o
+            // admin aprova na aba Vendas & Pix.
             echo json_encode([
-                'success' => true, 'mode' => 'mp', 'order_id' => $orderId,
-                'amount' => (float)$plan['price'], 'plan_name' => $plan['name'],
-                'qr_code' => $qrCode, 'qr_code_base64' => $qrB64 ?: null,
-                'pix_key' => null
-            ]);
-        } else {
-            // Sem token do Mercado Pago: pagamento manual com a chave Pix do admin
-            echo json_encode([
-                'success' => true, 'mode' => 'manual', 'order_id' => $orderId,
+                'success' => true, 'ok' => true, 'mode' => 'manual', 'order_id' => $orderId,
                 'amount' => (float)$plan['price'], 'plan_name' => $plan['name'],
                 'qr_code' => null, 'qr_code_base64' => null,
-                'pix_key' => ($settings['pix_key'] ?? '') ?: null
+                'pix_key' => ($settings['pix_key'] ?? '') ?: null,
+                'pix_fixed_code' => ($settings['pix_fixed_code'] ?? '') ?: null,
+                'pix_fixed_qr' => ($settings['pix_fixed_qr'] ?? '') ?: null,
+                'pix_beneficiary' => ($settings['pix_beneficiary'] ?? '') ?: null,
             ]);
+            break;
         }
+        $desc = 'CinePlus - Plano ' . $plan['name'];
+        $extRef = 'cineplus-order-' . $orderId;
+        if ($gw === 'mp') {
+            $res = mp_create_pix(($settings['mp_access_token'] ?? ''), (float)$plan['price'], $user['email'], $desc, $extRef);
+        } elseif ($gw === 'lynx') {
+            $res = lynx_create_pix(($settings['lynx_api_key'] ?? ''), (float)$plan['price'], $desc, ['order_id' => $orderId, 'user_id' => (int)$user['id']]);
+        } elseif ($gw === 'efi') {
+            $res = efi_create_pix($settings, (float)$plan['price'], $desc);
+        } else { // asaas
+            $res = asaas_create_pix(($settings['asaas_api_key'] ?? ''), !empty($settings['asaas_sandbox']), (float)$plan['price'], $user['email'], (string)($user['name'] ?? ''), $desc, $extRef);
+        }
+        if ($res['error']) {
+            // O pedido falho é cancelado: sem isso ele ficava 'pending'
+            // para sempre e o cliente achava que o pagamento estava a caminho.
+            $pdo->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$orderId]);
+            echo json_encode(['success' => false, 'ok' => false, 'message' => $res['message'], 'error' => $res['message']]);
+            break;
+        }
+        $qrCode = $res['data']['qr_code'] ?? '';
+        $qrB64 = $res['data']['qr_code_base64'] ?? '';
+        $pdo->prepare("UPDATE orders SET pix_code = ?, pix_qr_url = ? WHERE id = ?")->execute([$qrCode, $qrB64, $orderId]);
+        echo json_encode([
+            'success' => true, 'ok' => true, 'mode' => $gw, 'order_id' => $orderId,
+            'amount' => (float)$plan['price'], 'plan_name' => $plan['name'],
+            'qr_code' => $qrCode, 'qr_code_base64' => $qrB64 ?: null,
+            'pix_key' => null,
+            'pix_fixed_code' => null, 'pix_fixed_qr' => null, 'pix_beneficiary' => null,
+        ]);
+        break;
+
+    case 'test_gateway':
+        // Admin testa as credenciais do gateway selecionado SEM criar
+        // cobrança (o usuário colou o token e o Pix "não saiu" — aqui ele
+        // vê na hora se a chave é válida ou não, antes de qualquer cliente).
+        api_require_admin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Método inválido.', 405);
+        $gwT = trim((string)api_post_field('gateway', (string)($settings['payment_gateway'] ?? 'mp')));
+        if (!in_array($gwT, ['mp', 'lynx', 'efi', 'asaas', 'manual'], true)) $gwT = 'mp';
+        // Permite testar os valores DIGITADOS no formulário (ainda não
+        // salvos): o admin cola a chave, testa, e só depois salva.
+        $tok = function ($key) use ($settings) {
+            $v = trim((string)api_post_field($key, ''));
+            return $v !== '' ? $v : trim((string)($settings[$key] ?? ''));
+        };
+        if ($gwT === 'manual') {
+            $hasKey = trim((string)api_post_field('pix_key', (string)($settings['pix_key'] ?? ''))) !== ''
+                || trim((string)api_post_field('pix_fixed_code', (string)($settings['pix_fixed_code'] ?? ''))) !== ''
+                || trim((string)api_post_field('pix_fixed_qr', (string)($settings['pix_fixed_qr'] ?? ''))) !== '';
+            echo json_encode($hasKey
+                ? ['ok' => true, 'message' => 'Pix fixo configurado: o cliente verá o QR/código e a chave na tela de planos.']
+                : ['ok' => false, 'error' => 'Nada configurado: preencha a chave Pix, o copia e cola ou a imagem do QR fixo.']);
+            break;
+        }
+        if ($gwT === 'mp') {
+            $t = $tok('mp_access_token');
+            if ($t === '') { echo json_encode(['ok' => false, 'error' => 'Cole o token de acesso do Mercado Pago.']); break; }
+            $r = gw_http('https://api.mercadopago.com/v1/payments/search?limit=1', 'GET', ['Authorization: Bearer ' . $t, 'Content-Type: application/json']);
+            if ($r['error']) { echo json_encode(['ok' => false, 'error' => 'Mercado Pago sem resposta.']); break; }
+            echo json_encode($r['code'] === 401
+                ? ['ok' => false, 'error' => 'Token inválido ou expirado. Gere um novo em Mercado Pago → Suas integrações → Credenciais.']
+                : (['ok' => true, 'message' => 'Token do Mercado Pago válido. O Pix vai gerar o QR de verdade.']));
+            break;
+        }
+        if ($gwT === 'lynx') {
+            $t = $tok('lynx_api_key');
+            if ($t === '') { echo json_encode(['ok' => false, 'error' => 'Cole a chave de API da LynxPix.']); break; }
+            $r = gw_http('https://lynxpix.cc/api/v1/pixQrCode/check?id=' . rawurlencode('lynx_teste_chave'), 'GET', ['Authorization: Bearer ' . $t, 'Content-Type: application/json', 'Accept: application/json']);
+            if ($r['error']) { echo json_encode(['ok' => false, 'error' => 'LynxPix sem resposta.']); break; }
+            echo json_encode($r['code'] === 401
+                ? ['ok' => false, 'error' => 'Chave de API inválida ou revogada.']
+                : (['ok' => true, 'message' => 'Chave da LynxPix válida. O cliente verá como recebedor o nome da empresa agregadora.']));
+            break;
+        }
+        if ($gwT === 'efi') {
+            $cid = $tok('efi_client_id');
+            $csec = $tok('efi_client_secret');
+            if ($cid === '' || $csec === '') { echo json_encode(['ok' => false, 'error' => 'Preencha o client_id e o client_secret da Efí.']); break; }
+            $cert = trim((string)api_post_field('efi_cert_path', (string)($settings['efi_cert_path'] ?? '')));
+            $r = gw_http('https://api.efipay.com.br/oauth/token', 'POST', [
+                'Authorization: Basic ' . base64_encode($cid . ':' . $csec),
+                'Content-Type: application/json',
+            ], ['grant_type' => 'client_credentials'], $cert);
+            if ($r['error'] || $r['code'] >= 400 || empty($r['data']['access_token'])) {
+                $hint = $cert === '' ? ' Em produção a Efí exige o certificado .p12 — preencha o caminho dele.' : ' Confira o certificado .p12 e as credenciais.';
+                echo json_encode(['ok' => false, 'error' => 'Efí não autenticou (HTTP ' . $r['code'] . ').' . $hint]);
+                break;
+            }
+            echo json_encode(['ok' => true, 'message' => 'Credenciais da Efí válidas.']);
+            break;
+        }
+        // asaas
+        $t = $tok('asaas_api_key');
+        if ($t === '') { echo json_encode(['ok' => false, 'error' => 'Cole a chave de API do Asaas.']); break; }
+        $sandbox = api_post_field('asaas_sandbox', '') !== '' ? (bool)api_post_field('asaas_sandbox') : !empty($settings['asaas_sandbox']);
+        $base = $sandbox ? 'https://api-sandbox.asaas.com' : 'https://api.asaas.com';
+        $r = gw_http($base . '/v3/customers?limit=1', 'GET', ['access_token: ' . $t, 'Content-Type: application/json']);
+        if ($r['error']) { echo json_encode(['ok' => false, 'error' => 'Asaas sem resposta.']); break; }
+        if ($r['code'] === 401) { echo json_encode(['ok' => false, 'error' => 'Chave de API inválida. Confira se a chave é do ambiente certo (produção x sandbox).']); break; }
+        echo json_encode(['ok' => true, 'message' => 'Chave do Asaas válida (' . ($sandbox ? 'sandbox' : 'produção') . ').']);
         break;
 
     case 'rate':

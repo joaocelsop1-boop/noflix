@@ -11,7 +11,7 @@ export function PlanGate({ reason }: { reason?: string }) {
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-black px-6 text-center">
       <div className="max-w-md">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
           You&apos;re watching · CinePlus
         </p>
         <h2 className="mt-3 text-2xl font-bold text-white md:text-3xl">
@@ -24,7 +24,7 @@ export function PlanGate({ reason }: { reason?: string }) {
         <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
           <Link
             href="/planos"
-            className="rounded-md bg-[#e50914] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#f6121d]"
+            className="rounded-md btn-neon px-6 py-3 text-sm font-bold transition"
           >
             Ver planos
           </Link>

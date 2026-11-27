@@ -98,7 +98,7 @@ export function Navbar() {
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-[background-color,backdrop-filter,box-shadow] duration-500",
         scrolled
-          ? "bg-[#141414]/95 shadow-[0_8px_30px_rgba(0,0,0,0.55)] backdrop-blur-md"
+          ? "bg-[#0f1220]/95 shadow-[0_8px_30px_rgba(0,0,0,0.55)] backdrop-blur-md"
           : "bg-gradient-to-b from-black/85 via-black/45 to-transparent",
       )}
     >
@@ -245,7 +245,7 @@ export function Navbar() {
             >
               <ProfileAvatar
                 avatar={hydrated && profile ? profile.avatar : "robot"}
-                accent={hydrated && profile ? profile.accent : "#e50914"}
+                accent={hydrated && profile ? profile.accent : "#22e6ff"}
                 rounded="rounded"
                 className="h-8 w-8"
                 kids={hydrated && profile?.kids}
@@ -288,7 +288,7 @@ export function Navbar() {
                         <Link
                           href="/planos"
                           onClick={() => setMenu(null)}
-                          className="rounded-md bg-[#e50914] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#f6121d]"
+                          className="rounded-md btn-neon px-3 py-1.5 text-xs font-bold transition"
                         >
                           Ver planos
                         </Link>

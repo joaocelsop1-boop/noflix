@@ -100,7 +100,7 @@ function PanelPosterCard({ entry }: { entry: CatalogueEntry }) {
       ) : (
         <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#2a2a2a] to-[#111] p-2 text-center">
           <span>
-            <span className="block text-[44px] font-bold leading-none text-[#e50914]">{initial}</span>
+            <span className="block text-[44px] font-bold leading-none neon-text">{initial}</span>
             <span className="mt-2 block text-[11px] font-medium leading-tight text-white/80">
               {entry.name}
             </span>

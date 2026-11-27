@@ -33,7 +33,16 @@ export default function PlanosPage() {
   const [ordering, setOrdering] = useState<number | null>(null);
   const [approved, setApproved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [preselectedId, setPreselectedId] = useState<number | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  /* Pix a mostrar: QR do gateway ou QR fixo do admin (manual); o mesmo vale
+     para o copia e cola. No modo manual não há pix_code do gateway. */
+  const payQr = order?.pix_qr_url || order?.pix_fixed_qr || null;
+  const payCode = order?.pix_code || order?.pix_fixed_code || null;
+  const isManual = order?.mode === "manual";
+  const manualEmpty =
+    isManual && !payQr && !payCode && !order?.pix_key;
 
   useEffect(() => {
     let alive = true;
@@ -46,7 +55,26 @@ export default function PlanosPage() {
       setChecking(false);
       void fetchPanelPlans()
         .then((list) => {
-          if (alive) setPlans(list);
+          if (alive) {
+            setPlans(list);
+            // ?plano=<id ou nome> (vem do site de vendas): já deixa o plano
+            // selecionado e rola até ele.
+            const q = new URLSearchParams(window.location.search).get("plano");
+            if (q) {
+              const found = list.find(
+                (p) => String(p.id) === q || p.name.toLowerCase() === q.toLowerCase(),
+              );
+              if (found) {
+                setPreselectedId(found.id);
+                setOrderPlan(found);
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector(`[data-plan-id="${found.id}"]`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                });
+              }
+            }
+          }
         })
         .catch(() => {
           if (alive) setLoadError("Não foi possível carregar os planos. Tente novamente.");
@@ -96,9 +124,9 @@ export default function PlanosPage() {
   };
 
   const copyPix = async () => {
-    if (!order?.pix_code) return;
+    if (!payCode) return;
     try {
-      await navigator.clipboard.writeText(order.pix_code);
+      await navigator.clipboard.writeText(payCode);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -109,7 +137,7 @@ export default function PlanosPage() {
   if (checking) {
     return (
       <main className="grid min-h-screen place-items-center bg-black">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#22e6ff]" />
       </main>
     );
   }
@@ -117,9 +145,9 @@ export default function PlanosPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-black pb-16 pt-24 md:pt-28">
+      <main className="min-h-screen bg-[#07080f] pb-16 pt-24 md:pt-28">
         <div className="mx-auto max-w-[1100px] px-4 md:px-12">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
             CinePlus · Planos
           </p>
           <h1 className="mt-1 font-display text-[clamp(1.6rem,4vw,2.6rem)] leading-none text-white">
@@ -131,7 +159,7 @@ export default function PlanosPage() {
           </p>
 
           {loadError && (
-            <p role="alert" className="mt-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff6b72]">
+            <p role="alert" className="mt-6 rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {loadError}
             </p>
           )}
@@ -144,18 +172,26 @@ export default function PlanosPage() {
             {plans.map((plan) => {
               const recommended = Boolean(plan.is_recommended);
               const selected = orderPlan?.id === plan.id;
+              const preselected = preselectedId === plan.id;
               return (
                 <article
                   key={plan.id}
+                  data-plan-id={plan.id}
                   className={cn(
-                    "relative flex flex-col rounded-xl border bg-[#141414] p-6",
-                    recommended ? "border-[#e50914] shadow-[0_0_40px_rgba(229,9,20,0.25)]" : "border-white/10",
-                    selected && "ring-2 ring-[#e50914]",
+                    "relative flex flex-col rounded-xl border bg-[#0f1220] p-6",
+                    recommended ? "border-[#22e6ff] shadow-[0_0_40px_rgba(34,230,255,0.25)]" : "border-white/10",
+                    selected && "ring-2 ring-[#22e6ff]",
+                    preselected && !selected && "ring-2 ring-[#22e6ff]/60",
                   )}
                 >
                   {recommended && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-[#e50914] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-[#ff2bd6] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
                       Recomendado
+                    </span>
+                  )}
+                  {preselected && !recommended && (
+                    <span className="absolute -top-3 left-6 rounded-full bg-[#ff2bd6] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+                      Selecionado
                     </span>
                   )}
                   <h2 className="text-lg font-bold text-white">{plan.name}</h2>
@@ -170,7 +206,7 @@ export default function PlanosPage() {
                     className={cn(
                       "mt-6 w-full rounded-md py-2.5 text-sm font-bold transition disabled:opacity-60",
                       recommended
-                        ? "bg-[#e50914] text-white hover:bg-[#f6121d]"
+                        ? "btn-neon"
                         : "bg-white text-black hover:bg-white/85",
                     )}
                   >
@@ -182,14 +218,14 @@ export default function PlanosPage() {
           </div>
 
           {orderError && (
-            <p role="alert" className="mt-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff6b72]">
+            <p role="alert" className="mt-6 rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {orderError}
             </p>
           )}
 
           {/* Pix do pedido */}
           {order?.ok && !approved && (
-            <section className="mx-auto mt-10 max-w-lg rounded-xl border border-white/10 bg-[#141414] p-6 text-center">
+            <section className="mx-auto mt-10 max-w-lg rounded-xl border border-white/10 bg-[#0f1220] p-6 text-center">
               <h2 className="text-lg font-bold text-white">Pague com Pix para liberar</h2>
               <p className="mt-1 text-sm text-white/55">
                 {orderPlan?.name} ·{" "}
@@ -197,35 +233,60 @@ export default function PlanosPage() {
                   {formatBRL(order.amount ?? orderPlan?.price ?? 0)}
                 </span>
               </p>
-              {order.pix_qr_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={order.pix_qr_url}
-                  alt="QR Code Pix"
-                  className="mx-auto mt-5 h-56 w-56 rounded-lg bg-white p-2"
-                />
-              ) : null}
-              {order.pix_code && (
-                <div className="mt-5 text-left">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
-                    Código copia e cola
+              {manualEmpty ? (
+                <p role="alert" className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-left text-sm text-amber-200">
+                  O pagamento manual ainda não foi configurado pelo administrador. Fale com o suporte para concluir sua assinatura.
+                </p>
+              ) : (
+                <>
+                  {payQr ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={payQr}
+                      alt="QR Code Pix"
+                      className="mx-auto mt-5 h-56 w-56 rounded-lg bg-white p-2"
+                    />
+                  ) : null}
+                  {payCode && (
+                    <div className="mt-5 text-left">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                        Código copia e cola
+                      </p>
+                      <p className="mt-1.5 break-all rounded-md border border-white/15 bg-black/60 p-3 text-xs leading-relaxed text-white/80">
+                        {payCode}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void copyPix()}
+                        className="mt-3 w-full rounded-md bg-white py-2.5 text-sm font-bold text-black transition hover:bg-white/85"
+                      >
+                        {copied ? "Código copiado!" : "Copiar código Pix"}
+                      </button>
+                    </div>
+                  )}
+                  {isManual && order.pix_key && (
+                    <div className="mt-5 text-left">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                        Chave Pix
+                      </p>
+                      <p className="mt-1.5 break-all rounded-md border border-white/15 bg-black/60 p-3 text-sm text-white/80">
+                        {order.pix_key}
+                      </p>
+                      {order.pix_beneficiary && (
+                        <p className="mt-2 text-xs text-white/50">
+                          Beneficiário: <span className="font-semibold text-white/80">{order.pix_beneficiary}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <p className="mt-4 flex items-center justify-center gap-2 text-xs text-white/45">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                    {isManual
+                      ? "Após pagar, seu acesso é liberado assim que confirmarmos o pagamento."
+                      : "Aguardando pagamento… conferimos automaticamente a cada 5 segundos."}
                   </p>
-                  <p className="mt-1.5 break-all rounded-md border border-white/15 bg-black/60 p-3 text-xs leading-relaxed text-white/80">
-                    {order.pix_code}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void copyPix()}
-                    className="mt-3 w-full rounded-md bg-white py-2.5 text-sm font-bold text-black transition hover:bg-white/85"
-                  >
-                    {copied ? "Código copiado!" : "Copiar código Pix"}
-                  </button>
-                </div>
+                </>
               )}
-              <p className="mt-4 flex items-center justify-center gap-2 text-xs text-white/45">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                Aguardando pagamento… conferimos automaticamente a cada 5 segundos.
-              </p>
             </section>
           )}
 
@@ -241,7 +302,7 @@ export default function PlanosPage() {
               </p>
               <Link
                 href="/browse"
-                className="mt-5 inline-block rounded-md bg-[#e50914] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#f6121d]"
+                className="mt-5 inline-block rounded-md btn-neon px-6 py-3 text-sm font-bold transition"
               >
                 Assistir agora
               </Link>

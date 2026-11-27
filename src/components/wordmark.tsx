@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 
 /**
  * CinePlus-style wordmark. We render it as real text (Anton) instead of using
- * the trademarked logo file, and give it the signature red + letterspacing.
+ * the trademarked logo file, and give it the signature neon gradient + letterspacing.
  */
 export function Wordmark({
   className,
@@ -17,7 +17,7 @@ export function Wordmark({
   const content = (
     <span
       className={cn(
-        "wordmark select-none text-[#e50914] drop-shadow-[0_2px_10px_rgba(229,9,20,0.35)]",
+        "wordmark select-none neon-text drop-shadow-[0_2px_10px_rgba(34,230,255,0.35)]",
         className,
       )}
       aria-label="CinePlus"

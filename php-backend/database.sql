@@ -17,6 +17,18 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `trial_hours` INT NOT NULL DEFAULT 3,
   `mp_access_token` VARCHAR(255) NOT NULL DEFAULT '',
   `pix_key` VARCHAR(255) NOT NULL DEFAULT '',
+  `payment_gateway` VARCHAR(20) NOT NULL DEFAULT 'mp',
+  `pix_fixed_code` TEXT NOT NULL,
+  `pix_fixed_qr` TEXT NOT NULL,
+  `pix_beneficiary` VARCHAR(120) NOT NULL DEFAULT '',
+  `lynx_api_key` VARCHAR(255) NOT NULL DEFAULT '',
+  `lynx_webhook_secret` VARCHAR(255) NOT NULL DEFAULT '',
+  `efi_client_id` VARCHAR(255) NOT NULL DEFAULT '',
+  `efi_client_secret` VARCHAR(255) NOT NULL DEFAULT '',
+  `efi_cert_path` VARCHAR(255) NOT NULL DEFAULT '',
+  `efi_sandbox` TINYINT(1) NOT NULL DEFAULT 0,
+  `asaas_api_key` VARCHAR(255) NOT NULL DEFAULT '',
+  `asaas_sandbox` TINYINT(1) NOT NULL DEFAULT 0,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -72,6 +84,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `amount` DECIMAL(10,2) NOT NULL,
   `pix_code` TEXT,
   `pix_qr_url` TEXT,
+  `gateway` VARCHAR(20) NOT NULL DEFAULT '',
   `status` ENUM('pending', 'approved', 'cancelled') DEFAULT 'pending',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `approved_at` DATETIME DEFAULT NULL,

@@ -51,13 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0b0c10; color: #f1f5f9; }
     .font-pixel { font-family: 'Press Start 2P', monospace; }
-    .red-brand { color: #e50914; }
-    .bg-red-brand { background-color: #e50914; }
-    .bg-red-brand:hover { background-color: #c40812; }
+    .red-brand { color: #22e6ff; }
+    .bg-red-brand { background-color: #ff2bd6; }
+    .bg-red-brand:hover { background-color: #d11aae; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
-  <h1 class="font-pixel text-xl text-white tracking-widest mb-1"><span class="red-brand">Mine</span>TV</h1>
+  <h1 class="font-pixel text-xl text-white tracking-widest mb-1"><span style="background:linear-gradient(90deg,#22e6ff,#ff2bd6);-webkit-background-clip:text;background-clip:text;color:transparent">CinePlus</span></h1>
   <p class="text-xs text-gray-400 mb-6">Painel Administrativo</p>
 
   <div class="bg-[#141620] border border-gray-700 rounded-2xl max-w-sm w-full p-6 space-y-4">
@@ -69,13 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
       <div>
         <label class="block text-xs text-gray-400 mb-1">E-mail</label>
-        <input type="email" name="email" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
+        <input type="email" name="email" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
       </div>
       <div>
         <label class="block text-xs text-gray-400 mb-1">Senha</label>
-        <input type="password" name="password" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
+        <input type="password" name="password" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
       </div>
-      <button type="submit" class="w-full py-3 bg-red-brand text-white font-bold rounded-lg text-xs hover:bg-red-700 transition">Entrar no painel</button>
+      <button type="submit" class="w-full py-3 bg-red-brand text-white font-bold rounded-lg text-xs transition">Entrar no painel</button>
     </form>
     <p class="text-[11px] text-gray-500 text-center">Use o e-mail e a senha do administrador. Troque a senha assim que entrar (aba Administradores &gt; Trocar minha senha).</p>
     <p class="text-xs text-gray-400 text-center"><a href="login.php" class="text-red-400 hover:underline">Voltar ao player</a></p>

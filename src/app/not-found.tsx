@@ -3,7 +3,7 @@ import { Wordmark } from "@/components/wordmark";
 
 export default function NotFound() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#141414] px-6 text-center">
+    <main className="grid min-h-screen place-items-center bg-[#0f1220] px-6 text-center">
       <div>
         <Wordmark className="mx-auto text-3xl" />
         <h1 className="mt-10 text-4xl font-semibold text-white md:text-6xl">

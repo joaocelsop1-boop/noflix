@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Configurações — CinePlus" };
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#141414]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1220]" />}>
       <SettingsScreen />
     </Suspense>
   );

@@ -44,13 +44,63 @@ function get_settings($pdo) {
         'site_name' => 'CinePlus',
         'affiliate_percent' => 10,
         'trial_hours' => 3,
+        // Pagamentos: gateway selecionado + credenciais (todas vazias por
+        // padrão; o admin preenche na aba Pagamentos).
+        'payment_gateway' => 'mp',
         'mp_access_token' => '',
         'pix_key' => '',
+        'pix_fixed_code' => '',
+        'pix_fixed_qr' => '',
+        'pix_beneficiary' => '',
+        'lynx_api_key' => '',
+        'lynx_webhook_secret' => '',
+        'efi_client_id' => '',
+        'efi_client_secret' => '',
+        'efi_cert_path' => '',
+        'efi_sandbox' => 0,
+        'asaas_api_key' => '',
+        'asaas_sandbox' => 0,
     ];
+    ensure_payment_columns($pdo);
     $stmt = $pdo->query("SELECT * FROM settings WHERE id = 1 LIMIT 1");
     $row = $stmt->fetch();
     if (!$row) return $defaults;
     return array_merge($defaults, $row);
+}
+
+// Garante as colunas de pagamento em bancos criados antes delas (mesmo
+// padrão do panel_proxy no admin): sem isso, o UPDATE do admin quebra com
+// "Unknown column" e NADA é salvo. Roda a cada get_settings — SHOW COLUMNS
+// é só metadado, barato. A tabela orders também ganha `gateway` (qual
+// gateway gerou o QR), usado para reaproveitar o pedido certo.
+function ensure_payment_columns($pdo) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $settingsCols = [
+        'payment_gateway' => "VARCHAR(20) NOT NULL DEFAULT 'mp'",
+        'pix_fixed_code' => "TEXT NOT NULL",
+        'pix_fixed_qr' => "TEXT NOT NULL",
+        'pix_beneficiary' => "VARCHAR(120) NOT NULL DEFAULT ''",
+        'lynx_api_key' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'lynx_webhook_secret' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'efi_client_id' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'efi_client_secret' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'efi_cert_path' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'efi_sandbox' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'asaas_api_key' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'asaas_sandbox' => "TINYINT(1) NOT NULL DEFAULT 0",
+    ];
+    try {
+        foreach ($settingsCols as $col => $def) {
+            $exists = $pdo->query("SHOW COLUMNS FROM settings LIKE '" . $col . "'")->fetch();
+            if (!$exists) $pdo->exec("ALTER TABLE settings ADD COLUMN " . $col . " " . $def);
+        }
+        $gw = $pdo->query("SHOW COLUMNS FROM orders LIKE 'gateway'")->fetch();
+        if (!$gw) $pdo->exec("ALTER TABLE orders ADD COLUMN gateway VARCHAR(20) NOT NULL DEFAULT ''");
+    } catch (Throwable $e) {
+        error_log('ensure_payment_columns: ' . $e->getMessage());
+    }
 }
 
 // Normaliza a URL do painel: aceita o que o usuário colar (URL completa do

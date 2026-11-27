@@ -84,7 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panelParam = $newProxy !== '' ? '&panel=' . urlencode($newUrl) : '';
         $test = test_panel_server($testBase, $newUser, $newPass, $panelParam);
         if ($test['ok']) {
-            $stmt = $pdo->prepare("UPDATE settings SET sigma_url = ?, sigma_username = ?, sigma_password = ?, panel_proxy = ?, affiliate_percent = ?, trial_hours = ?, mp_access_token = ?, pix_key = ? WHERE id = 1");
+            // Pagamentos (token/chave Pix) NÃO entram aqui: eles têm a aba
+            // própria e o formulário próprio (save_payments), que salva
+            // sempre — antes, o teste do painel descartava o token junto.
+            $stmt = $pdo->prepare("UPDATE settings SET sigma_url = ?, sigma_username = ?, sigma_password = ?, panel_proxy = ?, affiliate_percent = ?, trial_hours = ? WHERE id = 1");
             $stmt->execute([
                 $newUrl,
                 $newUser,
@@ -92,8 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newProxy,
                 intval($_POST['affiliate_percent']),
                 intval($_POST['trial_hours']),
-                trim($_POST['mp_access_token'] ?? ''),
-                trim($_POST['pix_key'] ?? '')
             ]);
             clear_catalog_cache(); // trocar de servidor invalida o catálogo em cache
             $msg = "Configurações do servidor Sigma atualizadas com sucesso!";
@@ -104,6 +105,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgType = 'error';
             $msg = 'Servidor novo NÃO respondeu (' . $test['error'] . '). NADA foi salvo e o catálogo antigo foi mantido — confira a URL, o usuário e a senha do painel.';
         }
+    }
+
+    // Salvar pagamentos (aba Pagamentos) — SEMPRE salva, sem testar o painel
+    // Sigma: o token do gateway não depende do painel, e era o teste do
+    // painel que descartava o token quando o painel falhava ("coloquei os
+    // dados mas o Pix não saiu para o cliente" — o token nunca tinha sido
+    // salvo). Garante as colunas novas em bancos antigos.
+    elseif ($action === 'save_payments') {
+        $gw = $_POST['payment_gateway'] ?? 'mp';
+        if (!in_array($gw, ['mp', 'lynx', 'efi', 'asaas', 'manual'], true)) $gw = 'mp';
+        $stmt = $pdo->prepare("UPDATE settings SET payment_gateway = ?, mp_access_token = ?, pix_key = ?, pix_fixed_code = ?, pix_fixed_qr = ?, pix_beneficiary = ?, lynx_api_key = ?, lynx_webhook_secret = ?, efi_client_id = ?, efi_client_secret = ?, efi_cert_path = ?, efi_sandbox = ?, asaas_api_key = ?, asaas_sandbox = ? WHERE id = 1");
+        $stmt->execute([
+            $gw,
+            trim($_POST['mp_access_token'] ?? ''),
+            trim($_POST['pix_key'] ?? ''),
+            trim($_POST['pix_fixed_code'] ?? ''),
+            trim($_POST['pix_fixed_qr'] ?? ''),
+            trim($_POST['pix_beneficiary'] ?? ''),
+            trim($_POST['lynx_api_key'] ?? ''),
+            trim($_POST['lynx_webhook_secret'] ?? ''),
+            trim($_POST['efi_client_id'] ?? ''),
+            trim($_POST['efi_client_secret'] ?? ''),
+            trim($_POST['efi_cert_path'] ?? ''),
+            !empty($_POST['efi_sandbox']) ? 1 : 0,
+            trim($_POST['asaas_api_key'] ?? ''),
+            !empty($_POST['asaas_sandbox']) ? 1 : 0,
+        ]);
+        $msg = "Pagamentos salvos! Gateway ativo: " . strtoupper($gw) . ". Use o botão \"Testar\" para conferir a chave antes de mandar o cliente pagar.";
     }
 
     // Limpar cache do catálogo (força puxar tudo de novo do painel) — SÓ
@@ -333,9 +362,9 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0b0c10; color: #e2e8f0; }
     .font-pixel { font-family: 'Press Start 2P', monospace; }
-    .border-red-brand { border-color: #e50914; }
-    .bg-red-brand { background-color: #e50914; }
-    .bg-red-brand:hover { background-color: #b80710; }
+    .border-red-brand { border-color: #22e6ff; }
+    .bg-red-brand { background-color: #ff2bd6; }
+    .bg-red-brand:hover { background-color: #d11aae; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -343,8 +372,8 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
   <!-- Cabeçalho Principal -->
   <header class="bg-[#12141c] border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
     <div class="flex items-center gap-4">
-      <h1 class="font-pixel text-xl text-red-500 tracking-wider">CinePlus</h1>
-      <span class="text-xs px-2 py-1 bg-red-950/80 border border-red-700/50 text-red-400 rounded font-semibold uppercase">Painel ADM</span>
+      <h1 class="font-pixel text-xl text-[#22e6ff] tracking-wider">CinePlus</h1>
+      <span class="text-xs px-2 py-1 bg-cyan-950/80 border border-cyan-700/50 text-cyan-300 rounded font-semibold uppercase">Painel ADM</span>
     </div>
     <div class="flex items-center gap-4 text-sm">
       <span class="text-gray-400">Logado como: <strong class="text-white"><?= htmlspecialchars($_SESSION['user_name']) ?></strong></span>
@@ -365,8 +394,9 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
   <!-- Abas de Navegação -->
   <div class="max-w-7xl mx-auto w-full px-6 pt-6">
     <nav class="flex space-x-2 border-b border-gray-800 pb-2 overflow-x-auto text-sm">
-      <button onclick="showTab('tab-dashboard')" id="btn-tab-dashboard" class="tab-btn px-4 py-2 rounded-t font-medium text-red-500 bg-[#161922] border-b-2 border-red-500">Dashboard</button>
+      <button onclick="showTab('tab-dashboard')" id="btn-tab-dashboard" class="tab-btn px-4 py-2 rounded-t font-medium text-[#22e6ff] bg-[#161922] border-b-2 border-[#22e6ff]">Dashboard</button>
       <button onclick="showTab('tab-server')" id="btn-tab-server" class="tab-btn px-4 py-2 rounded-t font-medium text-gray-400 hover:text-white">Servidor Sigma</button>
+      <button onclick="showTab('tab-payments')" id="btn-tab-payments" class="tab-btn px-4 py-2 rounded-t font-medium text-gray-400 hover:text-white">Pagamentos (Pix)</button>
       <button onclick="showTab('tab-clients')" id="btn-tab-clients" class="tab-btn px-4 py-2 rounded-t font-medium text-gray-400 hover:text-white">Clientes (<?= $totalClients ?>)</button>
       <button onclick="showTab('tab-plans')" id="btn-tab-plans" class="tab-btn px-4 py-2 rounded-t font-medium text-gray-400 hover:text-white">Planos & Preços</button>
       <button onclick="showTab('tab-sales')" id="btn-tab-sales" class="tab-btn px-4 py-2 rounded-t font-medium text-gray-400 hover:text-white">Vendas & Pix (<?= $pendingPix ?> pendentes)</button>
@@ -406,7 +436,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
       <div class="bg-[#12141c] p-6 rounded-xl border border-gray-800">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white">Status do Servidor Sigma</h3>
-          <button onclick="testSigmaConnection()" class="px-3 py-1.5 bg-red-brand text-white text-xs font-semibold rounded hover:bg-red-700 transition">Testar Conexão Agora</button>
+          <button onclick="testSigmaConnection()" class="px-3 py-1.5 bg-red-brand text-white text-xs font-semibold rounded transition">Testar Conexão Agora</button>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div class="p-3 bg-gray-900/50 rounded border border-gray-800">
@@ -454,24 +484,24 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
           <div class="space-y-4">
             <div>
               <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">URL do Servidor HTTP:</label>
-              <input type="text" name="sigma_url" value="<?= htmlspecialchars($settings['sigma_url']) ?>" placeholder="http://seuservidor.com:8080" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
+              <input type="text" name="sigma_url" value="<?= htmlspecialchars($settings['sigma_url']) ?>" placeholder="http://seuservidor.com:8080" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
               <p class="text-[11px] text-gray-500 mt-1">É AQUI que você troca o servidor: mudou a URL aqui e salvou, o site inteiro passa a usar o novo painel — inclusive o proxy. Não precisa editar o arquivo proxy-painel.php no cPanel.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Usuário:</label>
-                <input type="text" name="sigma_username" value="<?= htmlspecialchars($settings['sigma_username']) ?>" placeholder="usuario_sigma" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
+                <input type="text" name="sigma_username" value="<?= htmlspecialchars($settings['sigma_username']) ?>" placeholder="usuario_sigma" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
               </div>
               <div>
                 <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Senha:</label>
-                <input type="password" name="sigma_password" value="<?= htmlspecialchars($settings['sigma_password']) ?>" placeholder="senha_sigma" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
+                <input type="password" name="sigma_password" value="<?= htmlspecialchars($settings['sigma_password']) ?>" placeholder="senha_sigma" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
               </div>
             </div>
 
             <div>
               <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Proxy do painel (opcional):</label>
-              <input type="text" name="panel_proxy" value="<?= htmlspecialchars($settings['panel_proxy'] ?? '') ?>" placeholder="https://webplayer.storestreaming.shop/proxy-painel.php" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
+              <input type="text" name="panel_proxy" value="<?= htmlspecialchars($settings['panel_proxy'] ?? '') ?>" placeholder="https://webplayer.storestreaming.shop/proxy-painel.php" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
               <p class="text-[11px] text-gray-500 mt-1">Só preencha se o painel bloquear o IP da Oracle (o "Testar conexão" dá 404/timeout mesmo com a URL certa). O proxy é o arquivo proxy-painel.php no cPanel — ele encaminha as chamadas para o painel. Com o proxy preenchido, TODAS as chamadas (catálogo e streams) passam por ele. Deixe vazio para falar direto com o painel. <strong class="text-gray-400">O proxy usa a "URL do Servidor" acima como destino — para trocar de painel, basta trocar a URL acima e salvar.</strong></p>
             </div>
 
@@ -486,22 +516,11 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-800">
-              <div>
-                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Token do Mercado Pago (Pix automático):</label>
-                <input type="password" name="mp_access_token" value="<?= htmlspecialchars($settings['mp_access_token'] ?? '') ?>" placeholder="vazio = Pix manual" autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
-                <p class="text-[11px] text-gray-500 mt-1">Com o token, o checkout gera o QR Pix de verdade. Sem ele, o cliente paga com a chave Pix abaixo e você aprova na aba Vendas &amp; Pix.</p>
-              </div>
-              <div>
-                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Sua chave Pix (pagamento manual):</label>
-                <input type="text" name="pix_key" value="<?= htmlspecialchars($settings['pix_key'] ?? '') ?>" placeholder="CPF, e-mail, telefone ou chave aleatória" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
-                <p class="text-[11px] text-gray-500 mt-1">Mostrada ao cliente quando não há token do Mercado Pago.</p>
-              </div>
-            </div>
+            <p class="text-[11px] text-gray-500 mt-1">Pagamentos (Pix) ficam na aba <strong class="text-gray-400">Pagamentos</strong> — lá você escolhe o gateway (Mercado Pago, LynxPix, Efí, Asaas ou Pix fixo) e testa a chave antes de salvar.</p>
           </div>
 
           <div class="mt-6 flex items-center gap-4">
-            <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700 transition">Salvar Configurações</button>
+            <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Configurações</button>
             <button type="button" onclick="testSigmaConnection()" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded text-sm transition">Testar Conexão</button>
           </div>
           <p class="text-[11px] text-gray-500 mt-2">O teste usa a URL digitada no campo acima — não precisa salvar antes de testar. O resultado mostra qual URL foi testada.</p>
@@ -511,6 +530,150 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
       </div>
     </div>
 
+    <!-- ABA: PAGAMENTOS (PIX) -->
+    <div id="tab-payments" class="tab-content hidden">
+      <div class="bg-[#12141c] p-6 rounded-xl border border-gray-800 max-w-3xl">
+        <h3 class="text-lg font-semibold text-white mb-2">Pagamentos — Pix</h3>
+        <p class="text-sm text-gray-400 mb-6">Escolha o gateway que gera o QR Pix do cliente. As credenciais ficam salvas aqui e o botão <b class="text-white">Testar</b> confere a chave <b class="text-white">antes</b> de qualquer cliente pagar — sem criar cobrança. Salvar aqui não depende do painel Sigma.</p>
+
+        <form method="POST" id="payments-form">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+          <input type="hidden" name="form_action" value="save_payments">
+          <div class="space-y-5">
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Gateway de pagamento:</label>
+              <select name="payment_gateway" id="payment_gateway" onchange="showGateway()" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
+                <?php $gwSel = $settings['payment_gateway'] ?? 'mp'; foreach (['mp' => 'Mercado Pago (Pix automático)', 'lynx' => 'LynxPix (Pix automático)', 'efi' => 'Efí — ex-Gerencianet (Pix automático)', 'asaas' => 'Asaas (Pix automático)', 'manual' => 'Pix fixo (manual — você aprova na aba Vendas & Pix)'] as $v => $l): ?>
+                <option value="<?= $v ?>" <?= $gwSel === $v ? 'selected' : '' ?>><?= $l ?></option>
+                <?php endforeach; ?>
+              </select>
+              <p class="text-[11px] text-gray-500 mt-1">Só o gateway selecionado é usado no checkout. Trocar o gateway não apaga as chaves dos outros.</p>
+            </div>
+
+            <div id="gw-mp" class="gw-section space-y-4 pt-2 border-t border-gray-800">
+              <div>
+                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Token de acesso do Mercado Pago:</label>
+                <input type="password" name="mp_access_token" id="mp_access_token" value="<?= htmlspecialchars($settings['mp_access_token'] ?? '') ?>" placeholder="APP_USR-..." autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                <p class="text-[11px] text-gray-500 mt-1">Onde pegar: Mercado Pago → Suas integrações → Credenciais → Access Token (produção). <b class="text-gray-300">O cliente vê como recebedor o nome da sua conta no Mercado Pago.</b></p>
+              </div>
+            </div>
+
+            <div id="gw-lynx" class="gw-section space-y-4 pt-2 border-t border-gray-800 hidden">
+              <div>
+                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Chave de API da LynxPix:</label>
+                <input type="password" name="lynx_api_key" id="lynx_api_key" value="<?= htmlspecialchars($settings['lynx_api_key'] ?? '') ?>" placeholder="chave da LynxPix" autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                <p class="text-[11px] text-gray-500 mt-1"><b class="text-gray-300">O cliente vê como recebedor o nome da empresa agregadora (GateBridge Settle Ltda) — seu nome pessoal não aparece.</b></p>
+              </div>
+              <div>
+                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Segredo do webhook LynxPix (opcional — para confirmação automática depois):</label>
+                <input type="password" name="lynx_webhook_secret" id="lynx_webhook_secret" value="<?= htmlspecialchars($settings['lynx_webhook_secret'] ?? '') ?>" placeholder="segredo do webhook" autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+              </div>
+            </div>
+
+            <div id="gw-efi" class="gw-section space-y-4 pt-2 border-t border-gray-800 hidden">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Client ID da Efí:</label>
+                  <input type="text" name="efi_client_id" id="efi_client_id" value="<?= htmlspecialchars($settings['efi_client_id'] ?? '') ?>" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Client Secret da Efí:</label>
+                  <input type="password" name="efi_client_secret" id="efi_client_secret" value="<?= htmlspecialchars($settings['efi_client_secret'] ?? '') ?>" autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Caminho do certificado .p12 (obrigatório em produção):</label>
+                <input type="text" name="efi_cert_path" id="efi_cert_path" value="<?= htmlspecialchars($settings['efi_cert_path'] ?? '') ?>" placeholder="/caminho/no/servidor/certificado.p12" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                <p class="text-[11px] text-gray-500 mt-1">A Efí exige o certificado .p12 da conta para autenticar em produção (mTLS). Envie o arquivo .p12 para o servidor (fora da pasta pública) e cole o caminho aqui. Sem ele, o teste falha e o checkout mostra o motivo. <b class="text-gray-300">O cliente vê como recebedor o nome da sua conta Efí.</b></p>
+              </div>
+              <label class="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" name="efi_sandbox" value="1" <?= !empty($settings['efi_sandbox']) ? 'checked' : '' ?> class="accent-cyan-400"> Ambiente de testes (sandbox)</label>
+            </div>
+
+            <div id="gw-asaas" class="gw-section space-y-4 pt-2 border-t border-gray-800 hidden">
+              <div>
+                <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Chave de API do Asaas:</label>
+                <input type="password" name="asaas_api_key" id="asaas_api_key" value="<?= htmlspecialchars($settings['asaas_api_key'] ?? '') ?>" placeholder="$aact_..." autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+                <p class="text-[11px] text-gray-500 mt-1">Onde pegar: Asaas → Integrações → API. <b class="text-gray-300">O cliente vê como recebedor o nome da sua conta Asaas.</b></p>
+              </div>
+              <label class="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" name="asaas_sandbox" id="asaas_sandbox" value="1" <?= !empty($settings['asaas_sandbox']) ? 'checked' : '' ?> class="accent-cyan-400"> Ambiente de testes (sandbox — chave de sandbox)</label>
+            </div>
+
+            <div class="pt-2 border-t border-gray-800">
+              <p class="text-xs uppercase font-semibold text-gray-400 mb-3">Pix fixo (manual) — usado quando o gateway é “Pix fixo” e também como chave recebedora da Efí:</p>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Sua chave Pix:</label>
+                  <input type="text" name="pix_key" id="pix_key" value="<?= htmlspecialchars($settings['pix_key'] ?? '') ?>" placeholder="CPF, e-mail, telefone ou chave aleatória" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Nome do beneficiário (mostrado ao cliente):</label>
+                  <input type="text" name="pix_beneficiary" id="pix_beneficiary" value="<?= htmlspecialchars($settings['pix_beneficiary'] ?? '') ?>" placeholder="Ex.: CinePlus" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Copia e cola do Pix fixo (opcional):</label>
+                  <textarea name="pix_fixed_code" id="pix_fixed_code" rows="3" placeholder="Cole aqui o código copia e cola do seu Pix fixo" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-xs focus:border-cyan-400 focus:outline-none"><?= htmlspecialchars($settings['pix_fixed_code'] ?? '') ?></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Imagem do QR Code fixo (opcional):</label>
+                  <input type="file" id="pix_qr_file" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-gray-800 file:text-white file:text-xs">
+                  <input type="hidden" name="pix_fixed_qr" id="pix_fixed_qr" value="<?= htmlspecialchars($settings['pix_fixed_qr'] ?? '') ?>">
+                  <?php if (!empty($settings['pix_fixed_qr'])): ?><img src="<?= htmlspecialchars($settings['pix_fixed_qr']) ?>" alt="QR fixo atual" class="mt-2 h-32 w-32 rounded bg-white p-1"><?php endif; ?>
+                  <p class="text-[11px] text-gray-500 mt-1">Envie a imagem do QR do seu Pix fixo (do app do banco). Ela é guardada junto com as configurações e mostrada ao cliente no checkout.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center gap-4">
+            <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Pagamentos</button>
+            <button type="button" onclick="testGateway()" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded text-sm transition">Testar chave</button>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-2">O teste usa os valores digitados acima — não precisa salvar antes de testar.</p>
+        </form>
+
+        <div id="gateway-test-box" class="mt-6 p-4 rounded-lg bg-gray-900 border border-gray-800 hidden text-sm"></div>
+      </div>
+    </div>
+    <script>
+    function showGateway() {
+      var gw = document.getElementById('payment_gateway').value;
+      document.querySelectorAll('.gw-section').forEach(function (el) { el.classList.add('hidden'); });
+      var sec = document.getElementById('gw-' + gw);
+      if (sec) sec.classList.remove('hidden');
+    }
+    showGateway();
+    document.getElementById('pix_qr_file').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function () { document.getElementById('pix_fixed_qr').value = String(r.result || ''); };
+      r.readAsDataURL(f);
+    });
+    async function testGateway() {
+      var box = document.getElementById('gateway-test-box');
+      var gw = document.getElementById('payment_gateway').value;
+      var fd = new FormData();
+      fd.append('gateway', gw);
+      ['mp_access_token','lynx_api_key','efi_client_id','efi_client_secret','efi_cert_path','asaas_api_key','pix_key','pix_fixed_code','pix_fixed_qr'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) fd.append(id, el.value);
+      });
+      var sb = document.getElementById('asaas_sandbox');
+      if (sb && sb.checked) fd.append('asaas_sandbox', '1');
+      box.classList.remove('hidden');
+      box.textContent = 'Testando…';
+      try {
+        var res = await fetch('api.php?action=test_gateway', { method: 'POST', body: fd, credentials: 'same-origin' });
+        var data = await res.json();
+        box.textContent = data.ok ? '✓ ' + (data.message || 'Chave válida.') : '✕ ' + (data.error || 'Falha no teste.');
+        box.style.color = data.ok ? '#6ee7b7' : '#fca5a5';
+      } catch (e) {
+        box.textContent = '✕ Não foi possível testar agora. Tente de novo.';
+        box.style.color = '#fca5a5';
+      }
+    }
+    </script>
+
     <!-- ABA 3: CLIENTES -->
     <div id="tab-clients" class="tab-content hidden">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -518,7 +681,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
           <h3 class="text-lg font-semibold text-white">Gerenciamento de Clientes</h3>
           <p class="text-sm text-gray-400">Total de <?= count($clients) ?> clientes registrados.</p>
         </div>
-        <button onclick="document.getElementById('modal-new-client').classList.remove('hidden')" class="px-4 py-2 bg-red-brand text-white text-sm font-semibold rounded hover:bg-red-700 transition">+ Novo Cliente</button>
+        <button onclick="document.getElementById('modal-new-client').classList.remove('hidden')" class="px-4 py-2 bg-red-brand text-white text-sm font-semibold rounded transition">+ Novo Cliente</button>
       </div>
 
       <div class="bg-[#12141c] border border-gray-800 rounded-xl overflow-x-auto">
@@ -778,7 +941,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
                 <label class="block text-xs uppercase text-gray-400 mb-1">Nova senha (mín. 6 caracteres):</label>
                 <input type="password" name="new_password" required minlength="6" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
               </div>
-              <button type="submit" class="w-full py-2 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700 transition">Alterar senha</button>
+              <button type="submit" class="w-full py-2 bg-red-brand text-white font-semibold rounded text-sm transition">Alterar senha</button>
             </form>
           </div>
           <div class="bg-[#12141c] p-6 rounded-xl border border-gray-800">
@@ -798,7 +961,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
               <label class="block text-xs uppercase text-gray-400 mb-1">Senha de Acesso:</label>
               <input type="password" name="admin_password" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
             </div>
-            <button type="submit" class="w-full py-2 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700 transition">Salvar Administrador</button>
+            <button type="submit" class="w-full py-2 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Administrador</button>
           </form>
         </div>
         </div>
@@ -884,7 +1047,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
         </div>
         <div class="pt-2 flex justify-end gap-3">
           <button type="button" onclick="document.getElementById('modal-edit-client').classList.add('hidden')" class="px-4 py-2 bg-gray-800 text-gray-300 rounded text-sm">Cancelar</button>
-          <button type="submit" class="px-4 py-2 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700">Salvar alterações</button>
+          <button type="submit" class="px-4 py-2 bg-red-brand text-white font-semibold rounded text-sm">Salvar alterações</button>
         </div>
       </form>
     </div>
@@ -926,7 +1089,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
         </div>
         <div class="pt-2 flex justify-end gap-3">
           <button type="button" onclick="document.getElementById('modal-new-client').classList.add('hidden')" class="px-4 py-2 bg-gray-800 text-gray-300 rounded text-sm">Cancelar</button>
-          <button type="submit" class="px-4 py-2 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700">Cadastrar Cliente</button>
+          <button type="submit" class="px-4 py-2 bg-red-brand text-white font-semibold rounded text-sm">Cadastrar Cliente</button>
         </div>
       </form>
     </div>
@@ -950,12 +1113,12 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.tab-btn').forEach(el => {
-        el.classList.remove('text-red-500', 'bg-[#161922]', 'border-b-2', 'border-red-500');
+        el.classList.remove('text-[#22e6ff]', 'bg-[#161922]', 'border-b-2', 'border-[#22e6ff]');
         el.classList.add('text-gray-400');
       });
       document.getElementById(tabId).classList.remove('hidden');
       const activeBtn = document.getElementById('btn-' + tabId);
-      activeBtn.classList.add('text-red-500', 'bg-[#161922]', 'border-b-2', 'border-red-500');
+      activeBtn.classList.add('text-[#22e6ff]', 'bg-[#161922]', 'border-b-2', 'border-[#22e6ff]');
       activeBtn.classList.remove('text-gray-400');
     }
 

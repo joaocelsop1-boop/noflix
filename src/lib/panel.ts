@@ -33,10 +33,18 @@ export type PanelPlan = {
 
 export type PanelOrder = {
   ok: boolean;
+  success?: boolean;
+  mode?: string;
   order_id?: number | string;
   pix_code?: string;
   pix_qr_url?: string;
   amount?: number;
+  plan_name?: string;
+  /** Pix fixo (manual): chave, copia e cola, QR e beneficiário do admin */
+  pix_key?: string | null;
+  pix_fixed_code?: string | null;
+  pix_fixed_qr?: string | null;
+  pix_beneficiary?: string | null;
   error?: string;
 };
 
@@ -237,9 +245,20 @@ export async function createPanelOrder(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ plan_id: planId, whatsapp: whatsapp || undefined }),
   });
-  const data = (await readJson<PanelOrder>(res)) ?? { ok: false };
-  if (!res.ok && !data.error) return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
-  return data;
+  const raw = (await readJson<Record<string, unknown>>(res)) ?? {};
+  // O PHP responde {success, message, ...} e o front esperava {ok, error}:
+  // sem esta normalização o pedido SEMPRE parecia falhar (ok undefined) e
+  // o QR nunca aparecia — mesmo com o token válido. Mapeia os dois formatos.
+  const data = raw as PanelOrder & { success?: boolean; message?: string };
+  const ok = data.ok ?? data.success ?? false;
+  if (!res.ok && !data.error && !data.message) {
+    return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
+  }
+  return {
+    ...data,
+    ok: Boolean(ok),
+    error: data.error ?? (typeof data.message === "string" ? data.message : undefined),
+  };
 }
 
 export async function fetchPanelOrderStatus(

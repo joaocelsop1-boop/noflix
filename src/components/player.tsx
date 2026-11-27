@@ -38,7 +38,7 @@ import {
 import { anilistIdFor } from "@/lib/anime-ids";
 import { NativePlayer, type NativeSource } from "@/components/native-player";
 import { PlanGate } from "@/components/plan-gate";
-import { fetchPanelMe } from "@/lib/panel";
+import { fetchPanelMe, fetchPanelInfo } from "@/lib/panel";
 import type { Season, Title } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -168,6 +168,51 @@ export function Player({
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [season, setSeason] = useState(initialSeason);
   const [episode, setEpisode] = useState(initialEpisode);
+
+  /* Séries do painel: a página passa seasons=[] (não há TMDB aqui) — as
+     temporadas/episódios vêm do get_series_info do painel, e sem elas o
+     menu não mostrava nenhum seletor (sempre S01E01). */
+  const [panelSeasons, setPanelSeasons] = useState<Season[]>([]);
+  useEffect(() => {
+    if (!isPanelTitle || title.panel?.type !== "series" || title.kind !== "series") return;
+    let alive = true;
+    void fetchPanelInfo("series", title.panel.id).then((info) => {
+      if (!alive || !info) return;
+      const raw = (info.episodes ?? {}) as Record<string, unknown>;
+      const list: Season[] = Object.keys(raw)
+        .map((key) => {
+          const eps = Array.isArray(raw[key]) ? (raw[key] as Record<string, unknown>[]) : [];
+          return {
+            number: Number(key) || 0,
+            year: title.year,
+            episodes: eps
+              .map((ep) => ({
+                number: Number(ep.episode_num ?? 0) || 0,
+                name:
+                  String(ep.title ?? "").trim() ||
+                  `Episódio ${Number(ep.episode_num ?? 0) || ""}`.trim(),
+                runtime: Number(
+                  (ep.info as Record<string, unknown> | undefined)?.duration ??
+                    ep.duration ??
+                    0,
+                ) || 0,
+                overview: String(ep.plot ?? ""),
+              }))
+              .filter((ep) => ep.number > 0)
+              .sort((a, b) => a.number - b.number),
+          };
+        })
+        .filter((s) => s.number > 0 && s.episodes.length > 0)
+        .sort((a, b) => a.number - b.number);
+      setPanelSeasons(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isPanelTitle, title]);
+
+  /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
+  const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
 
   const [menu, setMenu] = useState(false);
   const [chrome, setChrome] = useState(true);
@@ -446,14 +491,14 @@ export function Player({
     () => playOrder(title).map((id) => PLAYERS.find((entry) => entry.id === id)).filter(Boolean) as typeof PLAYERS,
     [title],
   );
-  const nextEp = useMemo(() => nextEpisodeOf(seasons, season, episode), [seasons, season, episode]);
+  const nextEp = useMemo(() => nextEpisodeOf(allSeasons, season, episode), [allSeasons, season, episode]);
   const nextEpisodeLabel = useMemo(() => {
     if (!nextEp) return undefined;
-    const name = seasons
+    const name = allSeasons
       .find((entry) => entry.number === nextEp.season)
       ?.episodes.find((item) => item.number === nextEp.episode)?.name;
     return name ? `S${nextEp.season} E${nextEp.episode} · ${name}` : `S${nextEp.season} E${nextEp.episode}`;
-  }, [nextEp, seasons]);
+  }, [nextEp, allSeasons]);
   /** where our own player should start (same rule the embeds use) */
   const startAt = useMemo(() => {
     const stored = progress[title.slug];
@@ -464,7 +509,7 @@ export function Player({
   }, [progress, title.slug, season, episode]);
   /* our player is the default; a title with no resolvable stream falls back */
   const nativeActive = nativeMode && nativeState !== "none";
-  const currentSeason = seasons.find((s) => s.number === season);
+  const currentSeason = allSeasons.find((s) => s.number === season);
 
   /* ---------------------------------------------------------------- source */
 
@@ -851,7 +896,7 @@ export function Player({
                 setStalled(false);
                 cycleServer();
               }}
-              className="pointer-events-auto rounded-full border border-white/20 bg-[#141414]/95 px-4 py-2 text-[12px] font-semibold text-white shadow-2xl backdrop-blur-md transition hover:border-[var(--nf-accent)] hover:bg-[var(--nf-accent)]"
+              className="pointer-events-auto rounded-full border border-white/20 bg-[#0f1220]/95 px-4 py-2 text-[12px] font-semibold text-white shadow-2xl backdrop-blur-md transition hover:border-[var(--nf-accent)] hover:bg-[var(--nf-accent)]"
             >
               Nada tocando ainda? Tente {playerMeta(nextUp).label} →
             </button>
@@ -901,7 +946,7 @@ export function Player({
 
               <div className="max-w-[42vw] rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md">
                 {isPanelTitle && (
-                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#e50914]">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#22e6ff]">
                     Você está assistindo
                   </p>
                 )}
@@ -974,7 +1019,7 @@ export function Player({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
               transition={{ duration: 0.14 }}
-              className="pointer-events-auto absolute right-3 top-16 z-40 max-h-[76vh] w-[286px] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#141414]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl md:right-5"
+              className="pointer-events-auto absolute right-3 top-16 z-40 max-h-[76vh] w-[286px] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0f1220]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl md:right-5"
             >
               <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
                 Player
@@ -1134,7 +1179,7 @@ export function Player({
                     <Row
                       active={false}
                       title={`S${nextEp.season}:E${nextEp.episode} · ${
-                        (seasons.find((s) => s.number === nextEp.season)?.episodes.find(
+                        (allSeasons.find((s) => s.number === nextEp.season)?.episodes.find(
                           (e) => e.number === nextEp.episode,
                         )?.name) ?? "Próximo episódio"
                       }`}
@@ -1150,12 +1195,12 @@ export function Player({
                       <p className="mt-1 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
                         {currentSeason.name && !/^Season \d+$/.test(currentSeason.name)
                           ? currentSeason.name
-                          : `Season ${season}`}
-                        {seasons.length > 1 ? ` · ${seasons.length} seasons` : ""}
+                          : `Temporada ${season}`}
+                        {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                       </p>
-                      {seasons.length > 1 && (
+                      {allSeasons.length > 1 && (
                         <div className="mb-1 flex gap-1 overflow-x-auto px-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                          {seasons.map((entry) => (
+                          {allSeasons.map((entry) => (
                             <button
                               key={entry.number}
                               type="button"
@@ -1243,7 +1288,7 @@ export function Player({
                 <span className="min-w-0">
                   <span className="block truncate text-[12px] font-semibold text-white">
                     S{nextEp.season}:E{nextEp.episode} ·{" "}
-                    {(seasons
+                    {(allSeasons
                       .find((s) => s.number === nextEp.season)
                       ?.episodes.find((e) => e.number === nextEp.episode)?.name) ?? "Próximo episódio"}
                   </span>

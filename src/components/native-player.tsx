@@ -854,7 +854,7 @@ export function NativePlayer({
 
       {/* next episode card, like the real thing */}
       {nextIn !== null && onNext && !failed && (
-        <div className="absolute bottom-24 right-4 z-30 w-[228px] rounded-lg border border-white/10 bg-[#141414]/95 p-3 shadow-2xl backdrop-blur-xl md:right-6">
+        <div className="absolute bottom-24 right-4 z-30 w-[228px] rounded-lg border border-white/10 bg-[#0f1220]/95 p-3 shadow-2xl backdrop-blur-xl md:right-6">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
             {nextIn > 0 ? `Próximo episódio em ${nextIn}` : "Próximo episódio"}
           </p>
@@ -1153,7 +1153,7 @@ export function NativePlayer({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute bottom-11 right-0 z-40 max-h-[46vh] w-[210px] overflow-y-auto overscroll-contain rounded-lg border border-white/10 bg-[#141414]/[0.98] p-1 shadow-2xl backdrop-blur-xl">
+    <div className="absolute bottom-11 right-0 z-40 max-h-[46vh] w-[210px] overflow-y-auto overscroll-contain rounded-lg border border-white/10 bg-[#0f1220]/[0.98] p-1 shadow-2xl backdrop-blur-xl">
       {children}
     </div>
   );

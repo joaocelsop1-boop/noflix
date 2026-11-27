@@ -149,7 +149,7 @@ function baseTitle(
     overview: "",
     creator: "",
     cast: [],
-    accent: "#e50914",
+    accent: "#22e6ff",
     format,
     panel,
     ...(live ? { live: true } : {}),

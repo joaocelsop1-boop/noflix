@@ -10,7 +10,9 @@ type Mode = "login" | "register";
 
 /**
  * Login / cadastro do painel — visual escuro estilo frameXTV/CinePlus.
- * Em sucesso vai para /browse. Já logado, nem vê o formulário.
+ * Em sucesso vai para /browse — ou para /planos?plano=<mesmo> quando o
+ * cliente veio do site de vendas com um plano escolhido (?plano=<id|nome>).
+ * Já logado, nem vê o formulário.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -24,11 +26,17 @@ export default function LoginPage() {
   const [forgot, setForgot] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  /* destino após entrar: /planos com o plano do site de vendas, ou /browse */
+  const afterAuth = () => {
+    const plano = new URLSearchParams(window.location.search).get("plano");
+    return plano ? `/planos?plano=${encodeURIComponent(plano)}` : "/browse";
+  };
+
   useEffect(() => {
     let alive = true;
     void fetchPanelMe().then((me) => {
       if (!alive) return;
-      if (me?.loggedIn) router.replace("/browse");
+      if (me?.loggedIn) router.replace(afterAuth());
       else setChecking(false);
     });
     return () => {
@@ -52,7 +60,7 @@ export default function LoginPage() {
         // servidor, e o router.replace nem sempre refletia isso de primeira
         // (o usuário ficava na tela de login e só entrava após refresh
         // manual). Com o reload, o middleware e a página já veem a sessão.
-        window.location.href = "/browse";
+        window.location.href = afterAuth();
       } else {
         const result = await panelRegister({
           name: name.trim(),
@@ -64,7 +72,7 @@ export default function LoginPage() {
           setError(result.error ?? "Não foi possível criar a conta.");
           return;
         }
-        window.location.href = "/browse";
+        window.location.href = afterAuth();
       }
     } catch {
       // Antes não havia catch: se o fetch falhasse (rede, timeout), nada
@@ -78,13 +86,13 @@ export default function LoginPage() {
   if (checking) {
     return (
       <main className="grid min-h-screen place-items-center bg-black">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#22e6ff]" />
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-10">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#07080f] px-4 py-10">
       <Link href="/" aria-label="CinePlus home">
         <Wordmark className="text-[34px] md:text-[40px]" />
       </Link>
@@ -92,7 +100,7 @@ export default function LoginPage() {
         You&apos;re watching · CinePlus
       </p>
 
-      <div className="mt-8 w-full max-w-md rounded-xl border border-white/10 bg-[#141414] p-6 shadow-2xl md:p-8">
+      <div className="mt-8 w-full max-w-md rounded-xl border border-white/10 bg-[#0f1220] p-6 shadow-2xl md:p-8">
         {/* abas Entrar / Criar conta */}
         <div className="grid grid-cols-2 rounded-md bg-white/5 p-1">
           {(
@@ -112,7 +120,7 @@ export default function LoginPage() {
               aria-pressed={mode === tab.id}
               className={
                 mode === tab.id
-                  ? "rounded-md bg-[#e50914] px-3 py-2 text-sm font-bold text-white"
+                  ? "rounded-md btn-neon px-3 py-2 text-sm font-bold"
                   : "rounded-md px-3 py-2 text-sm font-semibold text-white/60 transition hover:text-white"
               }
             >
@@ -134,7 +142,7 @@ export default function LoginPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
-                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
               />
             </label>
           )}
@@ -150,7 +158,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@email.com"
-              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
             />
           </label>
 
@@ -166,7 +174,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
             />
           </label>
 
@@ -181,13 +189,13 @@ export default function LoginPage() {
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
                 placeholder="(00) 00000-0000"
-                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
               />
             </label>
           )}
 
           {error && (
-            <p role="alert" className="rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff6b72]">
+            <p role="alert" className="rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {error}
             </p>
           )}
@@ -195,7 +203,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-md bg-[#e50914] py-3 text-sm font-bold text-white transition hover:bg-[#f6121d] disabled:opacity-60"
+            className="w-full rounded-md btn-neon py-3 text-sm font-bold transition disabled:opacity-60"
           >
             {busy ? "Aguarde…" : mode === "login" ? "Entrar e assistir" : "Criar conta e assistir"}
           </button>

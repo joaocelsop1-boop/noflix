@@ -22,7 +22,7 @@ export default function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div style={{ width: 74, height: 8, background: "#e50914", borderRadius: 4 }} />
+          <div style={{ width: 74, height: 8, background: "#22e6ff", borderRadius: 4 }} />
           <div style={{ fontSize: 24, letterSpacing: 10, color: "#ffffff99" }}>
             STREAMING FRONT-END
           </div>
@@ -34,7 +34,7 @@ export default function OpengraphImage() {
             fontSize: 168,
             fontWeight: 800,
             letterSpacing: -6,
-            color: "#e50914",
+            color: "#ff2bd6",
             lineHeight: 1,
           }}
         >

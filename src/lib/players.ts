@@ -137,7 +137,7 @@ export const QUALITIES = ["4k", "1080p", "720p", "480p"] as const;
 export type Quality = (typeof QUALITIES)[number];
 export const DEFAULT_QUALITY: Quality = "1080p";
 
-const ACCENT = "e50914";
+const ACCENT = "22e6ff";
 
 export function isPlayerId(value: unknown): value is PlayerId {
   return PLAYERS.some((player) => player.id === value);

@@ -67,7 +67,7 @@ export default async function PlayPage({
       overview: `${query.title ?? "Conteúdo do painel"} — transmitindo do seu painel.`,
       creator: "CinePlus",
       cast: [],
-      accent: "#e50914",
+      accent: "#22e6ff",
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
     };
     return (
