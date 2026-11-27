@@ -33,6 +33,11 @@ export type CatalogueEntry = {
    * `mature` = R / TV-MA / crime / horror.
    */
   audience?: Audience;
+  /**
+   * Item do painel Xtream (não TMDB). Quando presente, o player abre
+   * /play/0?panel=1&type=..&id=.. em vez do embed TMDB. O tmdbId fica 0.
+   */
+  panel?: { type: "movie" | "series" | "live"; id: number };
 };
 
 export type Audience = "kids" | "mature" | "general";

@@ -23,11 +23,13 @@ type Entry = {
   anime?: boolean;
   /** which shelf found it: kids/family, mature (R / TV-MA), or general */
   audience?: "kids" | "family" | "mature" | "general";
+  /** Item do painel Xtream (não TMDB): o player abre /play/0?panel=1&type=..&id=.. */
+  panel?: { type: "movie" | "series" | "live"; id: number };
 };
 
 /** The audience filters offered on top of the tab + genre chips. */
 const AUDIENCES: Array<{ id: AudienceId; label: string; hint: string }> = [
-  { id: "all", label: "Tudo", hint: "the whole shelf" },
+  { id: "all", label: "Tudo", hint: "a prateleira inteira" },
   { id: "kids", label: "Infantil e família", hint: "Livre, PG, animação familiar" },
   { id: "mature", label: "Adulto", hint: "Para maiores, TV-MA, crime, terror" },
 ];
@@ -35,9 +37,9 @@ const AUDIENCES: Array<{ id: AudienceId; label: string; hint: string }> = [
 type AudienceId = "all" | "kids" | "mature";
 
 const TABS: Array<{ id: Tab; label: string; noun: string }> = [
-  { id: "movie", label: "Filmes", noun: "films" },
-  { id: "series", label: "Séries", noun: "series" },
-  { id: "anime", label: "Anime", noun: "anime" },
+  { id: "movie", label: "Filmes", noun: "filmes" },
+  { id: "series", label: "Séries", noun: "séries" },
+  { id: "anime", label: "Anime", noun: "animes" },
 ];
 
 const GENRES: Record<Tab, Array<{ id: number; name: string }>> = {
@@ -207,10 +209,10 @@ export function LiveCatalogue({
               </h1>
               <p className="mt-2 max-w-[60ch] text-[12.5px] text-white/50">
                 {total > 0
-                  ? `${total.toLocaleString()} ${activeTab.noun} ready to stream — ${items.length.toLocaleString()} loaded${genreId ? " after filtering" : ""}. More tiles appear as you scroll.`
+                  ? `${total.toLocaleString()} ${activeTab.noun} prontos para assistir — ${items.length.toLocaleString()} carregados${genreId ? " após o filtro" : ""}. Mais títulos aparecem ao rolar.`
                   : kids
-                    ? "Loading the kid-safe shelf — family, animation and comedy only."
-                    : "Loading the shelf — films, series and anime, popularity ordered."}
+                    ? "Carregando a prateleira segura — família, animação e comédia."
+                    : "Carregando a prateleira — filmes, séries e anime, por popularidade."}
               </p>
             </div>
 
@@ -287,13 +289,20 @@ export function LiveCatalogue({
               <button
                 key={item.key}
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  // Item do painel: abre o player do painel (stream do Xtream).
+                  if (item.panel) {
+                    router.push(
+                      `/play/0?panel=1&type=${item.panel.type}&id=${item.panel.id}&title=${encodeURIComponent(item.name)}`,
+                    );
+                    return;
+                  }
                   router.push(
                     `/play/${item.tmdbId}?title=${encodeURIComponent(item.name)}&kind=${
                       item.kind === "series" ? "series" : "movie"
                     }${item.anime ? "&anime=1" : ""}&year=${item.year ?? ""}`,
-                  )
-                }
+                  );
+                }}
                 style={{ contentVisibility: "auto", containIntrinsicSize: "260px 390px" }}
                 className="group relative overflow-hidden rounded-[6px] bg-[#1b1b1b] text-left ring-1 ring-white/5 transition duration-200 hover:z-10 hover:ring-white/40 focus-brand"
               >
@@ -351,21 +360,21 @@ export function LiveCatalogue({
 
           {done && items.length > 0 && (
             <p className="pb-6 text-center text-[12px] text-white/35">
-              That&apos;s the whole shelf — {items.length.toLocaleString()} {activeTab.noun}.
+              É toda a prateleira — {items.length.toLocaleString()} {activeTab.noun}.
             </p>
           )}
           {done && items.length === 0 && !loading && (
             <div className="pb-8 text-center">
               <p className="text-[13px] text-white/55">
-                The live shelf couldn&apos;t be reached just now — the curated catalogue is still
-                here.
+                Não foi possível carregar a prateleira agora — o catálogo curado continua
+                aqui.
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
                 <a
                   href="/new-popular"
                   className="rounded-full bg-white px-4 py-1.5 text-[12.5px] font-semibold text-black transition hover:bg-white/85"
                 >
-                  Browse the curated catalogue
+                  Navegar pelo catálogo curado
                 </a>
                 <button
                   type="button"
@@ -376,7 +385,7 @@ export function LiveCatalogue({
                   }}
                   className="rounded-full bg-white/10 px-4 py-1.5 text-[12.5px] font-semibold text-white/85 transition hover:bg-white/20"
                 >
-                  Try again
+                  Tentar novamente
                 </button>
               </div>
             </div>
