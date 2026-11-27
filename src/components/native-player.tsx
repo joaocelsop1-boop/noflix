@@ -1380,11 +1380,11 @@ export function NativePlayer({
         </div>
       </div>
 
-      {/* title chip */}
-      <div className={cn("pointer-events-none absolute left-4 top-3 z-30 transition-opacity", chrome ? "opacity-100" : "opacity-0")}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--nf-accent)]">CinePlus Player</p>
-        <p className="max-w-[60vw] truncate text-[13px] font-semibold text-white/90">{title}</p>
-      </div>
+      {/* tudo25: chip "CinePlus Player" + título REMOVIDO — ele ficava no
+         mesmo canto superior esquerdo que o pill "Você está assistindo"
+         do Player e os dois se sobrepunham (o "CINEPLUS" por cima do
+         título e o fragmento "/ 3" solto). O pill do Player já mostra
+         o título limpo; o NativePlayer não precisa repetir. */}
     </div>
   );
 }

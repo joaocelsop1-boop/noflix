@@ -8,6 +8,7 @@ import {
   type CatalogueTab,
 } from "@/lib/catalogue";
 import { phpApi, phpMe } from "@/lib/php";
+import { titleKey } from "@/lib/title-clean";
 
 export const revalidate = 21_600;
 
@@ -205,12 +206,20 @@ async function panelCatalogue(
   const data = result.data;
   const list = Array.isArray(data) ? data : [];
   const out: CatalogueEntry[] = [];
+  /* tudo25: dedup por título limpo + ano — o painel tem o mesmo título
+     várias vezes com stream_id diferente ("The K2" / "THE K2 (LEG)",
+     "Skye Hoshi" 3x); sem isso as fileiras repetem o mesmo filme. */
+  const seenTitles = new Set<string>();
   for (const raw of list) {
     if (!raw || typeof raw !== "object") continue;
     const rec = raw as Record<string, unknown>;
     const catId = String(rec.category_id ?? "");
     const entry = mapPanelItem(rec, kind, catName.get(catId) ?? "");
-    if (entry) out.push(entry);
+    if (!entry) continue;
+    const tk = titleKey(entry.name, entry.year);
+    if (seenTitles.has(tk)) continue;
+    seenTitles.add(tk);
+    out.push(entry);
   }
   return out;
 }

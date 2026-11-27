@@ -128,17 +128,20 @@ export function ShelfStrip({
 
   return (
     <div className={cn("group/shelf relative", className)}>
+      {/* tudo25: setas flutuantes redondas, centralizadas na vertical —
+          a barra de altura total cobria o numeral "1" do Top 10 sempre que
+          a fileira tinha rolado um pouco. */}
       <button
         type="button"
         aria-label="Scroll left"
         onClick={() => nudge(-1)}
         disabled={!edges.left}
         className={cn(
-          "absolute left-0 top-0 z-20 hidden h-full w-10 items-center justify-center rounded-r bg-black/50 text-white opacity-0 transition duration-300 hover:bg-black/75 disabled:pointer-events-none disabled:opacity-0 md:flex md:w-12",
+          "absolute left-3 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white opacity-0 shadow-lg ring-1 ring-white/20 backdrop-blur-md transition duration-300 hover:bg-black/90 disabled:pointer-events-none disabled:opacity-0 md:flex",
           edges.left && "pointer-events-auto group-hover/shelf:opacity-100",
         )}
       >
-        <ChevronLeftIcon width={30} height={30} />
+        <ChevronLeftIcon width={20} height={20} />
       </button>
 
       <button
@@ -147,11 +150,11 @@ export function ShelfStrip({
         onClick={() => nudge(1)}
         disabled={!edges.right}
         className={cn(
-          "absolute right-0 top-0 z-20 hidden h-full w-10 items-center justify-center rounded-l bg-black/50 text-white opacity-0 transition duration-300 hover:bg-black/75 disabled:pointer-events-none disabled:opacity-0 md:flex md:w-12",
+          "absolute right-3 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white opacity-0 shadow-lg ring-1 ring-white/20 backdrop-blur-md transition duration-300 hover:bg-black/90 disabled:pointer-events-none disabled:opacity-0 md:flex",
           edges.right && "pointer-events-auto group-hover/shelf:opacity-100",
         )}
       >
-        <ChevronRightIcon width={30} height={30} />
+        <ChevronRightIcon width={20} height={20} />
       </button>
 
       <div
@@ -167,7 +170,7 @@ export function ShelfStrip({
         onPointerLeave={endDrag}
         onClickCapture={onClickCapture}
         className={cn(
-          "no-scrollbar flex snap-x snap-mandatory items-start gap-2 overflow-x-auto overscroll-x-contain px-4 pb-6 outline-none md:cursor-grab md:gap-2.5 md:px-12 md:snap-proximity md:active:cursor-grabbing",
+          "no-scrollbar flex snap-x snap-mandatory scroll-pl-4 items-start gap-2 overflow-x-auto overscroll-x-contain px-4 pb-6 outline-none md:cursor-grab md:gap-2.5 md:px-12 md:scroll-pl-12 md:snap-proximity md:active:cursor-grabbing",
           contentClassName,
         )}
       >

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { artUrl } from "@/lib/img";
 import {apiUrl, appUrl} from "@/lib/paths";
 import { fetchPanelMe } from "@/lib/panel";
-import { cleanTitle } from "@/lib/title-clean";
+import { cleanTitle, titleKey } from "@/lib/title-clean";
 import { useTmdbMeta, useTmdbMetas } from "@/lib/tmdb-client";
 import type { TmdbMeta } from "@/lib/tmdb-types";
 import { cn } from "@/lib/cn";
@@ -51,6 +51,9 @@ function HeroThumb({
 }) {
   const [broken, setBroken] = useState(false);
   const src = artUrl(entry.poster ?? entry.backdrop);
+  /* tudo25: reset quando a imagem muda — a miniatura que falhou uma vez
+     nunca tentava a próxima imagem. */
+  useEffect(() => setBroken(false), [src]);
   if (!src || broken) return null;
   return (
     <button
@@ -169,23 +172,32 @@ async function fetchTop10(
 ): Promise<CatalogueEntry[]> {
   const ids = await fetchCategoryIds(kind, slugs);
   const seen = new Set<string>();
+  /* tudo25: dedup por título limpo + ano — "The K2" e "THE K2 (LEG)" são
+     entradas diferentes no painel (stream_id diferente) e apareciam como
+     dois itens; mesmo título limpo + mesmo ano = um só. */
+  const seenTitles = new Set<string>();
+  const push = (entry: CatalogueEntry): boolean => {
+    if (seen.has(entry.key)) return false;
+    const tk = titleKey(entry.name, entry.year);
+    if (seenTitles.has(tk)) return false;
+    seen.add(entry.key);
+    seenTitles.add(tk);
+    out.push(entry);
+    return true;
+  };
   const out: CatalogueEntry[] = [];
   const lists = await Promise.all(
     ids.map((id) => fetchCatalogueCategory(kind === "movie" ? "movie" : "series", id, 10)),
   );
   for (const list of lists) {
     for (const entry of list) {
-      if (seen.has(entry.key)) continue;
-      seen.add(entry.key);
-      out.push(entry);
+      push(entry);
       if (out.length >= 10) return out;
     }
   }
   for (const entry of fallback) {
     if (out.length >= 10) break;
-    if (seen.has(entry.key)) continue;
-    seen.add(entry.key);
-    out.push(entry);
+    push(entry);
   }
   return out.slice(0, 10);
 }
@@ -259,6 +271,10 @@ function PanelPosterCard({
   /* capa morta no servidor de imagens: mostra o fallback na hora, sem
      esperar o erro de rede segurar a fileira */
   const [broken, setBroken] = useState(false);
+  /* tudo25: reset quando a imagem muda — a capa quebrada do painel
+     marcava broken=true e o pôster bom do TMDB, que chegava depois,
+     nunca era tentado. */
+  useEffect(() => setBroken(false), [img]);
   return (
     <div className="w-[var(--nf-card-w,186px)] shrink-0 snap-start">
       <button
@@ -402,9 +418,11 @@ function PanelTop10Row({
       </div>
       <ShelfStrip label={title}>
         {entries.map((entry, i) => (
-          /* tudo24: respiro à esquerda — o "1" gigante ficava cortado na
-             borda da tela. */
-          <div key={entry.key} className="relative flex snap-start items-end pl-2 md:pl-3">
+          /* tudo25: respiro maior à esquerda — o "1" gigante continuava
+             cortado na borda; o pl-2 do tudo24 não bastou. Junto com o
+             scroll-pl do ShelfStrip e as setas flutuantes, o numeral
+             inteiro fica visível. */
+          <div key={entry.key} className="relative flex snap-start items-end pl-4 md:pl-6">
             <span
               aria-hidden
               className="rank-numeral pointer-events-none -mr-4 w-[64px] shrink-0 select-none text-[92px] md:-mr-6 md:w-[86px] md:text-[122px]"
@@ -576,7 +594,7 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
             </span>
           </div>
           {displayOverview ? (
-            <p className="mt-4 line-clamp-2 hidden max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] sm:block md:text-[15px]">
+            <p className="mt-4 line-clamp-2 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]">
               {displayOverview}
             </p>
           ) : null}

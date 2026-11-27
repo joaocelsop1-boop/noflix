@@ -38,8 +38,11 @@ const MEM_MAX = 500;
 const DISK_MAX_FILES = 2000;
 const TIMEOUT_MS = 8000;
 const MAX_CONCURRENT = 6;
-/** Pontuação mínima (0–110) para aceitar um match do TMDB. */
-const MIN_SCORE = 60;
+/** Pontuação mínima (0–110) para aceitar um match do TMDB.
+ * tudo25: era 60 — baixo demais, casava o filme errado (pôster de outro
+ * título no lugar certo). Com 75, só entra match com título bem próximo
+ * E ano compatível. */
+const MIN_SCORE = 75;
 
 /** id de gênero TMDB → nome em português (ids estáveis do TMDB). */
 const GENRE_NAME = new Map<number, string>([
@@ -118,7 +121,9 @@ function scoreMatch(
   if (queryYear && Number.isFinite(cy)) {
     if (cy === queryYear) score += 10;
     else if (Math.abs(cy - queryYear) === 1) score += 3;
-    else if (Math.abs(cy - queryYear) > 5) score -= 25;
+    /* tudo25: ano bem diferente é quase certeza de filme errado — pesa
+       forte para o match não passar. */
+    else if (Math.abs(cy - queryYear) > 2) score -= 40;
   }
   return score;
 }
@@ -236,6 +241,13 @@ function toMeta(item: SearchItem, runtime?: number): TmdbMeta {
   };
 }
 
+/** Variante de busca sem números no início ("007 Contra GoldenEye" →
+ *  "Contra GoldenEye"): o TMDB acha o filme certo, e a pontuação continua
+ *  sendo julgada contra o título original limpo. */
+function titleVariant(title: string): string {
+  return title.replace(/^\d+[\s:.-]+/, "").trim();
+}
+
 async function resolveFresh(
   title: string,
   year: number | undefined,
@@ -246,22 +258,30 @@ async function resolveFresh(
   const primary: "movie" | "tv" = kind === "series" ? "tv" : "movie";
   const secondary: "movie" | "tv" = primary === "movie" ? "tv" : "movie";
   // Tentativas em ordem: tipo certo + pt-BR + ano → sem ano → en-US + ano →
-  // outro tipo + pt-BR + ano. Para na primeira com match bom (>= 60).
-  const attempts: Array<{ type: "movie" | "tv"; lang: string; y?: number }> = [
-    { type: primary, lang: "pt-BR", y: year },
-    { type: primary, lang: "pt-BR" },
-    { type: primary, lang: "en-US", y: year },
-    { type: secondary, lang: "pt-BR", y: year },
+  // outro tipo + pt-BR + ano → variante sem números no início. Para na
+  // primeira com match bom (>= MIN_SCORE). A pontuação é sempre julgada
+  // contra o título original limpo — a variante só muda a busca.
+  const variant = titleVariant(title);
+  const attempts: Array<{ type: "movie" | "tv"; lang: string; y?: number; q: string }> = [
+    { type: primary, lang: "pt-BR", y: year, q: title },
+    { type: primary, lang: "pt-BR", q: title },
+    { type: primary, lang: "en-US", y: year, q: title },
+    { type: secondary, lang: "pt-BR", y: year, q: title },
   ];
+  if (variant && variant !== title) {
+    attempts.push({ type: primary, lang: "pt-BR", y: year, q: variant });
+    attempts.push({ type: primary, lang: "en-US", y: year, q: variant });
+  }
   for (const a of attempts) {
-    const results = await limited(() => searchOnce(a.type, title, a.y, a.lang, key));
+    const results = await limited(() => searchOnce(a.type, a.q, a.y, a.lang, key));
     let best: { item: SearchItem; score: number } | null = null;
     for (const item of results.slice(0, 10)) {
-      const s = scoreMatch(
-        title,
-        year,
-        item.title ?? item.name ?? "",
-        item.release_date ?? item.first_air_date,
+      // tudo25: o título original do TMDB também vale — filme estrangeiro
+      // pode ter o nome em português diferente do original. Pega o melhor
+      // dos dois, sempre contra o título limpo do painel.
+      const s = Math.max(
+        scoreMatch(title, year, item.title ?? item.name ?? "", item.release_date ?? item.first_air_date),
+        scoreMatch(title, year, item.original_title ?? item.original_name ?? "", item.release_date ?? item.first_air_date),
       );
       if (!best || s > best.score) best = { item, score: s };
     }
@@ -340,7 +360,9 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
   if (!key) return null;
   const cleaned = cleanTitle(ref.title);
   const title = cleaned.title;
-  if (!title) return null;
+  /* tudo25: nome só com dígitos ("242310") é um id do painel, não um
+     título — nem adianta buscar no TMDB. */
+  if (!title || /^\d+$/.test(title)) return null;
   const year = cleaned.year ?? ref.year;
   const cacheKey = `${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
 

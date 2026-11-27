@@ -5,6 +5,7 @@ import "./globals.css";
 import { StoreProvider } from "@/components/store";
 import { AppShell } from "@/components/app-shell";
 import { BootIntro } from "@/components/boot-intro";
+import { ChunkReload } from "@/components/chunk-reload";
 
 export const metadata: Metadata = {
   title: "CinePlus — Assista a séries online, assista a filmes online",
@@ -60,6 +61,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
       </head>
       <body className="min-h-screen bg-[#0f1220] text-white antialiased">
+        {/* tudo25: reload guardado quando um chunk pós-deploy falha —
+            o "Application error" do login na primeira tentativa. */}
+        <ChunkReload />
         {/* server-rendered so the title card is the first paint, never a flash */}
         <BootIntro />
         <StoreProvider>

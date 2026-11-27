@@ -137,6 +137,7 @@ export function Player({
   initialEpisode,
   seasons,
   episodePicked,
+  artwork,
 }: {
   title: Title;
   initialSeason: number;
@@ -331,17 +332,69 @@ export function Player({
     panelMeta.genre ??
     movieMeta.genre ??
     (title.genres?.length ? title.genres.join(" · ") : undefined);
-  const detailDuration = tmdbDetail?.runtime ?? movieMeta.duration;
-  const detailRating = tmdbDetail?.rating;
-  /** capa da visão de detalhe e do poster do player: TMDB primeiro (backdrop
-     16:9), painel depois. */
-  const detailCover = tmdbDetail?.backdrop ?? tmdbDetail?.poster ?? panelMeta.cover ?? movieMeta.cover;
+  const detailDuration =
+    tmdbDetail?.runtime ??
+    movieMeta.duration ??
+    (title.runtime && title.runtime > 0 ? title.runtime : undefined);
+  /* tudo25: nota do TMDB — do hook do cliente ou do servidor (o
+     title.rating já vem do TMDB resolvido na página); sem nota, não
+     mostra ★. Nunca mais o 8 inventado. */
+  const detailRating = tmdbDetail?.rating ?? (title.rating > 0 ? title.rating : undefined);
+  /** capa da visão de detalhe e do poster do player: o artwork resolvido
+     no servidor (TMDB) primeiro, depois o hook do cliente, depois o
+     painel. tudo25: antes o artwork do servidor nem entrava aqui — a
+     capa quebrada do painel vencia e o detalhe ficava preto. */
+  const detailCover =
+    artwork?.backdrop ??
+    artwork?.poster ??
+    tmdbDetail?.backdrop ??
+    tmdbDetail?.poster ??
+    panelMeta.cover ??
+    movieMeta.cover;
   /** poster do player (backdrop grande como fundo enquanto carrega). */
   const playerPoster = detailCover
     ? apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)
     : undefined;
   /** título limpo na exibição ([Lançamento] e "(AAAA)" fora). */
   const displayName = cleanTitle(title.name).title;
+
+  /* tudo25: estágio 16:9 do player na própria tela do detalhe — igual à
+     demonstração: a imagem grande com o botão de play já visível embaixo,
+     sem ir para uma tela preta de "Conectando ao Painel…". O play nasce
+     da imagem, visível de cara. */
+  const playStage = (onPlay: () => void) => (
+    <button
+      type="button"
+      onClick={onPlay}
+      aria-label={`Assistir ${displayName}`}
+      className="group relative mt-8 block w-full overflow-hidden rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+    >
+      <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-[#1a1033] via-[#0d1526] to-black">
+        {detailCover && !coverBroken ? (
+          <img
+            src={apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)}
+            alt={displayName}
+            onError={() => setCoverBroken(true)}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center px-6">
+            <span className="text-center text-base font-semibold text-white/70">{displayName}</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid h-16 w-16 place-items-center rounded-full bg-[#e50914] shadow-[0_10px_36px_rgba(229,9,20,0.55)] transition group-hover:scale-110 group-active:scale-95 sm:h-20 sm:w-20">
+            <PlayIcon width={28} height={28} className="ml-1 text-white" />
+          </span>
+        </span>
+        <span className="absolute bottom-3 left-4 right-4 flex items-center gap-2 text-[13px] font-semibold text-white">
+          <span className="truncate">{displayName}</span>
+          {detailDuration ? <span className="shrink-0 text-white/60">{detailDuration} min</span> : null}
+        </span>
+      </div>
+    </button>
+  );
 
   /* Sessão única (tudo20): confere de 30 em 30s se esta sessão continua
      válida — se outro aparelho entrou, a sessão cai e o usuário vê a
@@ -368,7 +421,10 @@ export function Player({
      painel está morto) — cai para o placeholder estilizado em vez de
      mostrar o texto alternativo cru sobre preto. */
   const [coverBroken, setCoverBroken] = useState(false);
-  useEffect(() => setCoverBroken(false), [title.slug]);
+  /* tudo25: reset também quando a capa muda — a capa quebrada do painel
+     marcava coverBroken=true e a imagem boa do TMDB, que chegava depois,
+     nunca era tentada. */
+  useEffect(() => setCoverBroken(false), [title.slug, detailCover]);
   /* temporada exibida no sheet (null = segue a temporada que está tocando) */
   const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
@@ -1020,8 +1076,11 @@ export function Player({
                  com o título, nunca o texto alternativo cru sobre preto. */
               <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1a1033] via-[#0d1526] to-black px-6">
                 <div className="text-center">
-                  <span className="block text-[64px] font-bold leading-none text-white/20">
-                    {(displayName.trim()[0] ?? "?").toUpperCase()}
+                  {/* tudo25: sem letra/número gigante — era a primeira letra
+                      do título ("1" em 18 Rosas, "0" em GoldenEye) parecendo
+                      o numeral do Top 10 vazando para o detalhe. */}
+                  <span className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-white/15 bg-white/[0.06]">
+                    <PlayIcon width={24} height={24} className="ml-0.5 text-white/70" />
                   </span>
                   <span className="mt-3 block text-lg font-semibold text-white/70">
                     {displayName}
@@ -1088,17 +1147,21 @@ export function Player({
             ) : null}
 
             {title.kind === "movie" ? (
-              /* filme: só o CTA vermelho em pílula — a sinopse já está acima */
-              <button
-                type="button"
-                onClick={() => setPicked(true)}
-                className="mt-6 flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition hover:bg-[#f6121f] active:scale-[0.98]"
-              >
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
-                  <PlayIcon width={12} height={12} className="text-[#e50914]" />
-                </span>
-                Assistir Agora
-              </button>
+              /* filme: CTA vermelho em pílula + estágio 16:9 com a imagem
+                 grande e o play já visível embaixo (igual à demonstração) */
+              <>
+                <button
+                  type="button"
+                  onClick={() => setPicked(true)}
+                  className="mt-6 flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition hover:bg-[#f6121f] active:scale-[0.98]"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                    <PlayIcon width={12} height={12} className="text-[#e50914]" />
+                  </span>
+                  Assistir Agora
+                </button>
+                {playStage(() => setPicked(true))}
+              </>
             ) : allSeasons.length === 0 ? (
               panelSeasonsLoaded ? (
                 <div className="mt-8">
@@ -1115,6 +1178,7 @@ export function Player({
                     </span>
                     Assistir Agora
                   </button>
+                  {playStage(() => pickEpisode(1, 1))}
                 </div>
               ) : (
                 <div className="mt-8 flex items-center gap-2.5">
@@ -1139,6 +1203,11 @@ export function Player({
                   </span>
                   Assistir Agora
                 </button>
+
+                {playStage(() => {
+                  const first = pickerSeason?.episodes[0];
+                  if (pickerSeason && first) pickEpisode(pickerSeason.number, first.number);
+                })}
 
                 {/* abas: só as que têm conteúdo real (sem inventar elenco) */}
                 <div className="mt-8 flex gap-6 border-b border-white/10">
@@ -1275,10 +1344,18 @@ export function Player({
       )}
 
       {nativeActive && nativeState === "loading" && (
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="flex flex-col items-center gap-2.5">
-            <span className="h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
-            <p className="text-[12px] font-medium text-white/55">Buscando o stream…</p>
+        <div className="absolute inset-0 overflow-hidden">
+          {/* tudo25: a imagem grande do filme atrás do spinner — o player
+              nasce da imagem, nunca de uma tela preta. */}
+          {playerPoster ? (
+            <img src={playerPoster} alt="" aria-hidden className="h-full w-full object-cover" />
+          ) : null}
+          <div className="absolute inset-0 bg-black/55" />
+          <div className="absolute inset-0 grid place-items-center">
+            <div className="flex flex-col items-center gap-2.5">
+              <span className="h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
+              <p className="text-[12px] font-medium text-white/55">Buscando o stream…</p>
+            </div>
           </div>
         </div>
       )}
@@ -1411,7 +1488,7 @@ export function Player({
                   </p>
                 )}
                 <p className="truncate text-[12.5px] font-semibold leading-tight text-white">
-                  {title.name}
+                  {displayName}
                 </p>
                 <p className="truncate text-[10.5px] leading-tight text-white/55">
                   {title.kind === "series"

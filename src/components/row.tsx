@@ -49,11 +49,11 @@ export function Row({ row, priority = false }: { row: RowType; priority?: boolea
 
       <ShelfStrip label={row.title}>
         {items.map((title, i) => (
-          /* tudo24: no Top 10, respiro à esquerda — o número gigante
-             ficava cortado na borda da tela. */
+          /* tudo25: no Top 10, respiro maior à esquerda — o "1" gigante
+             continuava cortado na borda; o pl-2 do tudo24 não bastou. */
           <div
             key={`${row.id}-${title.slug}`}
-            className={cn("snap-start", row.ranked && "pl-2 md:pl-3")}
+            className={cn("snap-start", row.ranked && "pl-4 md:pl-6")}
           >
             <PosterCard
               title={title}

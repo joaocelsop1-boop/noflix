@@ -1,4 +1,6 @@
 import { Player } from "@/components/player";
+import { resolveTmdbMeta } from "@/lib/tmdb";
+import { cleanTitle } from "@/lib/title-clean";
 import { seasonsFor } from "@/lib/catalog";
 import { animeInfo, animeSeasons, movieInfo, realSeasons, seriesInfo } from "@/lib/seasons";
 import type { Genre, Title } from "@/lib/types";
@@ -46,31 +48,46 @@ export default async function PlayPage({
   const query = await searchParams;
 
   /* Título do painel (tmdbId 0): vem do /live ou do catálogo do painel e
-     toca no player próprio — nunca busca TMDB nem usa embed. */
+     toca no player próprio — nunca usa embed. tudo25: o nome exibido é
+     SEMPRE o título limpo do painel (o que o usuário clicou); o TMDB é
+     resolvido no servidor e só fornece imagem, sinopse, nota, gêneros e
+     duração DO MESMO título — antes o detalhe nem chamava o TMDB e
+     carregava ZERO imagens, com nota falsa 8 e sinopse inventada. */
   if (query.panel === "1") {
     const panelType =
       query.type === "series" ? "series" : query.type === "live" ? "live" : "movie";
     const panelId = Number(query.id) || 0;
+    const rawTitle = query.title?.slice(0, 120) ?? `Canal ${panelId}`;
+    const cleaned = cleanTitle(rawTitle);
+    const displayName = cleaned.title || rawTitle;
+    const year = cleaned.year ?? (Number(query.year) || 0);
+    const meta =
+      panelType === "live"
+        ? null
+        : await resolveTmdbMeta({ key: `panel-${panelType}-${panelId}`, title: displayName, year, kind: panelType as "movie" | "series", details: true });
     const panelTitle: Title = {
       slug: `panel-${panelType}-${panelId}`,
-      tmdbId: 0,
+      tmdbId: meta?.tmdbId ?? 0,
       panel: { type: panelType, id: panelId, ext: query.ext },
       live: panelType === "live",
       kind: panelType === "movie" ? "movie" : "series",
-      name: query.title?.slice(0, 120) ?? `Canal ${panelId}`,
+      name: displayName,
       // tudo22: ano desconhecido é 0 (não mostra ano) — antes caía para o
       // ano atual (2026) e a série piscava 2026 antes de corrigir para 1992.
-      year: Number(query.year) || 0,
-      genres: [],
+      year: year || meta?.year || 0,
+      genres: (meta?.genres ?? []) as Genre[],
       maturity: "16+",
-      rating: 8,
-      match: 80,
+      /* tudo25: nota do TMDB quando há; 0 = sem nota (o Player só mostra
+         ★ quando a nota é > 0) — nunca mais o 8 inventado. */
+      rating: meta?.rating ?? 0,
+      match: meta?.rating ? Math.round(meta.rating * 10) : 0,
       tagline: "Transmitindo agora.",
-      overview: `${query.title ?? "Conteúdo do painel"} — transmitindo do seu painel.`,
+      overview: meta?.overview ?? "",
       creator: "CinePlus",
       cast: [],
       accent: "#e50914",
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
+      runtime: meta?.runtime,
     };
     return (
       <Player
@@ -79,6 +96,10 @@ export default async function PlayPage({
         initialEpisode={Math.max(Number(query.e) || 1, 1)}
         seasons={[]}
         episodePicked={Boolean(query.s || query.e)}
+        artwork={{
+          poster: meta?.poster,
+          backdrop: meta?.backdrop,
+        }}
       />
     );
   }
