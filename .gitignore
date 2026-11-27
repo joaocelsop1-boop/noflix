@@ -12,6 +12,7 @@ node_modules
 
 # cache
 .cache/
+.img-cache/
 
 # misc
 .DS_Store

@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { TMDB_API_KEY, isBearerToken } from "@/lib/tmdb-key";
 
 /**
@@ -120,6 +123,118 @@ function imgCacheSet(url: string, type: string, body: Uint8Array<ArrayBuffer>): 
   imgCacheBytes += size;
 }
 
+/**
+ * Cache em disco (tudo13): o cache em memória some a cada redeploy/restart
+ * do Coolify, e a primeira carga de cada capa voltava aos hosts lentos do
+ * painel (fenix7/slackewn, muitos 404/403, timeout de 6s). As capas buscadas
+ * com sucesso também são gravadas em disco — "puxa do meu servidor" — numa
+ * pasta montada num volume nomeado no docker-compose, então sobrevive a
+ * redeploys. TTL de 7 dias; poda FIFO quando passar de ~500 MB ou ~2000
+ * arquivos. Falha de disco nunca quebra o atendimento: cai para
+ * memória/rede. Só sucessos vão para o disco; o cache negativo (capa morta)
+ * continua só em memória.
+ */
+const DISK_TTL = 7 * 24 * 60 * 60 * 1000;
+const DISK_MAX_FILES = 2000;
+const DISK_MAX_BYTES = 500 * 1024 * 1024;
+const DISK_DIR = process.env.IMG_CACHE_DIR ?? path.join(process.cwd(), ".img-cache");
+
+const EXT_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+};
+const TYPE_BY_EXT: Record<string, string> = Object.fromEntries(
+  Object.entries(EXT_BY_TYPE).map(([type, ext]) => [ext, type]),
+);
+
+function diskKey(url: string, type: string): string | null {
+  const ext = EXT_BY_TYPE[type.split(";")[0].trim().toLowerCase()];
+  if (!ext) return null;
+  return `${createHash("sha256").update(url).digest("hex")}.${ext}`;
+}
+
+let diskDirReady = false;
+async function ensureDiskDir(): Promise<boolean> {
+  if (diskDirReady) return true;
+  try {
+    await fs.mkdir(DISK_DIR, { recursive: true });
+    diskDirReady = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function diskCacheGet(
+  url: string,
+): Promise<{ type: string; body: Uint8Array<ArrayBuffer> } | null> {
+  try {
+    if (!(await ensureDiskDir())) return null;
+    const hash = createHash("sha256").update(url).digest("hex");
+    const names = await fs.readdir(DISK_DIR);
+    const name = names.find((n) => n.startsWith(`${hash}.`));
+    if (!name) return null;
+    const file = path.join(DISK_DIR, name);
+    const stat = await fs.stat(file);
+    if (Date.now() - stat.mtimeMs > DISK_TTL) {
+      await fs.unlink(file).catch(() => undefined);
+      return null;
+    }
+    const buf = await fs.readFile(file);
+    const type = TYPE_BY_EXT[path.extname(name).slice(1)] ?? "image/jpeg";
+    return { type, body: new Uint8Array(buf) };
+  } catch {
+    return null;
+  }
+}
+
+async function diskCacheSet(url: string, type: string, body: Uint8Array<ArrayBuffer>): Promise<void> {
+  try {
+    const name = diskKey(url, type);
+    if (!name) return;
+    if (!(await ensureDiskDir())) return;
+    await fs.writeFile(path.join(DISK_DIR, name), body);
+    await pruneDiskCache();
+  } catch {
+    /* disco indisponível: o cache em memória continua valendo */
+  }
+}
+
+async function pruneDiskCache(): Promise<void> {
+  try {
+    const names = await fs.readdir(DISK_DIR);
+    const infos: Array<{ name: string; mtimeMs: number; size: number }> = [];
+    let total = 0;
+    for (const name of names) {
+      try {
+        const st = await fs.stat(path.join(DISK_DIR, name));
+        if (!st.isFile()) continue;
+        infos.push({ name, mtimeMs: st.mtimeMs, size: st.size });
+        total += st.size;
+      } catch {
+        /* some */
+      }
+    }
+    if (infos.length === 0) return;
+    const now = Date.now();
+    infos.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    let count = infos.length;
+    for (const info of infos) {
+      const expired = now - info.mtimeMs > DISK_TTL;
+      if (!expired && count <= DISK_MAX_FILES && total <= DISK_MAX_BYTES) break;
+      await fs.unlink(path.join(DISK_DIR, info.name)).catch(() => undefined);
+      count -= 1;
+      total -= info.size;
+    }
+  } catch {
+    /* poda é best-effort */
+  }
+}
+
 function tmdbKey(): string {
   return (
     process.env.TMDB_API_KEY ??
@@ -192,6 +307,18 @@ async function grab(target: string): Promise<Response | null> {
       },
     });
   }
+  const onDisk = await diskCacheGet(target);
+  if (onDisk) {
+    imgCacheSet(target, onDisk.type, onDisk.body);
+    return new NextResponse(onDisk.body, {
+      headers: {
+        "content-type": onDisk.type,
+        "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400",
+        "x-artwork-source": new URL(target).hostname,
+        "x-artwork-cache": "disk",
+      },
+    });
+  }
   try {
     const upstream = await fetch(target, {
       headers: { "user-agent": UA, accept: "image/avif,image/webp,image/*,*/*" },
@@ -204,6 +331,7 @@ async function grab(target: string): Promise<Response | null> {
     if (!type.startsWith("image/")) return null;
     const body = new Uint8Array(await upstream.arrayBuffer());
     imgCacheSet(target, type, body);
+    await diskCacheSet(target, type, body);
     return new NextResponse(body, {
       headers: {
         "content-type": type,

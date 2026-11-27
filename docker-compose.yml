@@ -12,6 +12,10 @@ services:
       # O front Next.js fala com o PHP por aqui; o navegador nunca vê essa URL.
       - PHP_BACKEND_URL=${PHP_BACKEND_URL:-http://php:80}
       - TMDB_API_KEY=${TMDB_API_KEY:-}
+    volumes:
+      # Cache de capas em disco (/api/img): sobrevive a redeploys/restarts,
+      # então a inicial não volta a buscar as capas nos hosts lentos do painel.
+      - img-cache:/app/.img-cache
     depends_on:
       - php
       - db
@@ -55,3 +59,4 @@ services:
 volumes:
   db-data:
   php-cache:
+  img-cache:
