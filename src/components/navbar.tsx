@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { BellIcon, ChevronDownIcon, SearchIcon } from "@/components/icons";
+import { BellIcon, ChevronDownIcon, DownloadIcon, SearchIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
 import { usePanelMe } from "@/lib/use-panel-me";
 import { formatDateBR, panelLogout } from "@/lib/panel";
@@ -155,6 +155,23 @@ export function Navbar() {
         </ul>
 
         <div className="ml-auto flex items-center gap-3 md:gap-5">
+          {/* tudo19: botão "Baixar aplicativo" VISÍVEL na barra superior
+             (antes só existia no menu da conta e no rodapé — escondido,
+             e ninguém adivinhava que estava ali). Fica em todas as
+             páginas, em computador, tablet e celular: texto completo
+             em telas ≥640px e "Baixar app" no celular. Aponta para o
+             mesmo APK (download direto). Os links do menu da conta e
+             do rodapé continuam. */}
+          <a
+            href={appUrl("/cineplus.apk")}
+            download
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-2 text-[12px] font-bold whitespace-nowrap text-black transition hover:bg-white/85"
+          >
+            <DownloadIcon width={15} height={15} />
+            <span className="hidden sm:inline">Baixar aplicativo</span>
+            <span className="sm:hidden">Baixar app</span>
+          </a>
+
           <button
             type="button"
             onClick={() => setSearchOpen(true)}

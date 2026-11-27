@@ -218,9 +218,14 @@ export function NativePlayer({
       playable.map((entry) => {
         const relay = entry.proxy;
         const direct = entry.url;
+        /* tudo19: sem duplicar a mesma URL — nas fontes do painel,
+           url e proxy são a MESMA (stream.php), então tentar 2x era
+           gastar 25s a mais no mesmo endereço morto antes de escalar
+           para a próxima fonte. Para fontes com url ≠ proxy (CDN),
+           nada muda: as duas tentativas continuam. */
         return entry.type === "hls"
-          ? [relay, direct].filter(Boolean) as string[]
-          : [direct, relay].filter(Boolean) as string[];
+          ? Array.from(new Set([relay, direct].filter(Boolean))) as string[]
+          : Array.from(new Set([direct, relay].filter(Boolean))) as string[];
       }),
     [playable],
   );
@@ -338,6 +343,22 @@ export function NativePlayer({
         return;
       }
 
+      /* tudo19: timeout DURO no caminho hls.js — o MP4 e o HLS nativo
+         (Safari) têm o timeout de 25s que escala se não houver dado
+         (readyState < 2), mas o caminho hls.js NÃO tinha nenhum: se o
+         manifest não carregasse nem desse erro, o player ficava preso
+         em "Conectando ao Painel…" para sempre (o retry interno do
+         hls.js sozinho levava minutos). 25s, igual ao MP4; limpa no
+         primeiro `playing`, igual ao MP4. */
+      stalls.src = window.setTimeout(() => {
+        if (video.readyState < 2) escalate();
+      }, 25_000);
+      video.addEventListener(
+        "playing",
+        () => window.clearTimeout(stalls.src),
+        { once: true },
+      );
+
       const module = await import("hls.js");
       const Hls = module.default;
       if (cancelled) return;
@@ -379,6 +400,22 @@ export function NativePlayer({
         manifestLoadingTimeOut: 12_000,
         levelLoadingTimeOut: 12_000,
         fragLoadingTimeOut: 20_000,
+        /* tudo19: falhar RÁPIDO — o padrão do hls.js é retentar o
+           manifest até 6x (até 64s) antes de dar erro fatal, e o
+           ERROR handler ainda dava 2x startLoad (cada um com o seu
+           ciclo de 6 retries). Um manifest morto segurava o player
+           por minutos em "Conectando ao Painel…". Com 1 retry o
+           manifest morto vira erro fatal em ~25s, e o timeout duro
+           abaixo garante a escalada de qualquer jeito. */
+        manifestLoadingMaxRetry: 1,
+        manifestLoadingRetryDelay: 1_000,
+        manifestLoadingMaxRetryTimeout: 15_000,
+        levelLoadingMaxRetry: 1,
+        levelLoadingRetryDelay: 1_000,
+        levelLoadingMaxRetryTimeout: 15_000,
+        fragLoadingMaxRetry: 2,
+        fragLoadingRetryDelay: 1_000,
+        fragLoadingMaxRetryTimeout: 30_000,
         /* The CDNs hotlink on Referer, and a browser never lets us clear it on an
            XHR — but it does honour `referrerPolicy`. `context.url` is often a
            *relative* /api/hls path, and `new Request()` throws on those, which

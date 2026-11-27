@@ -203,18 +203,15 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
     streamExt = wanted.ext || streamExt;
   }
 
-  /* tudo18 — VOD em HLS adaptativo (filme/série): o painel Xtream serve
-     .m3u8 para VOD no mesmo esquema de URL do MP4 (só troca a extensão) e
-     o player (hls.js) se adapta à conexão em vez de travar: o vídeo vem em
-     pedaços curtos (.ts), cada um é um pedido curto e independente (o proxy
-     do cPanel lida muito melhor com isso do que com uma conexão única de
-     2 horas), e se a conexão cair o hls.js tenta o pedaço de novo. É por
-     isso que o MESMO servidor e o MESMO filme não travam em outros
-     webplayers (que usam HLS) e travavam aqui (MP4 progressivo).
-     O MP4 continua como 2ª fonte: se o HLS falhar (painel/título sem
-     .m3u8), o player escala para ele sozinho (o mecanismo de escalonamento
-     do NativePlayer já faz isso) — sem HLS, o comportamento é o de hoje.
-     Ao vivo já era HLS e continua igual (uma fonte só). */
+  /* tudo19 — MP4 é a 1ª fonte de novo (o comportamento que funcionava
+     antes do tudo18). O tudo18 pôs o HLS em 1º, mas o caminho do HLS
+     (playlist .m3u8 via stream.php) pode ficar preso por minutos sem
+     erro — e o player ficava em "Conectando ao Painel…" para sempre,
+     sem nunca cair para o MP4. O MP4 é o caminho que já provou tocar
+     (~30s para o 1º byte). O HLS continua como 2ª fonte: se o MP4
+     falhar (timeout de 25s no player), o player tenta o HLS — e o
+     caminho HLS agora tem timeout duro no NativePlayer, então ele
+     nunca fica preso. Ao vivo continua igual (uma fonte HLS só). */
   if (type === "live") {
     const liveParams = new URLSearchParams({ type, id: String(streamId) });
     const liveUrl = apiUrl(`/php/stream.php?${liveParams.toString()}`);
@@ -237,11 +234,11 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
     );
   }
 
-  const hlsParams = new URLSearchParams({ type, id: String(streamId), ext: "m3u8" });
-  const hlsUrl = apiUrl(`/php/stream.php?${hlsParams.toString()}`);
   const mp4Params = new URLSearchParams({ type, id: String(streamId) });
   if (streamExt) mp4Params.set("ext", streamExt);
   const mp4Url = apiUrl(`/php/stream.php?${mp4Params.toString()}`);
+  const hlsParams = new URLSearchParams({ type, id: String(streamId), ext: "m3u8" });
+  const hlsUrl = apiUrl(`/php/stream.php?${hlsParams.toString()}`);
 
   return NextResponse.json(
     {
@@ -252,17 +249,17 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
           provider: "panel",
           label: "Painel",
           quality: "FHD",
-          type: "m3u8",
-          url: hlsUrl,
-          proxy: hlsUrl,
+          type: "mp4",
+          url: mp4Url,
+          proxy: mp4Url,
         },
         {
           provider: "panel",
           label: "Painel",
           quality: "FHD",
-          type: "mp4",
-          url: mp4Url,
-          proxy: mp4Url,
+          type: "m3u8",
+          url: hlsUrl,
+          proxy: hlsUrl,
         },
       ],
     },
