@@ -109,7 +109,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                 {active ? "Editar perfil" : profiles.length ? "Novo perfil" : "Bem-vindo à MineTV"}
               </p>
               <h1 className="mb-6 font-display text-3xl tracking-wide text-white sm:text-4xl md:text-5xl">
-                {active ? "Deixe do seu jeito" : profiles.length ? "Add a profile" : "Crie sua conta"}
+                {active ? "Deixe do seu jeito" : profiles.length ? "Adicionar perfil" : "Crie sua conta"}
               </h1>
 
               <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
@@ -126,7 +126,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                     {draft.name.trim() || (kids ? "Infantil" : "Seu nome")}
                   </p>
                   <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-white/40">
-                    {chosenMaturity.label} · {draft.autoplay ? "Autoplay on" : "Autoplay off"}
+                    {chosenMaturity.label} · {draft.autoplay ? "Reprodução automática ligada" : "Reprodução automática desligada"}
                   </p>
                   {draft.maturity === "kids" && (
                     <p className="mt-3 rounded-lg bg-[#22c55e]/15 px-3 py-2 text-[11px] leading-snug text-[#86efac]">

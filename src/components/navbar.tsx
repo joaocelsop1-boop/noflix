@@ -314,39 +314,29 @@ export function Navbar() {
                       }}
                       className="block w-full px-4 py-2 text-left text-white/90 transition hover:underline"
                     >
-                      Manage Profiles
+                      Gerenciar perfis
                     </button>
                     <Link
                       href="/my-list"
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >
-                      My List
+                      Minha Lista
                     </Link>
                     <Link
                       href="/browse"
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >
-                      Browse All Titles
+                      Ver todos os títulos
                     </Link>
                     <Link
                       href="/settings"
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >
-                      Settings
+                      Configurações
                     </Link>
-                    <Link
-                      href="/settings?tab=developer"
-                      onClick={() => setMenu(null)}
-                      className="block px-4 py-2 text-white/90 transition hover:underline"
-                    >
-                      Developer options
-                    </Link>
-                    <p className="px-4 pt-3 pb-1 text-xs leading-relaxed text-white/35">
-                      Demo build — data &amp; artwork belong to their owners.
-                    </p>
                   </div>
                 </motion.div>
               )}

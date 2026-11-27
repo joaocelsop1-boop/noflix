@@ -16,14 +16,12 @@ const columns = [
   [
     { label: "Configurações", href: "/settings" },
     { label: "Aparência", href: "/settings?tab=appearance" },
-    { label: "Status do desenvolvedor", href: "/settings?tab=developer" },
     { label: "Sobre a MineTV", href: "/about" },
   ],
   [
     { label: "Política de privacidade", href: "/privacy" },
     { label: "Termos de uso", href: "/terms" },
     { label: "Direitos autorais e DMCA", href: "/dmca" },
-    { label: "Código no GitHub", href: "https://github.com/sdlksdsf/Movie" },
   ],
 ];
 
@@ -33,19 +31,11 @@ export function Footer() {
       <div className="mx-auto max-w-[1100px]">
         <div className="mb-6 flex items-center gap-4 text-white/80">
           <a
-          href="https://github.com/sdlksdsf/Movie"
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
-        >
-          GitHub ↗
-        </a>
-        <a
-          href="/about"
-          className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
-        >
-          Sobre a MineTV
-        </a>
+            href="/about"
+            className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
+          >
+            Sobre a MineTV
+          </a>
         </div>
 
         <div className="grid grid-cols-2 gap-y-3 sm:grid-cols-4">
@@ -74,12 +64,7 @@ export function Footer() {
 
         <div className="mt-8 space-y-2 text-[11px] leading-relaxed text-white/35">
           <p>
-            Uma demonstração inspirada na MineTV, feita com Next.js, Tailwind CSS e Framer Motion. Todos os títulos,
-            artes e metadados pertencem aos seus respectivos detentores de direitos.
-          </p>
-          <p>
-            A reprodução é entregue pelo player de terceiros CineLite. Se um stream não iniciar,
-            a fonte pode estar temporariamente indisponível — tente outro título ou servidor.
+            MineTV — filmes, séries e canais ao vivo, tudo em um só lugar.
           </p>
           <p className="pt-2">MineTV</p>
         </div>

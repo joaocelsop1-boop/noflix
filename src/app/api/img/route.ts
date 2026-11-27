@@ -22,12 +22,26 @@ import { TMDB_API_KEY, isBearerToken } from "@/lib/tmdb-key";
  * almost always has a real still for the same title.
  */
 
-const ALLOWED_HOSTS = new Set([
-  "image.tmdb.org",
-  "images.metahub.space",
-  "www.themoviedb.org",
-  "themoviedb.org",
-]);
+/**
+ * As capas do painel vêm de muitos hosts (o provedor troca de CDN com
+ * frequência: fenix7, ibb, imgur, cplay, ...). Uma lista fechada de hosts
+ * derrubava centenas de capas — por isso alguns filmes mostravam a imagem e
+ * outros não. Em vez de lista fechada, bloqueamos só o que é interno/privado
+ * (localhost, rede local, IP reservado); qualquer host público é aceito. O
+ * risco de SSRF é contido porque `grab()` só devolve o corpo quando o
+ * content-type é imagem, e o timeout é de 6s.
+ */
+const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".lan", ".home", ".corp", ".intranet"];
+
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  if (BLOCKED_HOST_SUFFIXES.some((s) => h.endsWith(s))) return true;
+  // IP literal em faixa privada/reservada
+  if (/^(10|127|172\.(1[6-9]|2\d|3[01])|192\.168|169\.254)\./.test(h)) return true;
+  if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fd") || h.startsWith("fc")) return true;
+  return false;
+}
 
 /** Six seconds is plenty for a CDN edge, and short enough to fail visibly. */
 const TIMEOUT_MS = 6000;
@@ -92,7 +106,7 @@ function parse(raw: string | null): string | null {
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    if (!ALLOWED_HOSTS.has(url.hostname)) return null;
+    if (isPrivateHost(url.hostname)) return null;
     return url.toString();
   } catch {
     return null;
@@ -148,7 +162,7 @@ export async function GET(request: Request) {
   }
 
   if (probe) {
-    return NextResponse.json({ ok: false, resolved: candidates, allowed: [...ALLOWED_HOSTS] });
+    return NextResponse.json({ ok: false, resolved: candidates });
   }
 
   /* a short cache: a hiccup on the CDN should be retried soon, not remembered */

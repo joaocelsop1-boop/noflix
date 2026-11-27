@@ -11,9 +11,19 @@ import { Row, ContinueRow } from "@/components/row";
 import { useStore, type WatchProgress } from "@/components/store";
 import { dynamicRows, rows } from "@/data/rows";
 import { getTitle, visibleFor } from "@/lib/catalog";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  PanelHome,
+  fetchPanelHomeData,
+  type PanelHomeData,
+} from "@/components/panel-home";
 
-export function HomePage() {
+/**
+ * Início com o catálogo curado (TMDB) — usada quando o usuário não está
+ * logado ou o painel não tem filmes/séries. Quando o painel tem conteúdo,
+ * a Início mostra SÓ o painel (ver PanelHome).
+ */
+function TmdbHome() {
   const { myList, profile, progress } = useStore();
 
   /* Continue Watching is built from real playback telemetry only — nothing is
@@ -64,7 +74,7 @@ export function HomePage() {
             <ContinueRow
               slugs={myList.slice(0, 12)}
               title="Minha Lista"
-              hint={`${myList.length} saved title${myList.length === 1 ? "" : "s"}`}
+              hint={`${myList.length} ${myList.length === 1 ? "título salvo" : "títulos salvos"}`}
               showProgress={false}
             />
           )}
@@ -94,4 +104,43 @@ export function HomePage() {
       <Footer />
     </>
   );
+}
+
+export function HomePage() {
+  const [mode, setMode] = useState<"checking" | "panel" | "tmdb">("checking");
+  const [panelData, setPanelData] = useState<PanelHomeData | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchPanelHomeData().then((data) => {
+      if (!alive) return;
+      if (data) {
+        setPanelData(data);
+        setMode("panel");
+      } else {
+        setMode("tmdb");
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (mode === "panel" && panelData) {
+    return <PanelHome data={panelData} />;
+  }
+
+  if (mode === "checking") {
+    return (
+      <>
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center">
+          <p className="text-[14px] text-white/50">Carregando seu catálogo…</p>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  return <TmdbHome />;
 }

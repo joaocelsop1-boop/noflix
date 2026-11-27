@@ -83,6 +83,42 @@ export function NativePlayer({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
+  /**
+   * Reforço de volume (Web Audio): o volume do <video> só vai até 1 (100%)
+   * e o áudio do painel chega baixo. O GainNode amplifica até 2x (200%).
+   * Criado uma única vez por elemento (createMediaElementSource só pode
+   * ser chamado uma vez) e reutilizado em todas as trocas de fonte.
+   */
+  const audioBoost = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
+  /** Ganho alvo (0 a 2). O slider de volume controla este valor. */
+  const gainTarget = useRef(1.5);
+  const ensureAudioBoost = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!audioBoost.current) {
+      try {
+        const Ctx =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const gain = ctx.createGain();
+        gain.gain.value = gainTarget.current;
+        ctx.createMediaElementSource(video).connect(gain);
+        gain.connect(ctx.destination);
+        audioBoost.current = { ctx, gain };
+      } catch {
+        audioBoost.current = null;
+      }
+    }
+    const boost = audioBoost.current;
+    if (boost) {
+      if (boost.ctx.state === "suspended") void boost.ctx.resume().catch(() => undefined);
+      boost.gain.gain.value = gainTarget.current;
+    }
+    // O volume do elemento fica em 1: o ganho é quem controla o volume.
+    video.volume = 1;
+  }, []);
   const videoEl = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
     /* no `crossOrigin`: provider CDNs rarely send CORS headers, and a plain
@@ -103,8 +139,16 @@ export function NativePlayer({
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(1.5);
   const [muted, setMuted] = useState(false);
+  /* Sincroniza o ganho de volume (0 a 2) com o estado do slider. */
+  useEffect(() => {
+    gainTarget.current = volume;
+    const boost = audioBoost.current;
+    if (boost) boost.gain.gain.value = volume;
+    const video = videoRef.current;
+    if (video) video.volume = 1;
+  }, [volume]);
   const [chrome, setChrome] = useState(true);
   const [menu, setMenu] = useState<null | "quality" | "captions" | "source" | "speed" | "audio">(null);
   const [levels, setLevels] = useState<Level[]>([]);
@@ -417,7 +461,8 @@ export function NativePlayer({
     const onWaiting = () => setWaiting(true);
     const onPlaying = () => setWaiting(false);
     const onVolume = () => {
-      setVolume(video.volume);
+      // O volume do elemento fica sempre em 1 (o ganho do Web Audio é quem
+      // controla o volume) — aqui só sincroniza o mudo.
       setMuted(video.muted);
     };
     const onEnded = () => {
@@ -543,9 +588,10 @@ export function NativePlayer({
   const toggle = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    ensureAudioBoost();
     if (video.paused) void video.play().catch(() => undefined);
     else video.pause();
-  }, []);
+  }, [ensureAudioBoost]);
 
   const seekBy = useCallback((delta: number) => {
     const video = videoRef.current;
@@ -562,9 +608,10 @@ export function NativePlayer({
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    ensureAudioBoost();
     video.muted = !video.muted;
-    if (!video.muted && video.volume === 0) video.volume = 1;
-  }, []);
+    if (!video.muted && volume === 0) setVolume(1.5);
+  }, [ensureAudioBoost, volume]);
 
   const toggleFullscreen = useCallback(() => {
     const shell = shellRef.current;
@@ -618,12 +665,12 @@ export function NativePlayer({
           break;
         case "arrowup":
           event.preventDefault();
-          if (videoRef.current) videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
+          setVolume((v) => Math.min(2, Math.round((v + 0.1) * 100) / 100));
           poke();
           break;
         case "arrowdown":
           event.preventDefault();
-          if (videoRef.current) videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
+          setVolume((v) => Math.max(0, Math.round((v - 0.1) * 100) / 100));
           poke();
           break;
         case "escape":
@@ -879,14 +926,15 @@ export function NativePlayer({
               <input
                 type="range"
                 min={0}
-                max={1}
+                max={2}
                 step={0.05}
                 value={muted ? 0 : volume}
                 onChange={(event) => {
                   const video = videoRef.current;
                   if (!video) return;
                   const next = Number(event.target.value);
-                  video.volume = next;
+                  ensureAudioBoost();
+                  setVolume(next);
                   video.muted = next === 0;
                 }}
                 aria-label="Volume"

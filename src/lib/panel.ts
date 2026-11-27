@@ -106,7 +106,13 @@ export function normalizePanelCatalog(
   data: unknown,
   kind: "movie" | "series" | "live",
 ): PanelCatalogItem[] {
-  const list = Array.isArray(data) ? data : [];
+  // A rota /api/panel/catalog devolve { ok, items, total } (objeto), não
+  // um array direto — aceita os dois formatos.
+  const list = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as Record<string, unknown>).items)
+      ? ((data as Record<string, unknown>).items as unknown[])
+      : [];
   return list
     .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
     .map((entry) => normalizePanelItem(entry, kind));

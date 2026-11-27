@@ -36,7 +36,7 @@ export function PersonalRows() {
       if (titles.length >= 4) {
         out.push({
           id: `because-${because.source.slug}`,
-          title: `Because You Watched ${because.source.name}`,
+          title: `Porque você assistiu ${because.source.name}`,
           hint: "Mesmo clima, mesmo gênero",
           slugs: titles.map((t) => t.slug),
         });
@@ -51,8 +51,8 @@ export function PersonalRows() {
       if (genreTitles.length >= 5) {
         out.push({
           id: `genre-${genre.toLowerCase()}`,
-          title: `More ${genre} Like You Watch`,
-          hint: `Your most-watched genre`,
+          title: `Mais ${genre} para você`,
+          hint: `Seu gênero mais assistido`,
           slugs: genreTitles.slice(0, 16).map((t) => t.slug),
         });
       }

@@ -61,7 +61,8 @@ function mapPanelItem(
   kind: "movie" | "series",
   categoryName: string,
 ): CatalogueEntry | null {
-  const id = num(raw.stream_id);
+  // Filme/ao vivo usam stream_id; série usa series_id.
+  const id = num(raw.stream_id ?? raw.series_id);
   const name = str(raw.name);
   if (!id || !name) return null;
   const rating10 = num(raw.rating);
@@ -82,7 +83,8 @@ function mapPanelItem(
     name,
     year,
     rating,
-    poster: str(raw.stream_icon),
+    // Série: a capa vem em `cover`; filme/ao vivo em `stream_icon`.
+    poster: str(raw.cover ?? raw.stream_icon),
     backdrop: str(raw.backdrop_path) ?? str(raw.stream_icon),
     overview: str(raw.plot),
     genres: genresFromCategory(categoryName),

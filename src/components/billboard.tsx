@@ -172,7 +172,7 @@ export function Billboard() {
                   className="focus-brand flex items-center gap-2 rounded-[4px] bg-white px-6 py-3 text-[15px] font-semibold text-black transition duration-200 hover:bg-white/85 active:scale-[0.98]"
                 >
                   <PlayIcon width={20} height={20} />
-                  Play
+                  Assistir
                 </button>
                 <button
                   type="button"
@@ -180,7 +180,7 @@ export function Billboard() {
                   className="focus-brand flex items-center gap-2 rounded-[4px] bg-white/20 px-6 py-3 text-[15px] font-semibold text-white backdrop-blur-sm transition duration-200 hover:bg-white/30 active:scale-[0.98]"
                 >
                   <InfoIcon width={20} height={20} />
-                  More Info
+                  Mais informações
                 </button>
                 <button
                   type="button"

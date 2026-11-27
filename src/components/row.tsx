@@ -41,7 +41,7 @@ export function Row({ row, priority = false }: { row: RowType; priority?: boolea
           href={row.ranked ? "/new-popular" : "/browse"}
           className="ml-auto flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#54b9c5] opacity-0 transition-all duration-300 group-hover/row:opacity-100"
         >
-          Explore All
+          Explorar tudo
           <ChevronRightIcon width={14} height={14} />
         </Link>
       </div>
@@ -97,7 +97,7 @@ export function ContinueRow({
           const label = p
             ? item.kind === "series"
               ? `S${p.season}:E${p.episode}`
-              : `${Math.round(p.percent * 100)}% watched`
+              : `${Math.round(p.percent * 100)}% assistido`
             : undefined;
           return (
             <div key={item.slug} className="snap-start">
@@ -322,7 +322,7 @@ export function PosterCard({
                   <button
                     type="button"
                     aria-label="Curtir"
-                    onClick={() => toast(`We'll show you more like ${title.name}`)}
+                    onClick={() => toast(`Vamos mostrar mais como ${title.name}`)}
                     className="grid h-8 w-8 place-items-center rounded-full border border-white/40 text-white transition hover:border-white"
                   >
                     <ThumbUpIcon width={14} height={14} />

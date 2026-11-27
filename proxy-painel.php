@@ -15,6 +15,12 @@
  *   e devolve a resposta (JSON ou binário) para o NOFLIX.
  * O mesmo vale para os streams: /live/usuario/senha/123.m3u8, /movie/..., .ts etc.
  *
+ * STREAMING (importante):
+ * A resposta é repassada em BLOCOS, à medida que chega do painel — o arquivo
+ * NUNCA é carregado inteiro na memória. Sem isso, um filme (centenas de MB)
+ * estourava a memória do PHP e o player ficava travado. O cabeçalho Range
+ * (para pular/adiantar o vídeo) também é repassado ao painel.
+ *
  * SEGURANÇA:
  * - Só aceita chamadas vindas do IP da Oracle ($ALLOWED_IP). Qualquer outro
  *   IP recebe 403. Se o IP da Oracle mudar, atualize $ALLOWED_IP abaixo.
@@ -57,18 +63,24 @@ if (strpos($path, '..') !== false || !preg_match('#^/[A-Za-z0-9_\-./]+$#', $path
 $query = $_SERVER['QUERY_STRING'] ?? '';
 $target = $PANEL_BASE . $path . ($query !== '' ? '?' . $query : '');
 
-// ---- encaminha para o painel (método GET ou POST, repassa o corpo) ----
+// ---- encaminha para o painel, repassando em blocos (streaming) ----
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $target);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+// Sem limite de tempo: um filme pode levar horas para tocar; o limite é
+// do servidor web, não daqui. (Antes era 60s e o filme morria no meio.)
+curl_setopt($ch, CURLOPT_TIMEOUT, 0);
 curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-// Repassa o método e o corpo (o admin do NOFLIX usa POST em algumas ações).
+// Repassa o cabeçalho Range (pular/adiantar o vídeo) e o método/corpo.
+$headers = [];
+if (!empty($_SERVER['HTTP_RANGE'])) {
+    $headers[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
+}
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 if ($method === 'POST') {
     curl_setopt($ch, CURLOPT_POST, true);
@@ -76,34 +88,48 @@ if ($method === 'POST') {
 } elseif ($method !== 'GET') {
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 }
+if ($headers) {
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+}
+// Repassa o status e os cabeçalhos do painel para o navegador.
+curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $header) {
+    $len = strlen($header);
+    if (preg_match('/^HTTP\/\d+(?:\.\d+)?\s+(\d+)/i', $header, $m)) {
+        http_response_code((int)$m[1]);
+        return $len;
+    }
+    if (preg_match('/^(Content-Type|Content-Length|Content-Range|Accept-Ranges):/i', $header)) {
+        header(trim($header));
+    }
+    return $len;
+});
+// Escreve cada bloco assim que chega — nada fica na memória.
+curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $data) {
+    echo $data;
+    flush();
+    return strlen($data);
+});
 
-$body = curl_exec($ch);
-$http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$ctype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+set_time_limit(0);
+// Tipo padrão caso o painel não envie Content-Type.
+if (substr($path, -5) === '.m3u8') {
+    header('Content-Type: application/vnd.apple.mpegurl');
+} elseif (substr($path, -3) === '.ts') {
+    header('Content-Type: video/MP2T');
+} elseif (substr($path, -4) === '.mp4') {
+    header('Content-Type: video/mp4');
+}
+header('Accept-Ranges: bytes');
+
+$ok = curl_exec($ch);
 $err = curl_error($ch);
 curl_close($ch);
-
-if ($body === false || $http === 0) {
-    http_response_code(502);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => true, 'message' => 'Falha ao conectar ao painel: ' . $err]);
-    exit;
-}
-
-// ---- devolve a resposta do painel como ela veio ----
-http_response_code($http);
-if ($ctype) {
-    header('Content-Type: ' . $ctype);
-} else {
-    // Sem Content-Type do painel: adivinha pelo caminho.
-    if (substr($path, -5) === '.m3u8') {
-        header('Content-Type: application/vnd.apple.mpegurl');
-    } elseif (substr($path, -3) === '.ts') {
-        header('Content-Type: video/MP2T');
-    } elseif (substr($path, -4) === '.mp4') {
-        header('Content-Type: video/mp4');
-    } else {
+if ($ok === false) {
+    // A conexão com o painel falhou antes de qualquer byte: 502.
+    // (Se já saiu algum byte, o status já foi enviado e não dá para trocar.)
+    if (!headers_sent()) {
+        http_response_code(502);
         header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => true, 'message' => 'Falha ao conectar ao painel: ' . $err]);
     }
 }
-echo $body;
