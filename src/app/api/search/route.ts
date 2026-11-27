@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const res = await fetch(url, { headers: { cookie }, cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json().catch(() => null);
-    return Array.isArray(data?.items) ? data.items : [];
+    return Array.isArray(data?.results) ? data.results : [];
   };
 
   const [movies, series] = await Promise.all([fetchTab("movie"), fetchTab("series")]);

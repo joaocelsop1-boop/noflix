@@ -88,8 +88,8 @@ function markDead(url: string): void {
  * do painel. FIFO quando cheio; TTL de 1h por entrada.
  */
 const IMG_TTL = 60 * 60 * 1000;
-const IMG_MAX_ENTRIES = 150;
-const IMG_MAX_BYTES = 48 * 1024 * 1024;
+const IMG_MAX_ENTRIES = 400;
+const IMG_MAX_BYTES = 128 * 1024 * 1024;
 const imgCache = new Map<string, { at: number; type: string; body: Uint8Array<ArrayBuffer>; size: number }>();
 let imgCacheBytes = 0;
 
@@ -173,20 +173,26 @@ async function diskCacheGet(
   url: string,
 ): Promise<{ type: string; body: Uint8Array<ArrayBuffer> } | null> {
   try {
-    if (!(await ensureDiskDir())) return null;
+    // O arquivo é <sha256>.<ext> — testa as extensões direto, sem listar a
+    // pasta. Antes cada capa fazia um readdir (até 2000 arquivos) para
+    // achar o seu: com 150 capas na inicial, 150 varreduras por abertura.
     const hash = createHash("sha256").update(url).digest("hex");
-    const names = await fs.readdir(DISK_DIR);
-    const name = names.find((n) => n.startsWith(`${hash}.`));
-    if (!name) return null;
-    const file = path.join(DISK_DIR, name);
-    const stat = await fs.stat(file);
-    if (Date.now() - stat.mtimeMs > DISK_TTL) {
-      await fs.unlink(file).catch(() => undefined);
-      return null;
+    for (const ext of ["jpg", "png", "webp", "avif", "gif", "svg"]) {
+      const file = path.join(DISK_DIR, `${hash}.${ext}`);
+      try {
+        const stat = await fs.stat(file);
+        if (Date.now() - stat.mtimeMs > DISK_TTL) {
+          await fs.unlink(file).catch(() => undefined);
+          continue;
+        }
+        const buf = await fs.readFile(file);
+        const type = TYPE_BY_EXT[ext] ?? "image/jpeg";
+        return { type, body: new Uint8Array(buf) };
+      } catch {
+        /* tenta a próxima extensão */
+      }
     }
-    const buf = await fs.readFile(file);
-    const type = TYPE_BY_EXT[path.extname(name).slice(1)] ?? "image/jpeg";
-    return { type, body: new Uint8Array(buf) };
+    return null;
   } catch {
     return null;
   }
@@ -204,7 +210,16 @@ async function diskCacheSet(url: string, type: string, body: Uint8Array<ArrayBuf
   }
 }
 
+/** Poda no máximo 1x a cada 10 min: antes ela rodava a cada capa gravada e
+ * varria a pasta inteira (readdir + stat de até 2000 arquivos) por capa —
+ * na 1ª carga da inicial, 150 podas. */
+let lastPruneAt = 0;
+const PRUNE_MIN_INTERVAL = 10 * 60 * 1000;
+
 async function pruneDiskCache(): Promise<void> {
+  const now = Date.now();
+  if (now - lastPruneAt < PRUNE_MIN_INTERVAL) return;
+  lastPruneAt = now;
   try {
     const names = await fs.readdir(DISK_DIR);
     const infos: Array<{ name: string; mtimeMs: number; size: number }> = [];

@@ -7,7 +7,7 @@ import {
   type CatalogueEntry,
   type CatalogueTab,
 } from "@/lib/catalogue";
-import { phpApi } from "@/lib/php";
+import { phpApi, phpMe } from "@/lib/php";
 
 export const revalidate = 21_600;
 
@@ -60,12 +60,17 @@ function normText(value: string): string {
     .toLowerCase();
 }
 
-/** Cache do catálogo do painel (10 min por aba): o catálogo é o mesmo para
+/** Cache do catálogo do painel (30 min por aba): o catálogo é o mesmo para
  * todo mundo (um só painel no admin) e buscar 20 mil filmes + 10 mil séries
  * no Xtream a cada abertura deixava a inicial lenta. Só guarda resultado
  * não-vazio; vazio (deslogado/painel fora) nunca é cacheado. */
-const PANEL_CACHE_TTL = 10 * 60 * 1000;
+const PANEL_CACHE_TTL = 30 * 60 * 1000;
 const panelCache = new Map<string, { at: number; entries: CatalogueEntry[] }>();
+/** Buscas em andamento por aba: sem isso, os pedidos paralelos da inicial
+ * (filme, série, anime, lançamentos) disparavam CADA UM a sua própria busca
+ * completa no painel — várias listas de 20 mil itens ao mesmo tempo no
+ * mesmo painel lento. Quem chega enquanto uma busca roda espera por ELA. */
+const panelInflight = new Map<string, Promise<CatalogueEntry[]>>();
 
 /** Exportado para a rota /api/panel/categories (aba Anime deriva as categorias dos itens). */
 export async function cachedPanelCatalogue(
@@ -74,12 +79,34 @@ export async function cachedPanelCatalogue(
 ): Promise<CatalogueEntry[]> {
   const hit = panelCache.get(tab);
   if (hit && Date.now() - hit.at < PANEL_CACHE_TTL) return hit.entries;
-  const entries = await panelCatalogue(tab, cookies);
-  if (entries.length > 0) {
-    if (panelCache.size >= 10) panelCache.clear();
-    panelCache.set(tab, { at: Date.now(), entries });
-  }
-  return entries;
+  const pending = panelInflight.get(tab);
+  if (pending) return pending;
+  const run = (async (): Promise<CatalogueEntry[]> => {
+    // Anime NÃO busca as listas de novo: deriva dos filmes+séries já
+    // buscados (a aba anime é um filtro deles). Antes ela buscava VOD e
+    // séries inteiras pela 2ª vez — o dobro de trabalho para 2 animes.
+    let entries: CatalogueEntry[];
+    if (tab === "anime") {
+      const [movies, series] = await Promise.all([
+        cachedPanelCatalogue("movie", cookies),
+        cachedPanelCatalogue("series", cookies),
+      ]);
+      entries = [...movies, ...series].filter((entry) => entry.anime);
+    } else {
+      entries = await panelCatalogue(tab, cookies);
+    }
+    if (entries.length > 0) {
+      if (panelCache.size >= 10) panelCache.clear();
+      panelCache.set(tab, { at: Date.now(), entries });
+    }
+    return entries;
+  })();
+  panelInflight.set(tab, run);
+  void run.then(
+    () => panelInflight.delete(tab),
+    () => panelInflight.delete(tab),
+  );
+  return run;
 }
 
 const str = (value: unknown): string | undefined =>
@@ -135,44 +162,39 @@ function mapPanelItem(
  * alimenta o filtro de gênero) vem de get_*_categories, buscado junto.
  */
 async function panelCatalogue(
-  tab: CatalogueTab,
+  tab: Exclude<CatalogueTab, "anime">,
   cookies: string | null,
 ): Promise<CatalogueEntry[]> {
-  const actions: Array<{ action: string; catAction: string; kind: "movie" | "series" }> =
+  const { action, catAction, kind } =
     tab === "movie"
-      ? [{ action: "get_vod_streams", catAction: "get_vod_categories", kind: "movie" }]
-      : tab === "series"
-        ? [{ action: "get_series", catAction: "get_series_categories", kind: "series" }]
-        : [
-            { action: "get_vod_streams", catAction: "get_vod_categories", kind: "movie" },
-            { action: "get_series", catAction: "get_series_categories", kind: "series" },
-          ];
+      ? { action: "get_vod_streams", catAction: "get_vod_categories", kind: "movie" as const }
+      : { action: "get_series", catAction: "get_series_categories", kind: "series" as const };
+  // Categorias e lista em PARALELO (eram sequenciais: 2 viagens ao painel
+  // para cada aba). As duas são independentes — o nome da categoria só é
+  // usado depois, no mapeamento.
+  const [catRes, result] = await Promise.all([
+    phpApi(catAction, { cookies, timeoutMs: 60_000 }),
+    phpApi(action, { cookies, timeoutMs: 60_000 }),
+  ]);
+  // Nome das categorias (id -> nome) para o filtro de gênero.
+  const catName = new Map<string, string>();
+  if (catRes.status === 200 && Array.isArray(catRes.data)) {
+    for (const c of catRes.data as Array<Record<string, unknown>>) {
+      const id = String(c.category_id ?? "");
+      const name = typeof c.category_name === "string" ? c.category_name : "";
+      if (id && name) catName.set(id, name);
+    }
+  }
+  if (result.status !== 200) return [];
+  const data = result.data;
+  const list = Array.isArray(data) ? data : [];
   const out: CatalogueEntry[] = [];
-  for (const { action, catAction, kind } of actions) {
-    // Nome das categorias (id -> nome) para o filtro de gênero.
-    const catName = new Map<string, string>();
-    const catRes = await phpApi(catAction, { cookies, timeoutMs: 60_000 });
-    if (catRes.status === 200 && Array.isArray(catRes.data)) {
-      for (const c of catRes.data as Array<Record<string, unknown>>) {
-        const id = String(c.category_id ?? "");
-        const name = typeof c.category_name === "string" ? c.category_name : "";
-        if (id && name) catName.set(id, name);
-      }
-    }
-    const result = await phpApi(action, { cookies, timeoutMs: 60_000 });
-    if (result.status !== 200) continue;
-    const data = result.data;
-    const list = Array.isArray(data) ? data : [];
-    for (const raw of list) {
-      if (!raw || typeof raw !== "object") continue;
-      const rec = raw as Record<string, unknown>;
-      const catId = String(rec.category_id ?? "");
-      const entry = mapPanelItem(rec, kind, catName.get(catId) ?? "");
-      if (!entry) continue;
-      // Aba anime: só o que é anime de verdade (categoria ou nome).
-      if (tab === "anime" && !entry.anime) continue;
-      out.push(entry);
-    }
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const rec = raw as Record<string, unknown>;
+    const catId = String(rec.category_id ?? "");
+    const entry = mapPanelItem(rec, kind, catName.get(catId) ?? "");
+    if (entry) out.push(entry);
   }
   return out;
 }
@@ -184,10 +206,10 @@ async function panelCatalogue(
  * prateleira inteira, `results` é a janela pedida — a interface percorre 120
  * por vez para a rolagem continuar leve no celular.
  *
- * Fonte: com chave TMDB, o catálogo curado do TMDB (2.500 títulos). SEM a
- * chave, o catálogo do painel Xtream do usuário (filmes/séries do painel) —
- * é dele que os filmes vêm, então a prateleira nunca fica vazia por falta
- * da chave TMDB.
+ * Fonte: o catálogo do painel Xtream do usuário (filmes/séries do painel) —
+ * é dele que os filmes vêm. A chave TMDB (quando houver) só alimenta as
+ * CAPAS via /api/img, nunca troca o catálogo: o catálogo curado do TMDB
+ * (2.500 títulos) só aparece para visitante SEM login.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -204,10 +226,25 @@ export async function GET(request: Request) {
   const audience = searchParams.get("audience");
   const q = normText((searchParams.get("q") ?? "").trim());
 
-  // Sem chave TMDB: usa o catálogo do painel (o usuário está logado e o
-  // painel está configurado no admin). Sem painel/logado, volta vazio.
-  if (!hasCatalogueKey()) {
-    const all = await cachedPanelCatalogue(tab, request.headers.get("cookie"));
+  const cookies = request.headers.get("cookie");
+  // O catálogo do painel é a fonte quando há conteúdo nele — INDEPENDENTE
+  // da chave TMDB. A chave só alimenta as CAPAS (via /api/img). Sem este
+  // desvio, bastaria colar a chave TMDB para a rota trocar para o catálogo
+  // curado do TMDB (2.500 títulos) e os 31 mil filmes do painel sumirem da
+  // inicial, da busca e da prateleira. O curado só aparece para visitante
+  // SEM login (demonstração); logado sem painel volta vazio (a inicial
+  // mostra o erro, nunca TMDB silencioso). O phpMe só é chamado quando o
+  // painel veio vazio — no caminho quente não custa nada.
+  const panelEntries = await cachedPanelCatalogue(tab, cookies);
+  let usePanel = panelEntries.length > 0;
+  if (!usePanel && hasCatalogueKey()) {
+    const me = await phpMe(cookies);
+    // phpMe null = backend fora: painel (vazio) — nunca TMDB silencioso.
+    usePanel = me === null || me.loggedIn;
+  }
+
+  if (usePanel) {
+    const all = panelEntries;
     let filtered = all;
     if (q) filtered = filtered.filter((entry) => normText(entry.name).includes(q));
     if (category) filtered = filtered.filter((entry) => entry.categoryId === category);

@@ -212,11 +212,14 @@ function serve_passthrough($url, $ext) {
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-    /* tudo12: fail fast se o upstream travar — sem isso uma conexao
+    /* tudo12/tudo15: fail fast se o upstream travar — sem isso uma conexao
        pendurada espera para sempre (pior que fechar: fechada, o navegador
-       retoma com um novo Range; pendurada, so gira). 1 KB/s por 30 s. */
+       retoma com um novo Range; pendurada, so gira). 1 KB/s por 60 s:
+       o painel pode levar ~30 s só para mandar o primeiro byte de um
+       filme grande — com 30 s o limite cortava um stream que estava para
+       começar. 60 s ainda fecha um travado de verdade. */
     curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
-    curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 30);
+    curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 60);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $rangeHeaders = [];

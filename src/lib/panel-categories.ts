@@ -51,8 +51,12 @@ function toCategory(raw: Record<string, unknown>): PanelCategory | null {
   return { id, name, slug: categorySlug(name) };
 }
 
-const CATEGORIES_TTL = 10 * 60 * 1000;
+const CATEGORIES_TTL = 30 * 60 * 1000;
 const categoriesCache = new Map<string, { at: number; list: PanelCategory[] }>();
+/** Mesma ideia do catálogo: sem coalescing, os pedidos paralelos da
+ * inicial (filme, série, lançamentos, Top 10) buscavam as mesmas categorias
+ * várias vezes ao mesmo tempo no painel. */
+const categoriesInflight = new Map<string, Promise<PanelCategory[]>>();
 
 async function fetchRawCategories(
   action: "get_vod_categories" | "get_series_categories",
@@ -61,23 +65,33 @@ async function fetchRawCategories(
   const key = action;
   const hit = categoriesCache.get(key);
   if (hit && Date.now() - hit.at < CATEGORIES_TTL) return hit.list;
-  const res = await phpApi(action, { cookies, timeoutMs: 60_000 });
-  const list: PanelCategory[] = [];
-  if (res.status === 200 && Array.isArray(res.data)) {
-    const seen = new Set<string>();
-    for (const c of res.data as Array<Record<string, unknown>>) {
-      const cat = toCategory(c);
-      if (cat && !seen.has(cat.id)) {
-        seen.add(cat.id);
-        list.push(cat);
+  const pending = categoriesInflight.get(key);
+  if (pending) return pending;
+  const run = (async (): Promise<PanelCategory[]> => {
+    const res = await phpApi(action, { cookies, timeoutMs: 60_000 });
+    const list: PanelCategory[] = [];
+    if (res.status === 200 && Array.isArray(res.data)) {
+      const seen = new Set<string>();
+      for (const c of res.data as Array<Record<string, unknown>>) {
+        const cat = toCategory(c);
+        if (cat && !seen.has(cat.id)) {
+          seen.add(cat.id);
+          list.push(cat);
+        }
       }
     }
-  }
-  if (list.length > 0) {
-    if (categoriesCache.size >= 10) categoriesCache.clear();
-    categoriesCache.set(key, { at: Date.now(), list });
-  }
-  return list;
+    if (list.length > 0) {
+      if (categoriesCache.size >= 10) categoriesCache.clear();
+      categoriesCache.set(key, { at: Date.now(), list });
+    }
+    return list;
+  })();
+  categoriesInflight.set(key, run);
+  void run.then(
+    () => categoriesInflight.delete(key),
+    () => categoriesInflight.delete(key),
+  );
+  return run;
 }
 
 /**

@@ -183,6 +183,8 @@ export function Player({
      menu não mostrava nenhum seletor (sempre S01E01). */
   const [panelSeasons, setPanelSeasons] = useState<Season[]>([]);
   const [panelSeasonsLoaded, setPanelSeasonsLoaded] = useState(false);
+  /* tudo15: a série toca sozinha — dispara 1x quando a lista chega */
+  const autoPicked = useRef(false);
   useEffect(() => {
     if (!isPanelTitle || title.panel?.type !== "series" || title.kind !== "series") return;
     let alive = true;
@@ -217,11 +219,27 @@ export function Player({
         .filter((s) => s.number > 0 && s.episodes.length > 0)
         .sort((a, b) => a.number - b.number);
       setPanelSeasons(list);
+      // tudo15: com a lista carregada, a série começa sozinha no 1º
+      // episódio (menor temporada/episódio) — antes ela ficava parada na
+      // tela "Escolher episódio" e parecia que "não rodava nada". O seletor
+      // continua no menu do player (temporadas + episódios) para trocar
+      // quando quiser; sem episódios no painel, a tela de escolha continua
+      // aparecendo com o botão "Assistir · Temporada 1 · Episódio 1".
+      if (list.length > 0 && !autoPicked.current && !episodePicked) {
+        autoPicked.current = true;
+        const first = list[0];
+        const ep = first.episodes[0];
+        if (first && ep) {
+          setSeason(first.number);
+          setEpisode(ep.number);
+          setPicked(true);
+        }
+      }
     });
     return () => {
       alive = false;
     };
-  }, [isPanelTitle, title]);
+  }, [isPanelTitle, title, episodePicked]);
 
   /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;

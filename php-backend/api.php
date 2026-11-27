@@ -9,6 +9,9 @@
  *   (POST) quando presentes — a URL testada é a digitada, não só a salva
  * - cache em arquivo cache/ (TTL 3600s) nas listas grandes; se o painel falhar,
  *   devolve o cache antigo, senão array vazio (nunca erro fatal)
+ * - stale-while-revalidate: cache velho (até 24h) é servido NA HORA e a
+ *   atualização roda em 2º plano (refresh_catalog) — o usuário nunca mais
+ *   espera 30-60s pelo painel só porque o cache venceu
  * - create_order: pedido pendente + Pix pelo gateway selecionado no admin
  *   (Mercado Pago, LynxPix, Efí, Asaas) ou Pix fixo manual; o erro do
  *   gateway volta legível ({ok:false, error}) e o pedido falho é cancelado
@@ -97,6 +100,13 @@ session_write_close();
 // ---------- cache em arquivo ----------
 define('CATALOG_CACHE_DIR', __DIR__ . '/cache');
 define('CATALOG_CACHE_TTL', 3600);
+// Velho (até 24h): ainda serve na hora, e a atualização roda em 2º plano.
+// O catálogo do painel muda pouco (títulos novos entram de vez em quando) —
+// servir a lista de ontem por alguns minutos é melhor que travar a tela
+// por 30-60s esperando o painel gerar 20 mil filmes de novo.
+define('CATALOG_CACHE_STALE_TTL', 86400);
+define('CATALOG_REFRESH_LOCK', CATALOG_CACHE_DIR . '/refresh.lock');
+define('CATALOG_REFRESH_LOCK_TTL', 600); // não dispara outro refresh por 10 min
 
 function catalog_cache_get($key) {
     $file = CATALOG_CACHE_DIR . '/' . $key . '.json';
@@ -111,6 +121,29 @@ function catalog_cache_put($key, $data) {
         @mkdir(CATALOG_CACHE_DIR, 0777, true);
     }
     @file_put_contents(CATALOG_CACHE_DIR . '/' . $key . '.json', json_encode($data), LOCK_EX);
+}
+
+// Dispara a atualização do cache em 2º plano (fire-and-forget): o usuário
+// já recebeu a resposta com o cache velho; este pedido só avisa o servidor
+// para buscar as listas novas. Trava de 10 min evita disparar um refresh
+// por lista velha quando a inicial pede filme+série+ao vivo de uma vez.
+// O refresh roda no próprio servidor (127.0.0.1) com o cookie da sessão,
+// para passar no login — e continua mesmo depois que este pedido desliga
+// (ignore_user_abort no refresh_catalog).
+function catalog_trigger_refresh() {
+    $lock = CATALOG_REFRESH_LOCK;
+    if (file_exists($lock) && (time() - filemtime($lock) < CATALOG_REFRESH_LOCK_TTL)) return;
+    if (!is_dir(CATALOG_CACHE_DIR)) @mkdir(CATALOG_CACHE_DIR, 0777, true);
+    @touch($lock);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'http://127.0.0.1/api.php?action=refresh_catalog');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT_MS, 300);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, 200);
+    $cookie = $_SERVER['HTTP_COOKIE'] ?? '';
+    if ($cookie !== '') curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+    curl_exec($ch);
+    curl_close($ch);
 }
 
 // ---------- chamada ao painel ----------
@@ -205,6 +238,13 @@ function filter_adult_categories($cats, $forceHide = false) {
 function catalog_list($settings, $action, $extra, $cacheKey) {
     $cached = catalog_cache_get($cacheKey);
     if ($cached && (time() - $cached['mtime'] < CATALOG_CACHE_TTL)) {
+        return $cached['data'];
+    }
+    // Cache VELHO (até 24h): serve na hora e atualiza em 2º plano. Antes,
+    // cache vencido = esperar o painel gerar 20 mil filmes (30-60s) com a
+    // tela travada — era isso que deixava cada abertura lenta.
+    if ($cached && (time() - $cached['mtime'] < CATALOG_CACHE_STALE_TTL)) {
+        catalog_trigger_refresh();
         return $cached['data'];
     }
     // Listas do catalogo sao grandes (20 mil filmes) e o painel via proxy pode
@@ -479,6 +519,34 @@ switch ($action) {
         $extra = $catId !== '' ? '&category_id=' . urlencode($catId) : '';
         $key = 'series' . ($catId !== '' ? '_' . preg_replace('/[^0-9]/', '', $catId) : '');
         echo json_encode(filter_adult_items(catalog_list($settings, 'get_series', $extra, $key), 'series', $settings));
+        break;
+
+    case 'refresh_catalog':
+        // Atualização do cache em 2º plano (stale-while-revalidate): chamado
+        // pelo catalog_list quando o cache está velho. Quem chamou já
+        // respondeu com o cache velho — este pedido só regrava os arquivos.
+        // Roda até o fim mesmo se quem disparou desligar (ignore_user_abort);
+        // cada lista leva até 60s no painel, 6 listas no pior caso.
+        api_require_login();
+        ignore_user_abort(true);
+        set_time_limit(0);
+        $refreshMap = [
+            'vod' => ['get_vod_streams', ''],
+            'series' => ['get_series', ''],
+            'live' => ['get_live_streams', ''],
+            'cat_vod' => ['get_vod_categories', ''],
+            'cat_series' => ['get_series_categories', ''],
+            'cat_live' => ['get_live_categories', ''],
+        ];
+        foreach ($refreshMap as $refreshKey => $spec) {
+            [$refreshAction, $refreshExtra] = $spec;
+            $refreshRes = call_sigma(sigma_url($settings, $refreshAction, $refreshExtra), 60);
+            if (!$refreshRes['error'] && !empty($refreshRes['data']) && is_array($refreshRes['data'])) {
+                catalog_cache_put($refreshKey, $refreshRes['data']);
+            }
+        }
+        @unlink(CATALOG_CACHE_DIR . '/refresh.lock');
+        echo json_encode(['ok' => true]);
         break;
 
     case 'get_vod_info':

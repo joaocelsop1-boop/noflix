@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStreams } from "@/lib/stream-resolver";
 import { proxied } from "@/lib/stream-sign";
 import { phpApi, phpMe } from "@/lib/php";
+import { cachedSeriesInfo } from "@/lib/panel-series-info";
 import { apiUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
@@ -154,28 +155,8 @@ function findEpisode(
   return firstEpisode(data);
 }
 
-/** get_series_info em cache (10 min): trocar de episódio não deve martelar o painel. */
-const SERIES_INFO_TTL = 10 * 60 * 1000;
-const seriesInfoCache = new Map<string, { at: number; data: unknown }>();
-
-async function cachedSeriesInfo(
-  seriesId: number,
-  cookies: string | null,
-): Promise<unknown> {
-  const key = `series:${seriesId}`;
-  const hit = seriesInfoCache.get(key);
-  if (hit && Date.now() - hit.at < SERIES_INFO_TTL) return hit.data;
-  const info = await phpApi("get_series_info", {
-    searchParams: { series_id: String(seriesId) },
-    cookies,
-  });
-  if (info.status === 200 && info.data) {
-    if (seriesInfoCache.size >= 200) seriesInfoCache.clear();
-    seriesInfoCache.set(key, { at: Date.now(), data: info.data });
-    return info.data;
-  }
-  return info.data ?? null;
-}
+/** get_series_info em cache (10 min): ver src/lib/panel-series-info.ts —
+ * a página do player e a resolução do stream compartilham a mesma busca. */
 
 /**
  * Panel stream: verifies the PHP session (active plan required) and returns
