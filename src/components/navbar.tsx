@@ -19,7 +19,6 @@ const links = [
   { href: "/tv-shows", label: "Séries" },
   { href: "/movies", label: "Filmes" },
   { href: "/anime", label: "Anime" },
-  { href: "/live", label: "Ao vivo" },
   { href: "/new-popular", label: "Novidades" },
   { href: "/browse", label: "Navegar" },
   { href: "/my-list", label: "Minha Lista" },
@@ -29,7 +28,6 @@ const mobileLinks = [
   { href: "/tv-shows", label: "Séries" },
   { href: "/movies", label: "Filmes" },
   { href: "/anime", label: "Anime" },
-  { href: "/live", label: "Ao vivo" },
   { href: "/browse", label: "Navegar" },
   { href: "/my-list", label: "Minha Lista" },
 ];

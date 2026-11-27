@@ -3,7 +3,6 @@
 import { Billboard } from "@/components/billboard";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
-import { LiveRows } from "@/components/live-rows";
 import { AudienceShelves } from "@/components/audience-shelves";
 import { LazySection } from "@/components/lazy-section";
 import { PersonalRows } from "@/components/personal-rows";
@@ -80,10 +79,6 @@ function TmdbHome() {
           )}
 
           <PersonalRows />
-
-          <LazySection minHeight={320} rootMargin="900px">
-            <LiveRows />
-          </LazySection>
 
           {/* kids/family, R-rated, and the 18+ shelf for All-maturity profiles */}
           <LazySection minHeight={320} rootMargin="900px">

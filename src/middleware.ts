@@ -75,7 +75,6 @@ export const config = {
     "/new-popular/:path*",
     "/play/:path*",
     "/watch/:path*",
-    "/live/:path*",
     "/title/:path*",
     "/genre/:path*",
     "/settings/:path*",

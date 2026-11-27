@@ -171,6 +171,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Status do cliente alterado para $newStatus!";
     }
 
+    // Editar cliente (nome, e-mail, WhatsApp, plano, status, vencimento;
+    // senha só muda se preencher uma nova)
+    elseif ($action === 'edit_client') {
+        $id = intval($_POST['user_id']);
+        $name = trim($_POST['name']);
+        $email = trim($_POST['email']);
+        $whatsapp = trim($_POST['whatsapp']);
+        $planId = !empty($_POST['plan_id']) ? intval($_POST['plan_id']) : null;
+        $status = $_POST['status'] ?? 'active';
+        if (!in_array($status, ['active', 'trial', 'blocked', 'expired'], true)) $status = 'active';
+        $expiresAt = trim($_POST['expires_at'] ?? '');
+        // Só edita cliente (nunca admin) e só aceita data válida.
+        $role = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
+        $role->execute([$id]);
+        if ($role->fetchColumn() !== 'client') {
+            $msg = "Só é possível editar clientes.";
+            $msgType = "error";
+        } elseif ($expiresAt !== '' && strtotime($expiresAt) === false) {
+            $msg = "Data de vencimento inválida.";
+            $msgType = "error";
+        } else {
+            try {
+                $sql = "UPDATE users SET name = ?, email = ?, whatsapp = ?, plan_id = ?, status = ?, expires_at = ? WHERE id = ? AND role = 'client'";
+                $params = [$name, $email, $whatsapp, $planId, $status, ($expiresAt !== '' ? date('Y-m-d H:i:s', strtotime($expiresAt)) : null), $id];
+                if (!empty($_POST['password'])) {
+                    $sql = "UPDATE users SET name = ?, email = ?, whatsapp = ?, plan_id = ?, status = ?, expires_at = ?, password = ? WHERE id = ? AND role = 'client'";
+                    $params = [$name, $email, $whatsapp, $planId, $status, ($expiresAt !== '' ? date('Y-m-d H:i:s', strtotime($expiresAt)) : null), password_hash($_POST['password'], PASSWORD_DEFAULT), $id];
+                }
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $msg = "Cliente atualizado com sucesso!";
+            } catch (PDOException $e) {
+                $msg = "Erro ao atualizar cliente: e-mail já existente.";
+                $msgType = "error";
+            }
+        }
+    }
+
+    // Excluir cliente (pedidos, perfis, avaliações e comissões dele somem
+    // junto pelo ON DELETE CASCADE do banco; admin nunca é excluído aqui)
+    elseif ($action === 'delete_client') {
+        $id = intval($_POST['user_id']);
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'client'");
+        $stmt->execute([$id]);
+        if ($stmt->rowCount() > 0) {
+            $msg = "Cliente excluído com sucesso!";
+        } else {
+            $msg = "Cliente não encontrado ou é um administrador.";
+            $msgType = "error";
+        }
+    }
+
     // Atualizar Plano
     elseif ($action === 'update_plan') {
         $planId = intval($_POST['plan_id']);
@@ -503,6 +555,13 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
                 </td>
                 <td class="p-3 text-right">
                   <div class="flex items-center justify-end gap-2">
+                    <button type="button" onclick="openEditClient(this)" data-id="<?= $c['id'] ?>" data-name="<?= htmlspecialchars($c['name'], ENT_QUOTES) ?>" data-email="<?= htmlspecialchars($c['email'], ENT_QUOTES) ?>" data-whatsapp="<?= htmlspecialchars($c['whatsapp'] ?? '', ENT_QUOTES) ?>" data-plan="<?= $c['plan_id'] ?? '' ?>" data-status="<?= $c['status'] ?>" data-expires="<?= $c['expires_at'] ? date('Y-m-d\TH:i', strtotime($c['expires_at'])) : '' ?>" class="text-xs px-2 py-1 bg-gray-800 hover:bg-blue-900 text-blue-300 rounded border border-gray-700">Editar</button>
+                    <form method="POST" class="inline" onsubmit="return confirm('Excluir o cliente <?= htmlspecialchars(addslashes($c['name'])) ?>? Os pedidos, perfis e avaliações dele também serão apagados. Não dá para desfazer.')">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+                      <input type="hidden" name="form_action" value="delete_client">
+                      <input type="hidden" name="user_id" value="<?= $c['id'] ?>">
+                      <button type="submit" class="text-xs px-2 py-1 bg-gray-800 hover:bg-red-900 text-red-300 rounded border border-gray-700">Excluir</button>
+                    </form>
                     <form method="POST" class="inline">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                       <input type="hidden" name="form_action" value="renew_client">
@@ -765,6 +824,65 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
 
   </main>
 
+  <!-- MODAL: EDITAR CLIENTE -->
+  <div id="modal-edit-client" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#161922] border border-gray-700 rounded-xl max-w-md w-full p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-white">Editar Cliente</h3>
+        <button onclick="document.getElementById('modal-edit-client').classList.add('hidden')" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form method="POST" class="space-y-3">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+        <input type="hidden" name="form_action" value="edit_client">
+        <input type="hidden" name="user_id" id="edit-user-id" value="">
+        <div>
+          <label class="block text-xs uppercase text-gray-400 mb-1">Nome Completo:</label>
+          <input type="text" name="name" id="edit-name" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+        </div>
+        <div>
+          <label class="block text-xs uppercase text-gray-400 mb-1">E-mail:</label>
+          <input type="email" name="email" id="edit-email" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+        </div>
+        <div>
+          <label class="block text-xs uppercase text-gray-400 mb-1">Nova senha (deixe em branco para não trocar):</label>
+          <input type="password" name="password" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+        </div>
+        <div>
+          <label class="block text-xs uppercase text-gray-400 mb-1">WhatsApp:</label>
+          <input type="text" name="whatsapp" id="edit-whatsapp" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+        </div>
+        <div>
+          <label class="block text-xs uppercase text-gray-400 mb-1">Plano:</label>
+          <select name="plan_id" id="edit-plan" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+            <option value="">Sem Plano</option>
+            <?php foreach ($plans as $p): ?>
+              <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> — R$ <?= number_format($p['price'], 2, ',', '.') ?> (<?= $p['duration_days'] ?> dias)</option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs uppercase text-gray-400 mb-1">Status:</label>
+            <select name="status" id="edit-status" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+              <option value="active">Ativo</option>
+              <option value="trial">Teste 3h</option>
+              <option value="blocked">Bloqueado</option>
+              <option value="expired">Expirado</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase text-gray-400 mb-1">Vencimento:</label>
+            <input type="datetime-local" name="expires_at" id="edit-expires" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+          </div>
+        </div>
+        <div class="pt-2 flex justify-end gap-3">
+          <button type="button" onclick="document.getElementById('modal-edit-client').classList.add('hidden')" class="px-4 py-2 bg-gray-800 text-gray-300 rounded text-sm">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: NOVO CLIENTE -->
   <div id="modal-new-client" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-[#161922] border border-gray-700 rounded-xl max-w-md w-full p-6">
@@ -808,6 +926,20 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
   </div>
 
   <script>
+    // Abre o modal de edição com os dados do cliente (vindos do botão).
+    function openEditClient(btn) {
+      var d = btn.dataset;
+      document.getElementById('edit-user-id').value = d.id || '';
+      document.getElementById('edit-name').value = d.name || '';
+      document.getElementById('edit-email').value = d.email || '';
+      document.getElementById('edit-whatsapp').value = d.whatsapp || '';
+      document.getElementById('edit-plan').value = d.plan || '';
+      document.getElementById('edit-status').value = d.status || 'active';
+      document.getElementById('edit-expires').value = d.expires || '';
+      var m = document.getElementById('modal-edit-client');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.tab-btn').forEach(el => {
