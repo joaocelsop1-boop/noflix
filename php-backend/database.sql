@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `sigma_url` VARCHAR(255) NOT NULL DEFAULT 'http://seuservidor.com:8080',
   `sigma_username` VARCHAR(100) NOT NULL DEFAULT '',
   `sigma_password` VARCHAR(100) NOT NULL DEFAULT '',
+  `panel_proxy` VARCHAR(255) NOT NULL DEFAULT '',
   `site_name` VARCHAR(100) NOT NULL DEFAULT 'MineTV',
   `affiliate_percent` INT NOT NULL DEFAULT 10,
   `trial_hours` INT NOT NULL DEFAULT 3,

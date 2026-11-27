@@ -35,7 +35,9 @@ if (!$user || !user_can_watch($user)) {
 session_write_close();
 
 $settings = get_settings($pdo);
-$panelHost = normalize_panel_url($settings['sigma_url'] ?? '');
+// panel_base_url: usa o proxy (se configurado) ou a URL do painel.
+// O proxy preserva o caminho, então /live/... e /movie/... chegam ao painel.
+$panelHost = panel_base_url($settings);
 $panelUser = $settings['sigma_username'] ?? '';
 $panelPass = $settings['sigma_password'] ?? '';
 if ($panelHost === '' || $panelUser === '' || $panelPass === '') {

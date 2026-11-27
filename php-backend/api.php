@@ -132,9 +132,10 @@ function call_sigma($url) {
 }
 
 function sigma_url($settings, $action, $extra = '') {
-    // normaliza a base: se o banco tiver uma URL suja (ex.: a URL completa do
-    // M3U colada no admin), a montagem não quebra e o painel responde.
-    $base = normalize_panel_url($settings['sigma_url'] ?? '');
+    // panel_base_url: usa o proxy (se configurado) ou a URL do painel
+    // normalizada. O proxy preserva o caminho, então o /player_api.php
+    // chega ao painel mesmo quando a Oracle é bloqueada por IP.
+    $base = panel_base_url($settings);
     return $base . '/player_api.php?username=' . urlencode($settings['sigma_username']) . '&password=' . urlencode($settings['sigma_password']) . '&action=' . $action . $extra;
 }
 
@@ -243,8 +244,9 @@ function mp_create_pix($token, $amount, $email, $description, $externalRef) {
 switch ($action) {
     case 'test_connection':
         api_require_admin();
-        // usa SÓ o que está salvo em settings — nada de URL/usuário/senha por POST
-        $url = normalize_panel_url($settings['sigma_url']) . "/player_api.php?username=" . urlencode($settings['sigma_username']) . "&password=" . urlencode($settings['sigma_password']);
+        // usa SÓ o que está salvo em settings — nada de URL/usuário/senha por POST.
+        // panel_base_url: passa pelo proxy quando configurado.
+        $url = panel_base_url($settings) . "/player_api.php?username=" . urlencode($settings['sigma_username']) . "&password=" . urlencode($settings['sigma_password']);
         $res = call_sigma($url);
         if ($res['error']) {
             echo json_encode(['success' => false, 'message' => 'Falha ao conectar: ' . $res['message']]);

@@ -11,9 +11,10 @@ require_admin();
 // Usado pelo save_settings e pelo clear_cache: nunca trocar o servidor nem
 // apagar o catálogo sem antes confirmar que o painel responde. O detalhe do
 // erro distingue DNS/timeout (getaddrinfo) de HTTP 404 (sem painel instalado).
-function test_panel_server($url, $user, $pass) {
-    $base = normalize_panel_url($url);
-    $testUrl = $base . "/player_api.php?username=" . urlencode($user) . "&password=" . urlencode($pass);
+// $base já é a base pronta: o proxy (quando configurado) ou a URL do painel
+// normalizada. O proxy preserva o caminho, então /player_api.php chega ao painel.
+function test_panel_server($base, $user, $pass) {
+    $testUrl = rtrim($base, '/') . "/player_api.php?username=" . urlencode($user) . "&password=" . urlencode($pass);
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $testUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -61,17 +62,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newUrl = normalize_panel_url(trim($_POST['sigma_url']));
         $newUser = trim($_POST['sigma_username']);
         $newPass = trim($_POST['sigma_password']);
+        // Proxy do painel (opcional): quando o painel bloqueia o IP da Oracle,
+        // as chamadas passam pelo proxy no cPanel (que o painel aceita).
+        // A base do teste é o proxy (se preenchido) ou a URL do painel.
+        $newProxy = trim($_POST['panel_proxy'] ?? '');
+        $testBase = $newProxy !== '' ? rtrim($newProxy, '/') : $newUrl;
+        // Garante a coluna panel_proxy no banco antigo (o CREATE TABLE novo já
+        // a inclui; banco criado antes da coluna precisa deste ALTER).
+        $col = $pdo->query("SHOW COLUMNS FROM settings LIKE 'panel_proxy'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE settings ADD COLUMN panel_proxy VARCHAR(255) NOT NULL DEFAULT ''");
+        }
         // Testa o servidor NOVO ANTES de salvar: se ele não responder, NADA
         // é salvo (nem a URL) e o catálogo antigo é mantido. Antes o UPDATE
         // rodava primeiro e a URL ruim sobrescrevia a boa — depois disso o
         // catálogo não tinha mais como reconstruir.
-        $test = test_panel_server($newUrl, $newUser, $newPass);
+        $test = test_panel_server($testBase, $newUser, $newPass);
         if ($test['ok']) {
-            $stmt = $pdo->prepare("UPDATE settings SET sigma_url = ?, sigma_username = ?, sigma_password = ?, affiliate_percent = ?, trial_hours = ?, mp_access_token = ?, pix_key = ? WHERE id = 1");
+            $stmt = $pdo->prepare("UPDATE settings SET sigma_url = ?, sigma_username = ?, sigma_password = ?, panel_proxy = ?, affiliate_percent = ?, trial_hours = ?, mp_access_token = ?, pix_key = ? WHERE id = 1");
             $stmt->execute([
                 $newUrl,
                 $newUser,
                 $newPass,
+                $newProxy,
                 intval($_POST['affiliate_percent']),
                 intval($_POST['trial_hours']),
                 trim($_POST['mp_access_token'] ?? ''),
@@ -93,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // fora do ar, o catálogo sumia e não tinha como reconstruir.
     elseif ($action === 'clear_cache') {
         $cur = get_settings($pdo);
-        $test = test_panel_server($cur['sigma_url'], $cur['sigma_username'], $cur['sigma_password']);
+        $test = test_panel_server(panel_base_url($cur), $cur['sigma_username'], $cur['sigma_password']);
         if ($test['ok']) {
             clear_catalog_cache();
             $msg = "Cache do catálogo limpo! Recarregue o player para puxar tudo de novo do painel.";
@@ -395,6 +408,12 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
                 <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Senha:</label>
                 <input type="password" name="sigma_password" value="<?= htmlspecialchars($settings['sigma_password']) ?>" placeholder="senha_sigma" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
               </div>
+            </div>
+
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Proxy do painel (opcional):</label>
+              <input type="text" name="panel_proxy" value="<?= htmlspecialchars($settings['panel_proxy'] ?? '') ?>" placeholder="https://webplayer.storestreaming.shop/proxy-painel.php" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">Só preencha se o painel bloquear o IP da Oracle (o "Testar conexão" dá 404/timeout mesmo com a URL certa). O proxy é o arquivo proxy-painel.php no cPanel — ele encaminha as chamadas para o painel. Com o proxy preenchido, TODAS as chamadas (catálogo e streams) passam por ele. Deixe vazio para falar direto com o painel.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-800">

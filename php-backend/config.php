@@ -40,11 +40,12 @@ function get_settings($pdo) {
         'sigma_url' => 'http://seuservidor.com:8080',
         'sigma_username' => '',
         'sigma_password' => '',
+        'panel_proxy' => '',
         'site_name' => 'MineTV',
         'affiliate_percent' => 10,
         'trial_hours' => 3,
         'mp_access_token' => '',
-        'pix_key' => ''
+        'pix_key' => '',
     ];
     $stmt = $pdo->query("SELECT * FROM settings WHERE id = 1 LIMIT 1");
     $row = $stmt->fetch();
@@ -71,6 +72,20 @@ function normalize_panel_url($url) {
     $host = $parsed['host'];
     $port = isset($parsed['port']) ? ':' . intval($parsed['port']) : '';
     return $scheme . '://' . $host . $port;
+}
+
+// Base usada para falar com o painel: se houver um proxy configurado
+// (panel_proxy), TODAS as chamadas (API e streams) passam por ele, com o
+// caminho preservado. Sem proxy, usa a URL do painel normalizada.
+// O proxy existe porque alguns painéis só respondem à API para IPs
+// liberados (o cPanel está liberado, a Oracle não). O proxy fica no cPanel
+// e encaminha para o painel — ver proxy-painel.php na raiz do projeto.
+function panel_base_url($settings) {
+    $proxy = trim((string)($settings['panel_proxy'] ?? ''));
+    if ($proxy !== '') {
+        return rtrim($proxy, '/');
+    }
+    return normalize_panel_url($settings['sigma_url'] ?? '');
 }
 
 // Usuário logado (cliente ou admin) — retorna a linha da tabela users ou null
