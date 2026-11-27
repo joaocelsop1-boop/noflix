@@ -7,9 +7,9 @@ import { AppShell } from "@/components/app-shell";
 import { BootIntro } from "@/components/boot-intro";
 
 export const metadata: Metadata = {
-  title: "MineTV — Watch TV Shows Online, Watch Movies Online",
+  title: "MineTV — Assista a séries online, assista a filmes online",
   description:
-    "A pixel-faithful MineTV experience: browse thousands of titles, hover to preview, and stream instantly in the built-in player.",
+    "A experiência MineTV: navegue por milhares de títulos, passe o mouse para pré-visualizar e assista na hora no player embutido.",
   applicationName: "MineTV",
 };
 

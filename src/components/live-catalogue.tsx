@@ -27,55 +27,55 @@ type Entry = {
 
 /** The audience filters offered on top of the tab + genre chips. */
 const AUDIENCES: Array<{ id: AudienceId; label: string; hint: string }> = [
-  { id: "all", label: "Everything", hint: "the whole shelf" },
-  { id: "kids", label: "Kids & family", hint: "G, PG, family animation" },
-  { id: "mature", label: "Mature", hint: "R-rated, TV-MA, crime, horror" },
+  { id: "all", label: "Tudo", hint: "the whole shelf" },
+  { id: "kids", label: "Infantil e família", hint: "Livre, PG, animação familiar" },
+  { id: "mature", label: "Adulto", hint: "Para maiores, TV-MA, crime, terror" },
 ];
 
 type AudienceId = "all" | "kids" | "mature";
 
 const TABS: Array<{ id: Tab; label: string; noun: string }> = [
-  { id: "movie", label: "Films", noun: "films" },
-  { id: "series", label: "Series", noun: "series" },
+  { id: "movie", label: "Filmes", noun: "films" },
+  { id: "series", label: "Séries", noun: "series" },
   { id: "anime", label: "Anime", noun: "anime" },
 ];
 
 const GENRES: Record<Tab, Array<{ id: number; name: string }>> = {
   movie: [
-    { id: 28, name: "Action" },
+    { id: 28, name: "Ação" },
     { id: 12, name: "Adventure" },
-    { id: 16, name: "Animation" },
-    { id: 35, name: "Comedy" },
+    { id: 16, name: "Animação" },
+    { id: 35, name: "Comédia" },
     { id: 80, name: "Crime" },
-    { id: 99, name: "Documentary" },
+    { id: 99, name: "Documentário" },
     { id: 18, name: "Drama" },
-    { id: 10751, name: "Family" },
-    { id: 14, name: "Fantasy" },
-    { id: 27, name: "Horror" },
-    { id: 9648, name: "Mystery" },
+    { id: 10751, name: "Família" },
+    { id: 14, name: "Fantasia" },
+    { id: 27, name: "Terror" },
+    { id: 9648, name: "Mistério" },
     { id: 10749, name: "Romance" },
-    { id: 878, name: "Sci-Fi" },
-    { id: 53, name: "Thriller" },
-    { id: 37, name: "Western" },
+    { id: 878, name: "Ficção científica" },
+    { id: 53, name: "Suspense" },
+    { id: 37, name: "Faroeste" },
   ],
   series: [
     { id: 10759, name: "Action & Adventure" },
-    { id: 16, name: "Animation" },
-    { id: 35, name: "Comedy" },
+    { id: 16, name: "Animação" },
+    { id: 35, name: "Comédia" },
     { id: 80, name: "Crime" },
-    { id: 99, name: "Documentary" },
+    { id: 99, name: "Documentário" },
     { id: 18, name: "Drama" },
-    { id: 10751, name: "Family" },
-    { id: 9648, name: "Mystery" },
-    { id: 10765, name: "Sci-Fi & Fantasy" },
+    { id: 10751, name: "Família" },
+    { id: 9648, name: "Mistério" },
+    { id: 10765, name: "Ficção científica e fantasia" },
     { id: 10764, name: "Reality" },
   ],
   anime: [
-    { id: 10759, name: "Action" },
-    { id: 35, name: "Comedy" },
+    { id: 10759, name: "Ação" },
+    { id: 35, name: "Comédia" },
     { id: 18, name: "Drama" },
-    { id: 14, name: "Fantasy" },
-    { id: 10765, name: "Sci-Fi" },
+    { id: 14, name: "Fantasia" },
+    { id: 10765, name: "Ficção científica" },
     { id: 10749, name: "Romance" },
   ],
 };
@@ -92,7 +92,7 @@ const PAGE = 96;
  */
 export function LiveCatalogue({
   initialTab,
-  heading = "The full catalogue",
+  heading = "O catálogo completo",
   chrome = true,
 }: {
   /** the tab this page opens on — the switcher stays available either way */
@@ -200,7 +200,7 @@ export function LiveCatalogue({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--nf-accent)]">
-                {kids ? "Kid-safe shelf" : "Browse"}
+                {kids ? "Prateleira segura para crianças" : "Navegar"}
               </p>
               <h1 className="mt-1 font-display text-[clamp(1.6rem,4vw,2.6rem)] leading-none text-white">
                 {heading}

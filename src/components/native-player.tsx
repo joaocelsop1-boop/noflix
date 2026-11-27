@@ -789,9 +789,9 @@ export function NativePlayer({
       {nextIn !== null && onNext && !failed && (
         <div className="absolute bottom-24 right-4 z-30 w-[228px] rounded-lg border border-white/10 bg-[#141414]/95 p-3 shadow-2xl backdrop-blur-xl md:right-6">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
-            {nextIn > 0 ? `Next episode in ${nextIn}` : "Next episode"}
+            {nextIn > 0 ? `Next episode in ${nextIn}` : "Próximo episódio"}
           </p>
-          <p className="mt-1 truncate text-[13px] font-semibold">{nextLabel ?? "Up next"}</p>
+          <p className="mt-1 truncate text-[13px] font-semibold">{nextLabel ?? "A seguir"}</p>
           <div className="mt-2.5 flex items-center gap-2">
             <button
               type="button"
@@ -828,7 +828,7 @@ export function NativePlayer({
           {/* seek bar */}
           <div
             role="slider"
-            aria-label="Seek"
+            aria-label="Buscar posição"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(progress)}
@@ -865,15 +865,15 @@ export function NativePlayer({
             <button type="button" onClick={() => seekBy(-10)} aria-label="Back 10 seconds" className="p-1.5 text-white/85 hover:text-white">
               <RewindIcon width={17} height={17} />
             </button>
-            <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="p-1.5 text-white hover:text-white/80">
+            <button type="button" onClick={toggle} aria-label={playing ? "Pausar" : "Assistir"} className="p-1.5 text-white hover:text-white/80">
               {playing ? <PauseIcon width={19} height={19} /> : <PlayIcon width={19} height={19} />}
             </button>
-            <button type="button" onClick={() => seekBy(10)} aria-label="Forward 10 seconds" className="p-1.5 text-white/85 hover:text-white">
+            <button type="button" onClick={() => seekBy(10)} aria-label="Avançar 10 segundos" className="p-1.5 text-white/85 hover:text-white">
               <ForwardIcon width={17} height={17} />
             </button>
 
             <div className="ml-1 flex items-center gap-1.5">
-              <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} className="p-1.5 text-white/85 hover:text-white">
+              <button type="button" onClick={toggleMute} aria-label={muted ? "Ativar som" : "Silenciar"} className="p-1.5 text-white/85 hover:text-white">
                 {muted || volume === 0 ? <MuteIcon width={17} height={17} /> : <VolumeIcon width={17} height={17} />}
               </button>
               <input
@@ -902,10 +902,10 @@ export function NativePlayer({
               {/* source switch */}
               {playable.length > 1 && (
                 <MenuButton
-                  label="Source"
+                  label="Fonte"
                   active={menu === "source"}
                   onClick={() => setMenu(menu === "source" ? null : "source")}
-                  text={playable[sourceIndex]?.label ?? "Source"}
+                  text={playable[sourceIndex]?.label ?? "Fonte"}
                   chrome={chrome}
                   panel={
                     <Panel>
@@ -932,7 +932,7 @@ export function NativePlayer({
               {captionTracks.length > 0 && (
                 <MenuButton
                   icon={<SubtitlesIcon width={17} height={17} />}
-                  label="Captions"
+                  label="Legendas"
                   active={menu === "captions"}
                   onClick={() => setMenu(menu === "captions" ? null : "captions")}
                   chrome={chrome}
@@ -968,15 +968,15 @@ export function NativePlayer({
               {/* quality */}
               {levels.length > 1 && (
                 <MenuButton
-                  label="Quality"
+                  label="Qualidade"
                   active={menu === "quality"}
                   onClick={() => setMenu(menu === "quality" ? null : "quality")}
                   text={
                     level >= 0
-                      ? levels.find((entry) => entry.index === level)?.label ?? "Auto"
+                      ? levels.find((entry) => entry.index === level)?.label ?? "Automático"
                       : activeLevel >= 0
                         ? `Auto · ${levels.find((entry) => entry.index === activeLevel)?.label ?? ""}`.trim()
-                        : "Auto"
+                        : "Automático"
                   }
                   chrome={chrome}
                   panel={
@@ -1014,10 +1014,10 @@ export function NativePlayer({
               {/* audio track */}
               {audioTracks.length > 1 && (
                 <MenuButton
-                  label="Audio"
+                  label="Áudio"
                   active={menu === "audio"}
                   onClick={() => setMenu(menu === "audio" ? null : "audio")}
-                  text={audioTracks.find((entry) => entry.index === audio)?.label ?? "Audio"}
+                  text={audioTracks.find((entry) => entry.index === audio)?.label ?? "Áudio"}
                   chrome={chrome}
                   panel={
                     <Panel>
@@ -1040,7 +1040,7 @@ export function NativePlayer({
 
               {/* playback speed */}
               <MenuButton
-                label="Playback speed"
+                label="Velocidade de reprodução"
                 active={menu === "speed"}
                 onClick={() => setMenu(menu === "speed" ? null : "speed")}
                 text={speed === 1 ? "1x" : `${speed}x`}
@@ -1063,10 +1063,10 @@ export function NativePlayer({
                 }
               />
 
-              <button type="button" onClick={() => void togglePip()} aria-label="Picture in picture" className="hidden p-1.5 text-white/85 hover:text-white sm:block">
+              <button type="button" onClick={() => void togglePip()} aria-label="Imagem em imagem" className="hidden p-1.5 text-white/85 hover:text-white sm:block">
                 <PiPIcon />
               </button>
-              <button type="button" onClick={toggleFullscreen} aria-label="Fullscreen" className="p-1.5 text-white/85 hover:text-white">
+              <button type="button" onClick={toggleFullscreen} aria-label="Tela cheia" className="p-1.5 text-white/85 hover:text-white">
                 <FullscreenIcon width={17} height={17} />
               </button>
             </div>

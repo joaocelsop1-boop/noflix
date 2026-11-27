@@ -4,7 +4,7 @@ import { Navbar } from "@/components/navbar";
 import { LiveRows } from "@/components/live-rows";
 
 export const metadata: Metadata = {
-  title: "Anime — NOFLIX",
+  title: "Anime — MineTV",
   description:
     "Anime series and films, subbed and dubbed, streamed from anime-native sources.",
 };

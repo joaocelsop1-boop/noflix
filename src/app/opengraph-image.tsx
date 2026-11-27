@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "NOFLIX — thousands of films, series and anime";
+export const alt = "MineTV — milhares de filmes, séries e animes";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -38,7 +38,7 @@ export default function OpengraphImage() {
             lineHeight: 1,
           }}
         >
-          NOFLIX
+          MineTV
         </div>
 
         <div style={{ marginTop: 26, fontSize: 40, color: "#ffffffd9", maxWidth: 900 }}>

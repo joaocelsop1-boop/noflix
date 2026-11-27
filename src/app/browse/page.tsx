@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LiveCatalogue } from "@/components/live-catalogue";
 import { allTitles } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "Browse the full catalogue — NOFLIX" };
+export const metadata: Metadata = { title: "Navegar pelo catálogo completo — MineTV" };
 
 export default function Page() {
   return (

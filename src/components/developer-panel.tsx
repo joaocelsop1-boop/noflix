@@ -20,19 +20,19 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const REPO = "sdlksdsf/Movie";
 
 const initial: Check[] = [
-  { id: "tmdb", label: "TMDB API", detail: "Catalogue, artwork, trailers", status: "idle" },
+  { id: "tmdb", label: "TMDB API", detail: "Catálogo, arte, trailers", status: "idle" },
   { id: "images", label: "TMDB image CDN", detail: "image.tmdb.org posters", status: "idle" },
-  { id: "framex", label: "frameXTV", detail: "Primary stream server", status: "idle" },
+  { id: "framex", label: "frameXTV", detail: "Servidor principal de stream", status: "idle" },
   { id: "vidfast", label: "VidFast", detail: "Backup · 4K + sources", status: "idle" },
   { id: "vidlink", label: "VidLink", detail: "Backup · 1080p + subtitles", status: "idle" },
-  { id: "cinelite", label: "CineLite", detail: "Backup stream server", status: "idle" },
-  { id: "rivestream", label: "RiveStream", detail: "Fallback stream server", status: "idle" },
+  { id: "cinelite", label: "CineLite", detail: "Servidor de backup", status: "idle" },
+  { id: "rivestream", label: "RiveStream", detail: "Servidor reserva de stream", status: "idle" },
   { id: "vidnest", label: "VidNest", detail: "Anime · sub & dub", status: "idle" },
   { id: "aniembed", label: "AniEmbed", detail: "Anime · backup", status: "idle" },
   { id: "supabase", label: "Supabase", detail: "Profile + list sync", status: "idle" },
   { id: "jikan", label: "Jikan / MyAnimeList", detail: "Anime metadata", status: "idle" },
-  { id: "tvmaze", label: "TVMaze", detail: "Episode metadata", status: "idle" },
-  { id: "github", label: "GitHub repository", detail: REPO, status: "idle" },
+  { id: "tvmaze", label: "TVMaze", detail: "Metadados do episódio", status: "idle" },
+  { id: "github", label: "Repositório no GitHub", detail: REPO, status: "idle" },
 ];
 
 async function timed(fn: () => Promise<{ ok: boolean; note?: string }>): Promise<{ status: Status; ms: number; note?: string }> {
@@ -216,7 +216,7 @@ export function DeveloperPanel() {
           disabled={running}
           className="rounded-md bg-white px-4 py-2 text-[12px] font-semibold text-black transition hover:bg-white/85 disabled:opacity-50"
         >
-          {running ? "Checking…" : "Re-run checks"}
+          {running ? "Checking…" : "Refazer verificações"}
         </button>
       </div>
 
@@ -248,15 +248,15 @@ export function DeveloperPanel() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Card title="Repository">
+        <Card title="Repositório">
           {repo ? (
             <>
-              <Row k="Stars" v={repo.stars.toLocaleString()} />
+              <Row k="Estrelas" v={repo.stars.toLocaleString()} />
               <Row k="Forks" v={repo.forks.toLocaleString()} />
-              <Row k="Open issues" v={repo.issues.toLocaleString()} />
-              <Row k="Default branch" v={repo.branch} />
+              <Row k="Issues abertas" v={repo.issues.toLocaleString()} />
+              <Row k="Branch padrão" v={repo.branch} />
               <Row
-                k="Last push"
+                k="Último envio"
                 v={repo.pushed ? new Date(repo.pushed).toLocaleDateString() : "—"}
               />
               <a
@@ -273,11 +273,11 @@ export function DeveloperPanel() {
           )}
         </Card>
 
-        <Card title="This session">
+        <Card title="Esta sessão">
           <Row k="Build" v={process.env.NEXT_PUBLIC_BUILD_ID ?? "local"} />
-          <Row k="Built" v={formatBuildTime(process.env.NEXT_PUBLIC_BUILD_TIME)} />
+          <Row k="Criado em" v={formatBuildTime(process.env.NEXT_PUBLIC_BUILD_TIME)} />
           <Row
-            k="Environment"
+            k="Ambiente"
             v={
               process.env.NEXT_PUBLIC_VERCEL_ENV
                 ? `Vercel · ${
@@ -288,8 +288,8 @@ export function DeveloperPanel() {
                 : "local"
             }
           />
-          <Row k="Database sync" v={SUPABASE_URL ? "Supabase connected" : "local only"} />
-          <Row k="Storage used" v={storageSize()} />
+          <Row k="Sincronização do banco de dados" v={SUPABASE_URL ? "Supabase conectado" : "local only"} />
+          <Row k="Armazenamento usado" v={storageSize()} />
           <Row k="Online" v={typeof navigator !== "undefined" && navigator.onLine ? "yes" : "no"} />
           <Row k="Viewport" v={viewportLabel()} />
         </Card>

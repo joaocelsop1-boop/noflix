@@ -2,54 +2,55 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Terms of use — NOFLIX",
-  description: "The rules for using NOFLIX, the streaming front-end demo.",
+  title: "Termos de uso — MineTV",
+  description: "As regras de uso da MineTV, o front-end de streaming.",
 };
 
 export default function Page() {
   return (
-    <LegalPage eyebrow="Legal" title="Terms of use" updated="7 November 2026">
+    <LegalPage eyebrow="Legal" title="Termos de uso" updated="7 de novembro de 2026">
       <p>
-        By using NOFLIX you agree to these terms. If you do not agree, please close the tab — nothing
-        is stored until you create a profile.
+        Ao usar a MineTV você concorda com estes termos. Se não concordar, feche a aba — nada
+        é guardado até você criar um perfil.
       </p>
 
-      <h2>What NOFLIX is</h2>
+      <h2>O que é a MineTV</h2>
       <p>
-        NOFLIX is a non-commercial interface demonstration. It indexes publicly available metadata and
-        embeds players operated by third parties. It does not host, upload, transcode or distribute any
-        audio-visual content.
+        A MineTV é uma demonstração de interface sem fins comerciais. Ela indexa metadados disponíveis
+        publicamente e incorpora players operados por terceiros. Não hospeda, envia, transcodifica nem
+        distribui nenhum conteúdo audiovisual.
       </p>
 
-      <h2>Acceptable use</h2>
+      <h2>Uso aceitável</h2>
       <ul>
-        <li>Do not use the site to break the law in your jurisdiction.</li>
-        <li>Do not attempt to overload, scrape abusively or attack the service or its providers.</li>
-        <li>Do not use kids profiles to bypass maturity settings.</li>
-        <li>Do not redistribute the site as your own product.</li>
+        <li>Não use o site para infringir a lei da sua jurisdição.</li>
+        <li>Não tente sobrecarregar, raspar de forma abusiva ou atacar o serviço nem seus provedores.</li>
+        <li>Não use perfis infantis para burlar as configurações de classificação.</li>
+        <li>Não redistribua o site como se fosse seu próprio produto.</li>
       </ul>
 
-      <h2>No warranty</h2>
+      <h2>Sem garantia</h2>
       <p>
-        The service is provided &ldquo;as is&rdquo;. Stream servers are third-party and can go down,
-        change domains or stop working without notice; NOFLIX tries alternative servers automatically
-        but cannot guarantee availability, quality or subtitles.
+        O serviço é fornecido &ldquo;como está&rdquo;. Os servidores de stream são de terceiros e podem cair,
+        mudar de domínio ou parar de funcionar sem aviso; a MineTV tenta servidores alternativos
+        automaticamente, mas não garante disponibilidade, qualidade nem legendas.
       </p>
 
-      <h2>Limitation of liability</h2>
+      <h2>Limitação de responsabilidade</h2>
       <p>
-        To the fullest extent permitted by law, the maintainers are not liable for any loss arising
-        from use of the site, including content provided by third-party embeds.
+        Na maior medida permitida por lei, os mantenedores não se responsabilizam por qualquer perda
+        decorrente do uso do site, incluindo conteúdo fornecido por players de terceiros.
       </p>
 
-      <h2>Intellectual property</h2>
+      <h2>Propriedade intelectual</h2>
       <p>
-        Titles, artwork, trailers and video belong to their owners. NOFLIX and its interface code are
-        released under the licence in the repository. See the copyright page for takedown information.
+        Títulos, artes, trailers e vídeos pertencem aos seus donos. A MineTV e o código da sua interface
+        são liberados sob a licença do repositório. Veja a página de direitos autorais para informações
+        de remoção.
       </p>
 
-      <h2>Changes</h2>
-      <p>These terms may be updated; the date above always reflects the current version.</p>
+      <h2>Alterações</h2>
+      <p>Estes termos podem ser atualizados; a data acima sempre reflete a versão atual.</p>
     </LegalPage>
   );
 }

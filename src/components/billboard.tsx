@@ -128,7 +128,7 @@ export function Billboard() {
                 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/75"
               >
                 <span className="font-display text-lg leading-none text-netflix-red">N</span>
-                <span>{active.anime ? "Anime" : active.kind === "series" ? "Series" : "Film"}</span>
+                <span>{active.anime ? "Anime" : active.kind === "series" ? "Séries" : "Filme"}</span>
                 {active.badge && (
                   <span className="rounded-sm bg-[var(--nf-accent)] px-1.5 py-[1px] text-[9px] font-bold tracking-[0.12em] text-white">
                     {active.badge}
@@ -184,10 +184,10 @@ export function Billboard() {
                 </button>
                 <button
                   type="button"
-                  aria-label={saved ? "Remove from My List" : "Add to My List"}
+                  aria-label={saved ? "Remover da Minha Lista" : "Adicionar à Minha Lista"}
                   onClick={() => {
                     toggleList(active.slug);
-                    toast(saved ? "Removed from My List" : "Added to My List");
+                    toast(saved ? "Removido da Minha Lista" : "Adicionado à Minha Lista");
                   }}
                   className={cn(
                     "focus-brand grid h-11 w-11 place-items-center rounded-full border transition duration-200",

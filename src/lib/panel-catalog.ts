@@ -47,65 +47,65 @@ function normalizeRating(item: RawItem): number {
 
 /** Portuguese category names from the panel mapped onto NOFLIX genres. */
 const CATEGORY_GENRE_MAP: Record<string, Genre> = {
-  "ação": "Action",
-  "action": "Action",
-  "aventura": "Adventure",
-  "adventure": "Adventure",
-  "animação": "Animation",
-  "animacao": "Animation",
-  "animation": "Animation",
-  "comédia": "Comedy",
-  "comedia": "Comedy",
-  "comedy": "Comedy",
+  "ação": "Ação",
+  "action": "Ação",
+  "aventura": "Aventura",
+  "adventure": "Aventura",
+  "animação": "Animação",
+  "animacao": "Animação",
+  "animation": "Animação",
+  "comédia": "Comédia",
+  "comedia": "Comédia",
+  "comedy": "Comédia",
   "crime": "Crime",
-  "documentário": "Documentary",
-  "documentario": "Documentary",
-  "documentary": "Documentary",
+  "documentário": "Documentário",
+  "documentario": "Documentário",
+  "documentary": "Documentário",
   "drama": "Drama",
-  "família": "Family",
-  "familia": "Family",
-  "family": "Family",
-  "fantasia": "Fantasy",
-  "fantasy": "Fantasy",
-  "história": "History",
-  "historia": "History",
-  "history": "History",
-  "terror": "Horror",
-  "horror": "Horror",
-  "música": "Music",
-  "musica": "Music",
-  "music": "Music",
-  "mistério": "Mystery",
-  "misterio": "Mystery",
-  "mystery": "Mystery",
+  "família": "Família",
+  "familia": "Família",
+  "family": "Família",
+  "fantasia": "Fantasia",
+  "fantasy": "Fantasia",
+  "história": "História",
+  "historia": "História",
+  "history": "História",
+  "terror": "Terror",
+  "horror": "Terror",
+  "música": "Música",
+  "musica": "Música",
+  "music": "Música",
+  "mistério": "Mistério",
+  "misterio": "Mistério",
+  "mystery": "Mistério",
   "romance": "Romance",
-  "ficção científica": "Sci-Fi",
-  "ficcao cientifica": "Sci-Fi",
-  "sci-fi": "Sci-Fi",
-  "suspense": "Thriller",
-  "thriller": "Thriller",
-  "guerra": "War",
-  "war": "War",
-  "faroeste": "Western",
-  "western": "Western",
+  "ficção científica": "Ficção científica",
+  "ficcao cientifica": "Ficção científica",
+  "sci-fi": "Ficção científica",
+  "suspense": "Suspense",
+  "thriller": "Suspense",
+  "guerra": "Guerra",
+  "war": "Guerra",
+  "faroeste": "Faroeste",
+  "western": "Faroeste",
 };
 
 const KNOWN_GENRES = new Set<string>([
-  "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama",
-  "Family", "Fantasy", "History", "Horror", "Music", "Mystery", "Romance",
-  "Sci-Fi", "Thriller", "War", "Western",
+  "Ação", "Aventura", "Animação", "Comédia", "Crime", "Documentário", "Drama",
+  "Família", "Fantasia", "História", "Terror", "Música", "Mistério", "Romance",
+  "Ficção científica", "Suspense", "Guerra", "Faroeste",
 ]);
 
 /**
  * Category name → [Genre]. Exact genre names and the PT→EN map above win;
- * anything else falls back to ["Action"] (per contract).
+ * anything else falls back to ["Ação"] (per contract).
  */
 function genreFromCategory(name: string): Genre[] {
   const trimmed = name.trim();
-  if (!trimmed) return ["Action"];
+  if (!trimmed) return ["Ação"];
   if (KNOWN_GENRES.has(trimmed)) return [trimmed as Genre];
   const mapped = CATEGORY_GENRE_MAP[trimmed.toLowerCase()];
-  return [mapped ?? "Action"];
+  return [mapped ?? "Ação"];
 }
 
 export function panelCategories(list: unknown): PanelCategory[] {

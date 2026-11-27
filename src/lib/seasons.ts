@@ -85,23 +85,23 @@ export type SeriesInfo = {
 };
 
 const TV_GENRES: Record<number, string> = {
-  16: "Animation",
-  35: "Comedy",
+  16: "Animação",
+  35: "Comédia",
   80: "Crime",
-  99: "Documentary",
+  99: "Documentário",
   18: "Drama",
-  10751: "Family",
-  10759: "Action",
-  9648: "Mystery",
-  10765: "Sci-Fi",
-  10768: "War",
+  10751: "Família",
+  10759: "Ação",
+  9648: "Mistério",
+  10765: "Ficção científica",
+  10768: "Guerra",
   10762: "Kids",
   10763: "News",
   10764: "Reality",
   10766: "Soap",
   10767: "Talk",
   10769: "Foreign",
-  37: "Western",
+  37: "Faroeste",
 };
 
 const maturityOf = (rating: boolean | undefined, adult: boolean | undefined) =>
@@ -202,25 +202,25 @@ async function seasonDetail(tmdbId: number, seasonNumber: number): Promise<RawEp
 }
 
 const MOVIE_GENRES: Record<number, string> = {
-  28: "Action",
-  12: "Adventure",
-  16: "Animation",
-  35: "Comedy",
+  28: "Ação",
+  12: "Aventura",
+  16: "Animação",
+  35: "Comédia",
   80: "Crime",
-  99: "Documentary",
+  99: "Documentário",
   18: "Drama",
-  10751: "Family",
-  14: "Fantasy",
-  36: "History",
-  27: "Horror",
-  10402: "Music",
-  9648: "Mystery",
+  10751: "Família",
+  14: "Fantasia",
+  36: "História",
+  27: "Terror",
+  10402: "Música",
+  9648: "Mistério",
   10749: "Romance",
-  878: "Sci-Fi",
+  878: "Ficção científica",
   10770: "TV Movie",
-  53: "Thriller",
-  10752: "War",
-  37: "Western",
+  53: "Suspense",
+  10752: "Guerra",
+  37: "Faroeste",
 };
 
 type RawMovie = {

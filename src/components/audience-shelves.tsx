@@ -36,14 +36,14 @@ type Shelf = {
 const SHELVES: Shelf[] = [
   {
     id: "kids",
-    title: "Kids & Family",
-    hint: "Certified G and PG",
+    title: "Infantil e Família",
+    hint: "Classificação Livre e PG",
     audience: "kids",
     tab: "movie",
   },
   {
     id: "mature",
-    title: "R-Rated & Mature",
+    title: "Para maiores e adultos",
     hint: "Certified R — not for the little ones",
     audience: "mature",
     tab: "movie",
@@ -151,7 +151,7 @@ export function AudienceShelves() {
                       </span>
                     </span>
                     <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.12em] text-white/80 backdrop-blur">
-                      {entry.kind === "series" ? "Series" : "Film"}
+                      {entry.kind === "series" ? "Séries" : "Filme"}
                     </span>
                   </Link>
                 </motion.div>

@@ -56,7 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultPlayer: "framex",
   quality: "1080p",
   autoplayNext: true,
-  language: "English",
+  language: "Inglês",
   hideMature: false,
   animeAudio: "sub",
 };
@@ -147,7 +147,7 @@ function migrateProfile(raw: Record<string, unknown>): Profile {
       : "all";
   return {
     id: typeof raw.id === "string" ? raw.id : `p_${Math.random().toString(36).slice(2)}`,
-    name: typeof raw.name === "string" ? raw.name : "Profile",
+    name: typeof raw.name === "string" ? raw.name : "Perfil",
     avatar: (raw.avatar as AvatarId) ?? EMOJI_TO_AVATAR[emoji] ?? "robot",
     accent: typeof raw.accent === "string" ? raw.accent : hex,
     kids: Boolean(raw.kids) || maturity === "kids",

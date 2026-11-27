@@ -29,7 +29,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const title = getTitle(slug);
   return {
-    title: title ? `${title.name} (${title.year}) — NOFLIX` : "NOFLIX",
+    title: title ? `${title.name} (${title.year}) — MineTV` : "MineTV",
     description: title?.overview,
   };
 }
@@ -76,7 +76,7 @@ export default async function TitlePage({
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/60">
                 <span className="font-display text-lg leading-none text-netflix-red">N</span>
-                {title.kind === "series" ? "Series" : "Film"}
+                {title.kind === "series" ? "Séries" : "Filme"}
               </div>
               <h1 className="font-display text-[clamp(2.2rem,5.5vw,4.6rem)] leading-[0.94] text-white">
                 {title.name}
@@ -92,7 +92,7 @@ export default async function TitlePage({
                     ? formatRuntime(title.runtime)
                     : seasons.length > 1
                       ? `${seasons.length} Seasons`
-                      : "Limited Series"}
+                      : "Série limitada"}
                 </span>
               </div>
               <p className="mt-4 max-w-[640px] text-sm leading-relaxed text-white/75">{title.overview}</p>
@@ -202,7 +202,7 @@ export default async function TitlePage({
             )}
 
             <div className="pt-4">
-              <h2 className="mb-4 text-lg font-semibold text-white">More Like This</h2>
+              <h2 className="mb-4 text-lg font-semibold text-white">Mais como este</h2>
               <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-9">
                 {alike.map((t) => (
                   <PosterTile key={t.slug} title={t} />

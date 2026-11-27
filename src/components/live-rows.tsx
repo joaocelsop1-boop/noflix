@@ -40,7 +40,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
     let next = [...tmdb];
     if (tvmaze) next = [...next, tvmaze];
     if (jikan) {
-      next = variant === "anime" ? [{ ...jikan, title: "Top Anime Right Now" }, ...next] : [...next, jikan];
+      next = variant === "anime" ? [{ ...jikan, title: "Top animes agora" }, ...next] : [...next, jikan];
     }
     if (variant === "anime") {
       next = next
@@ -61,7 +61,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
     const tmdbId = await resolveTmdbId(item.imdbId);
     setResolving(null);
     if (!tmdbId) {
-      toast("No streamable source found for that show");
+      toast("Nenhuma fonte disponível para esta série");
       return;
     }
     router.push(
@@ -79,7 +79,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
     /* anime rows sometimes only know their TMDB id — the player resolves the
        AniList id itself, so hand it everything we have and mark it as anime. */
     if (!anilistId && !item.tmdbId) {
-      toast("Could not resolve that anime's source id");
+      toast("Não foi possível resolver a fonte deste anime");
       return;
     }
     const path = item.tmdbId ?? anilistId;
@@ -183,7 +183,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
                     </span>
 
                     <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.12em] text-white/80 backdrop-blur">
-                      {item.anime ? "Anime" : item.kind === "series" ? "Series" : "Film"}
+                      {item.anime ? "Anime" : item.kind === "series" ? "Séries" : "Filme"}
                     </span>
                   </motion.button>
                 );

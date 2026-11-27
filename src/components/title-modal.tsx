@@ -112,7 +112,7 @@ function ModalBody({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Fechar"
             className="focus-brand absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#181818]/90 text-white transition hover:bg-black"
           >
             <CloseIcon width={20} height={20} />
@@ -135,9 +135,9 @@ function ModalBody({
                 type="button"
                 onClick={() => {
                   toggleList(title.slug);
-                  toast(saved ? "Removed from My List" : "Added to My List");
+                  toast(saved ? "Removido da Minha Lista" : "Adicionado à Minha Lista");
                 }}
-                aria-label={saved ? "Remove from My List" : "Add to My List"}
+                aria-label={saved ? "Remover da Minha Lista" : "Adicionar à Minha Lista"}
                 className={cn(
                   "focus-brand grid h-10 w-10 place-items-center rounded-full border-2 transition",
                   saved
@@ -149,7 +149,7 @@ function ModalBody({
               </button>
               <button
                 type="button"
-                aria-label="Like"
+                aria-label="Curtir"
                 onClick={() => toast("Rated — we'll tune your recommendations")}
                 className="focus-brand grid h-10 w-10 place-items-center rounded-full border-2 border-white/50 text-white transition hover:border-white"
               >
@@ -293,7 +293,7 @@ function ModalBody({
 
         {/* more like this */}
         <div className="px-5 pb-10 pt-6 md:px-9">
-          <h3 className="mb-4 text-[19px] font-semibold text-white">More Like This</h3>
+          <h3 className="mb-4 text-[19px] font-semibold text-white">Mais como este</h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {similar.slice(0, 6).map((s) => (
               <SimilarCard key={s.slug} slug={s.slug} />

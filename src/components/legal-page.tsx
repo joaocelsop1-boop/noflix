@@ -25,7 +25,7 @@ export function LegalPage({
           <h1 className="mt-1 font-display text-[clamp(1.8rem,4vw,2.7rem)] leading-none text-white">
             {title}
           </h1>
-          {updated && <p className="mt-2 text-[12px] text-white/35">Last updated {updated}</p>}
+          {updated && <p className="mt-2 text-[12px] text-white/35">Última atualização {updated}</p>}
 
           <div className="mt-7 space-y-5 text-[13.5px] leading-relaxed text-white/65 [&_a]:text-[var(--nf-accent)] [&_a:hover]:underline [&_h2]:mt-8 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h2]:text-white [&_h3]:mt-5 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:text-white/90 [&_li]:mt-1.5 [&_ul]:list-disc [&_ul]:pl-5">
             {children}
@@ -33,11 +33,11 @@ export function LegalPage({
 
           <div className="mt-10 flex flex-wrap gap-2 border-t border-white/10 pt-5 text-[12px]">
             {[
-              { href: "/about", label: "About" },
-              { href: "/privacy", label: "Privacy" },
-              { href: "/terms", label: "Terms" },
-              { href: "/dmca", label: "Copyright" },
-              { href: "/settings", label: "Settings" },
+              { href: "/about", label: "Sobre" },
+              { href: "/privacy", label: "Privacidade" },
+              { href: "/terms", label: "Termos" },
+              { href: "/dmca", label: "Direitos autorais" },
+              { href: "/settings", label: "Configurações" },
             ].map((link) => (
               <Link
                 key={link.href}

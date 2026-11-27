@@ -63,12 +63,12 @@ export default async function PlayPage({
       maturity: "16+",
       rating: 8,
       match: 80,
-      tagline: "Streaming now.",
+      tagline: "Transmitindo agora.",
       overview: `${query.title ?? "Conteúdo do painel"} — playing from your panel.`,
       creator: "MineTV",
       cast: [],
       accent: "#e50914",
-      format: panelType === "live" ? "Live" : panelType === "series" ? "Series" : "Film",
+      format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
     };
     return (
       <Player
@@ -124,7 +124,7 @@ export default async function PlayPage({
       (kind === "movie" ? 118 : undefined),
     rating: show?.rating ?? film?.rating ?? anime?.rating ?? 8,
     match: Math.round((show?.rating ?? film?.rating ?? anime?.rating ?? 8) * 10),
-    tagline: show?.tagline ?? film?.tagline ?? "Streaming now.",
+    tagline: show?.tagline ?? film?.tagline ?? "Transmitindo agora.",
     overview:
       show?.overview ??
       film?.overview ??
@@ -133,7 +133,7 @@ export default async function PlayPage({
     creator: "MineTV live",
     cast: [],
     accent: "#141414",
-    format: kind === "series" ? (show?.seasons === 1 ? "Limited Series" : "Series") : "Film",
+    format: kind === "series" ? (show?.seasons === 1 ? "Série limitada" : "Séries") : "Filme",
   };
 
   /* real episodes when TMDB/AniList knows the show, generated ones only as a

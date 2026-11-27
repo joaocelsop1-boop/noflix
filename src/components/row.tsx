@@ -63,8 +63,8 @@ export function Row({ row, priority = false }: { row: RowType; priority?: boolea
 
 export function ContinueRow({
   slugs,
-  title = "Continue Watching",
-  hint = "Pick up where you left off",
+  title = "Continuar assistindo",
+  hint = "Continue de onde parou",
   showProgress = true,
 }: {
   slugs: string[];
@@ -307,9 +307,9 @@ export function PosterCard({
                     type="button"
                     onClick={() => {
                       toggleList(title.slug);
-                      toast(saved ? "Removed from My List" : "Added to My List");
+                      toast(saved ? "Removido da Minha Lista" : "Adicionado à Minha Lista");
                     }}
-                    aria-label={saved ? "Remove from My List" : "Add to My List"}
+                    aria-label={saved ? "Remover da Minha Lista" : "Adicionar à Minha Lista"}
                     className={cn(
                       "grid h-8 w-8 place-items-center rounded-full border transition",
                       saved
@@ -321,7 +321,7 @@ export function PosterCard({
                   </button>
                   <button
                     type="button"
-                    aria-label="Like"
+                    aria-label="Curtir"
                     onClick={() => toast(`We'll show you more like ${title.name}`)}
                     className="grid h-8 w-8 place-items-center rounded-full border border-white/40 text-white transition hover:border-white"
                   >
@@ -329,7 +329,7 @@ export function PosterCard({
                   </button>
                   <button
                     type="button"
-                    aria-label="More info"
+                    aria-label="Mais informações"
                     onClick={() => {
                       setHovered(false);
                       openTitle(title.slug);

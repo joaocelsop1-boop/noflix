@@ -15,23 +15,23 @@ import { cn } from "@/lib/cn";
 import { allTitles } from "@/lib/catalog";
 
 const links = [
-  { href: "/", label: "Home" },
-  { href: "/tv-shows", label: "TV Shows" },
-  { href: "/movies", label: "Movies" },
+  { href: "/", label: "Início" },
+  { href: "/tv-shows", label: "Séries" },
+  { href: "/movies", label: "Filmes" },
   { href: "/anime", label: "Anime" },
   { href: "/live", label: "Ao vivo" },
-  { href: "/new-popular", label: "New & Popular" },
-  { href: "/browse", label: "Browse" },
-  { href: "/my-list", label: "My List" },
+  { href: "/new-popular", label: "Novidades" },
+  { href: "/browse", label: "Navegar" },
+  { href: "/my-list", label: "Minha Lista" },
 ];
 
 const mobileLinks = [
-  { href: "/tv-shows", label: "TV Shows" },
-  { href: "/movies", label: "Movies" },
+  { href: "/tv-shows", label: "Séries" },
+  { href: "/movies", label: "Filmes" },
   { href: "/anime", label: "Anime" },
   { href: "/live", label: "Ao vivo" },
-  { href: "/browse", label: "Browse" },
-  { href: "/my-list", label: "My List" },
+  { href: "/browse", label: "Navegar" },
+  { href: "/my-list", label: "Minha Lista" },
 ];
 
 export function Navbar() {
@@ -129,7 +129,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            aria-label="Search titles"
+            aria-label="Buscar títulos"
             className="focus-brand grid h-9 w-9 place-items-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white"
           >
             <SearchIcon width={19} height={19} />
@@ -147,7 +147,7 @@ export function Navbar() {
           <div className="relative">
             <button
               type="button"
-              aria-label="Notifications"
+              aria-label="Notificações"
               onClick={() => setMenu((m) => (m === "bell" ? null : "bell"))}
               className="focus-brand relative grid h-9 w-9 place-items-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white"
             >
@@ -182,7 +182,7 @@ export function Navbar() {
                       <span className="min-w-0">
                         <span className="block truncate text-sm text-white">{t.name}</span>
                         <span className="block text-xs text-white/50">
-                          {t.badge ?? "Now streaming"} · {t.year}
+                          {t.badge ?? "Transmitindo agora"} · {t.year}
                         </span>
                       </span>
                     </button>

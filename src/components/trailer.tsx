@@ -406,7 +406,7 @@ export function TrailerStage({ videoId, onFail }: { videoId: string; onFail?: ()
       <button
         type="button"
         onClick={toggle}
-        aria-label={wantSound ? "Mute trailer" : "Turn trailer sound on"}
+        aria-label={wantSound ? "Silenciar trailer" : "Ativar som do trailer"}
         title={needsTab ? "This frame blocks sound — open the site in its own tab" : undefined}
         className="focus-brand pointer-events-auto absolute bottom-3 right-3 z-20 grid h-9 w-9 place-items-center rounded-full border border-white/40 bg-black/55 text-white backdrop-blur transition hover:border-white hover:bg-black/75"
       >
@@ -445,12 +445,12 @@ export function HeroTrailer({ tmdbId, kind }: { tmdbId: number; kind: "movie" | 
       <button
         type="button"
         onClick={toggle}
-        aria-label={wantSound ? "Mute trailer" : "Turn trailer sound on"}
-        title={needsTab ? "This frame blocks sound — open the site in its own tab" : "Trailer sound"}
+        aria-label={wantSound ? "Silenciar trailer" : "Ativar som do trailer"}
+        title={needsTab ? "This frame blocks sound — open the site in its own tab" : "Som do trailer"}
         className="focus-brand absolute right-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/35 bg-black/45 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90 backdrop-blur transition hover:border-white hover:bg-black/70 hover:text-white md:right-12"
       >
         {wantSound ? <VolumeIcon width={14} height={14} /> : <MuteIcon width={14} height={14} />}
-        {wantSound ? "Sound on" : "Sound off"}
+        {wantSound ? "Som ativado" : "Som desativado"}
       </button>
     </>
   );

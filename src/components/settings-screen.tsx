@@ -13,11 +13,11 @@ import { PLAYERS, QUALITIES } from "@/lib/players";
 import { cn } from "@/lib/cn";
 
 const TABS = [
-  { id: "profile", label: "Profiles" },
-  { id: "appearance", label: "Appearance" },
-  { id: "playback", label: "Playback" },
-  { id: "privacy", label: "Privacy & data" },
-  { id: "developer", label: "Developer" },
+  { id: "profile", label: "Perfis" },
+  { id: "appearance", label: "Aparência" },
+  { id: "playback", label: "Reprodução" },
+  { id: "privacy", label: "Privacidade e dados" },
+  { id: "developer", label: "Desenvolvedor" },
   { id: "about", label: "About & legal" },
 ] as const;
 
@@ -51,7 +51,7 @@ export function SettingsScreen() {
             Settings
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/45">
-            Make NOFLIX yours — colours, layout, playback and privacy. Everything is saved on this
+            Deixe a MineTV do seu jeito — cores, layout, reprodução e privacidade. Tudo é salvo neste
             device and, if you are signed in to the cloud, mirrored to your account.
           </p>
 
@@ -86,7 +86,7 @@ export function SettingsScreen() {
 
           <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-5">
             <p className="text-[11.5px] text-white/35">
-              NOFLIX v1.1 · preferences stored locally
+              MineTV v1.1 · preferências guardadas localmente
             </p>
             <button
               type="button"
@@ -116,7 +116,7 @@ function ProfilesPanel() {
 
   if (!profile) {
     return (
-      <Panel title="No profile selected" hint="Pick a profile to edit it.">
+      <Panel title="Nenhum perfil selecionado" hint="Escolha um perfil para editá-lo.">
         <button
           type="button"
           onClick={() => setProfile(null)}
@@ -135,7 +135,7 @@ function ProfilesPanel() {
 
   return (
     <div className="space-y-5">
-      <Panel title="This profile" hint="Your name, character and what you are allowed to watch.">
+      <Panel title="Este perfil" hint="Seu nome, personagem e o que você pode assistir.">
         <div className="flex flex-col gap-5 sm:flex-row">
           <ProfileAvatar
             avatar={profile.avatar}
@@ -146,7 +146,7 @@ function ProfilesPanel() {
           />
           <div className="min-w-0 flex-1 space-y-4">
             <div>
-              <Field label="Profile name">
+              <Field label="Nome do perfil">
                 <input
                   value={name}
                   maxLength={18}
@@ -158,7 +158,7 @@ function ProfilesPanel() {
               </Field>
             </div>
 
-            <Field label="Colour">
+            <Field label="Cor">
               <div className="flex flex-wrap gap-2">
                 {ACCENTS.map((colour) => (
                   <button
@@ -187,7 +187,7 @@ function ProfilesPanel() {
               </div>
             </Field>
 
-            <Field label="Maturity level">
+            <Field label="Classificação etária">
               <div className="flex flex-wrap gap-2">
                 {MATURITY.map((level) => (
                   <button
@@ -218,7 +218,7 @@ function ProfilesPanel() {
 
             <ToggleRow
               title="Autoplay previews"
-              hint="Trailers play automatically while browsing"
+              hint="Trailers tocam automaticamente enquanto navega"
               value={profile.autoplay}
               onChange={(value) => updateProfile(profile.id, { autoplay: value })}
             />
@@ -226,7 +226,7 @@ function ProfilesPanel() {
         </div>
       </Panel>
 
-      <Panel title="All profiles" hint="Switch profile, or manage everyone on this account.">
+      <Panel title="All profiles" hint="Troque de perfil ou gerencie todos desta conta.">
         <div className="space-y-2">
           {profiles.map((item) => (
             <div
@@ -300,7 +300,7 @@ function AppearancePanel() {
 
   return (
     <div className="space-y-5">
-      <Panel title="Accent colour" hint="Buttons, highlights and focus rings across the site.">
+      <Panel title="Accent colour" hint="Botões, destaques e anéis de foco em todo o site.">
         <div className="flex flex-wrap items-center gap-2.5">
           {ACCENTS.map((colour) => (
             <button
@@ -338,13 +338,13 @@ function AppearancePanel() {
         </div>
       </Panel>
 
-      <Panel title="Card size" hint="How large posters are in every shelf and grid.">
+      <Panel title="Tamanho do cartão" hint="O tamanho dos pôsteres em cada prateleira e grade.">
         <div className="grid grid-cols-3 gap-2">
           {(
             [
-              { id: "compact", label: "Compact", hint: "More titles at once" },
-              { id: "cozy", label: "Cozy", hint: "Balanced" },
-              { id: "large", label: "Large", hint: "Bigger artwork" },
+              { id: "compact", label: "Compacto", hint: "Mais títulos de uma vez" },
+              { id: "cozy", label: "Aconchegante", hint: "Balanced" },
+              { id: "large", label: "Grande", hint: "Arte maior" },
             ] as const
           ).map((option) => (
             <button
@@ -365,29 +365,29 @@ function AppearancePanel() {
         </div>
       </Panel>
 
-      <Panel title="Motion & interaction">
+      <Panel title="Movimento e interação">
         <div className="space-y-3">
           <ToggleRow
-            title="Reduce motion"
-            hint="Fades instead of slides; great for older phones"
+            title="Reduzir movimento"
+            hint="Desvanecimento em vez de deslizar; ótimo para celulares mais antigos"
             value={settings.reduceMotion}
             onChange={(value) => updateSettings({ reduceMotion: value })}
           />
           <ToggleRow
-            title="Hover previews"
-            hint="Expand a card when you rest on it (desktop only)"
+            title="Prévias ao passar o mouse"
+            hint="Expande um cartão ao passar o mouse (só no computador)"
             value={settings.hoverPreviews}
             onChange={(value) => updateSettings({ hoverPreviews: value })}
           />
           <ToggleRow
-            title="Data saver"
-            hint="Fewer live rows and smaller artwork on slow connections"
+            title="Economia de dados"
+            hint="Menos fileiras ao vivo e arte menor em conexões lentas"
             value={settings.dataSaver}
             onChange={(value) => updateSettings({ dataSaver: value })}
           />
           <ToggleRow
             title="Autoplay trailers"
-            hint="Preview trailers start on their own"
+            hint="Prévias começam sozinhas"
             value={settings.autoplayTrailers}
             onChange={(value) => updateSettings({ autoplayTrailers: value })}
           />
@@ -395,7 +395,7 @@ function AppearancePanel() {
       </Panel>
 
       {profile && (
-        <Panel title="Profile colour" hint="Sets the ring around your avatar everywhere.">
+        <Panel title="Cor do perfil" hint="Define o anel ao redor do seu avatar em todos os lugares.">
           <div className="flex flex-wrap gap-2">
             {ACCENTS.map((colour) => (
               <button
@@ -427,8 +427,8 @@ function PlaybackPanel() {
   return (
     <div className="space-y-5">
       <Panel
-        title="Default server"
-        hint="NOFLIX switches automatically if a server stops responding — this is just where it starts."
+        title="Servidor padrão"
+        hint="A MineTV troca automaticamente se um servidor parar de responder — este é só o ponto de partida."
       >
         <div className="grid gap-2 sm:grid-cols-3">
           {PLAYERS.map((server) => (
@@ -457,9 +457,9 @@ function PlaybackPanel() {
         </div>
       </Panel>
 
-      <Panel title="Quality & language">
+      <Panel title="Qualidade e idioma">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Preferred quality">
+          <Field label="Qualidade preferida">
             <select
               value={settings.quality}
               onChange={(event) =>
@@ -474,13 +474,13 @@ function PlaybackPanel() {
               ))}
             </select>
           </Field>
-          <Field label="Preferred language">
+          <Field label="Idioma preferido">
             <select
               value={settings.language}
               onChange={(event) => updateSettings({ language: event.target.value })}
               className="w-full rounded-md border border-white/15 bg-black/50 px-3 py-2 text-sm text-white outline-none focus:border-[var(--nf-accent)]"
             >
-              {["English", "Urdu", "Hindi", "Arabic", "Spanish", "French", "Japanese", "Korean"].map(
+              {["Inglês", "Urdu", "Hindi", "Arabic", "Espanhol", "Francês", "Japonês", "Coreano"].map(
                 (language) => (
                   <option key={language} value={language}>
                     {language}
@@ -499,8 +499,8 @@ function PlaybackPanel() {
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              { id: "sub", label: "Subbed", hint: "Japanese audio, subtitles" },
-              { id: "dub", label: "Dubbed", hint: "English audio track" },
+              { id: "sub", label: "Legendado", hint: "Áudio em japonês, legendas" },
+              { id: "dub", label: "Dublado", hint: "Faixa de áudio em inglês" },
             ] as const
           ).map((option) => (
             <button
@@ -521,10 +521,10 @@ function PlaybackPanel() {
         </div>
       </Panel>
 
-      <Panel title="Playback behaviour">
+      <Panel title="Comportamento de reprodução">
         <ToggleRow
           title="Autoplay next episode"
-          hint="Series continue without touching anything"
+          hint="As séries continuam sem você tocar em nada"
           value={settings.autoplayNext}
           onChange={(value) => updateSettings({ autoplayNext: value })}
         />
@@ -562,9 +562,9 @@ function PrivacyPanel() {
 
   return (
     <div className="space-y-5">
-      <Panel title="Content filters" hint="Applies to every shelf, grid and search result.">
+      <Panel title="Filtros de conteúdo" hint="Applies to every shelf, grid and search result.">
         <ToggleRow
-          title="Hide mature titles"
+          title="Ocultar títulos adultos"
           hint="Hides 16+, R and TV-MA titles from browsing"
           value={settings.hideMature}
           onChange={(value) => updateSettings({ hideMature: value })}
@@ -574,11 +574,11 @@ function PrivacyPanel() {
         </p>
       </Panel>
 
-      <Panel title="Your data" hint="You own everything NOFLIX stores about you.">
+      <Panel title="Seus dados" hint="Você é dono de tudo que a MineTV guarda sobre você.">
         <div className="grid gap-2 sm:grid-cols-3">
-          <Stat label="My List" value={`${myList.length} titles`} />
-          <Stat label="Watch history" value={`${Object.keys(progress).length} titles`} />
-          <Stat label="Cloud sync" value={synced ? "Connected" : "Local only"} />
+          <Stat label="Minha Lista" value={`${myList.length} titles`} />
+          <Stat label="Histórico de exibição" value={`${Object.keys(progress).length} titles`} />
+          <Stat label="Sincronização na nuvem" value={synced ? "Connected" : "Somente local"} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -622,7 +622,7 @@ function PrivacyPanel() {
         </div>
       </Panel>
 
-      <Panel title="Privacy at a glance">
+      <Panel title="Privacidade em resumo">
         <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-white/55">
           <li>· No accounts, no passwords, no advertising trackers.</li>
           <li>· Profiles, My List and progress live in your browser; cloud sync is optional.</li>
@@ -648,19 +648,19 @@ function PrivacyPanel() {
 
 function AboutPanel() {
   const links = [
-    { href: "/about", label: "About NOFLIX", hint: "What this is and how it works" },
-    { href: "/privacy", label: "Privacy policy", hint: "What is stored and where" },
-    { href: "/terms", label: "Terms of use", hint: "The rules of the road" },
-    { href: "/dmca", label: "Copyright & DMCA", hint: "Takedown information" },
+    { href: "/about", label: "Sobre a MineTV", hint: "O que é isto e como funciona" },
+    { href: "/privacy", label: "Política de privacidade", hint: "O que é guardado e onde" },
+    { href: "/terms", label: "Termos de uso", hint: "As regras de uso" },
+    { href: "/dmca", label: "Direitos autorais e DMCA", hint: "Informações de remoção" },
   ];
 
   return (
     <div className="space-y-5">
-      <Panel title="NOFLIX" hint="A streaming front-end built with Next.js, TMDB and third-party players.">
+      <Panel title="MineTV" hint="Um front-end de streaming feito com Next.js, TMDB e players de terceiros.">
         <p className="text-[13px] leading-relaxed text-white/55">
-          NOFLIX does not host any video. It is a catalogue and player shell: artwork and metadata
-          come from TMDB, and playback happens inside embed players operated by third parties. If you
-          enjoy something you find here, watch it on the service that made it.
+          A MineTV não hospeda nenhum vídeo. É um catálogo e um player: artes e metadados
+          vêm do TMDB, e a reprodução acontece dentro de players incorporados operados por terceiros. Se
+          gostar de algo que encontrar aqui, assista no serviço que o produziu.
         </p>
         <p className="mt-3 text-[11.5px] text-white/30">
           Build {process.env.NEXT_PUBLIC_BUILD_ID ?? "local"} ·{" "}

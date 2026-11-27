@@ -2,86 +2,87 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Privacy policy — NOFLIX",
+  title: "Política de privacidade — MineTV",
   description:
-    "NOFLIX hosts no video files. What we do and do not store, who serves playback, and how to delete everything.",
+    "A MineTV não hospeda arquivos de vídeo. O que guardamos e o que não guardamos, quem serve a reprodução e como apagar tudo.",
 };
 
 export default function Page() {
   return (
-    <LegalPage eyebrow="Legal" title="Privacy policy" updated="6 November 2026">
+    <LegalPage eyebrow="Legal" title="Política de privacidade" updated="6 de novembro de 2026">
       <p className="rounded-xl border border-white/15 bg-white/[0.04] p-4 text-[13.5px] leading-relaxed text-white/80">
-        <strong className="text-white">We host nothing.</strong> NOFLIX stores no video files, no
-        audio, no images and no adult media of any kind. It is an interface: posters and descriptions
-        are pulled from public metadata APIs, and every frame you watch is delivered by an independent
-        third-party provider straight to your browser. Nothing passes through our servers, and there
-        is no upload, download, cache or media bucket behind this site.
+        <strong className="text-white">Não hospedamos nada.</strong> A MineTV não guarda arquivos de vídeo,
+        áudio, imagens nem mídia adulta de nenhum tipo. É uma interface: pôsteres e descrições
+        são puxados de APIs públicas de metadados, e cada quadro que você assiste é entregue por um
+        provedor independente direto para o seu navegador. Nada passa pelos nossos servidores, e não
+        há upload, download, cache nem repositório de mídia por trás deste site.
       </p>
 
-      <h2>What that means in practice</h2>
+      <h2>O que isso significa na prática</h2>
       <ul>
-        <li>There is no media storage in this deployment — no bucket, no CDN origin, no filesystem with videos on it.</li>
-        <li>Playback requests go from <em>your</em> browser to the provider. We never sit in the middle, so we cannot see what you watch, and we keep no record of it.</li>
-        <li>Only metadata (titles, artwork, synopses, episode lists, ratings) is fetched by the server and cached briefly in memory.</li>
-        <li>If a provider removes something, the link here stops working. We cannot restore it, because we never had a copy.</li>
+        <li>Não há armazenamento de mídia nesta implantação — sem bucket, sem origem de CDN, sem sistema de arquivos com vídeos.</li>
+        <li>As requisições de reprodução vão do <em>seu</em> navegador para o provedor. Nunca ficamos no meio, então não vemos o que você assiste e não guardamos registro disso.</li>
+        <li>Só metadados (títulos, artes, sinopses, listas de episódios, avaliações) são buscados pelo servidor e guardados brevemente na memória.</li>
+        <li>Se um provedor remove algo, o link aqui para de funcionar. Não podemos restaurar, porque nunca tivemos uma cópia.</li>
       </ul>
 
-      <h2>What we store</h2>
-      <p>Everything below lives in your browser, not on a server, under <code>localStorage</code> keys beginning with <code>nf.</code>:</p>
+      <h2>O que guardamos</h2>
+      <p>Tudo abaixo fica no seu navegador, não num servidor, em chaves do <code>localStorage</code> começando com <code>nf.</code>:</p>
       <ul>
-        <li><strong>Profiles</strong> — the name, character, colour and maturity level you choose.</li>
-        <li><strong>My List</strong> — the titles you saved.</li>
-        <li><strong>Watch progress</strong> — the season, episode and position you reached.</li>
-        <li><strong>Preferences</strong> — accent colour, density, server, quality, language and toggles.</li>
+        <li><strong>Perfis</strong> — o nome, o personagem, a cor e o nível de classificação que você escolhe.</li>
+        <li><strong>Minha Lista</strong> — os títulos que você salvou.</li>
+        <li><strong>Progresso de exibição</strong> — a temporada, o episódio e a posição que você alcançou.</li>
+        <li><strong>Preferências</strong> — cor de destaque, densidade, servidor, qualidade, idioma e interruptores.</li>
       </ul>
-      <p>Clearing site data removes all of it completely.</p>
+      <p>Limpar os dados do site remove tudo completamente.</p>
 
-      <h2>Optional cloud sync</h2>
+      <h2>Sincronização opcional na nuvem</h2>
       <p>
-        If the deployment is configured with a Supabase project, the same preferences are mirrored to
-        a single row keyed by a random device identifier generated in your browser. That row is
-        protected by row-level security, so only your device id can read or write it. There is no
-        email, no name beyond the profile label you typed, and no way to link the row to a real
-        person. Deleting your data (Settings → Privacy &amp; data) empties the local copy.
+        Se a implantação estiver configurada com um projeto Supabase, as mesmas preferências são espelhadas
+        para uma única linha identificada por um identificador aleatório de aparelho gerado no seu navegador.
+        Essa linha é protegida por segurança em nível de linha, então só o seu id de aparelho pode lê-la ou
+        escrevê-la. Não há e-mail, nem nome além do rótulo de perfil que você digitou, e não há como vincular
+        a linha a uma pessoa real. Apagar seus dados (Configurações → Privacidade e dados) esvazia a cópia local.
       </p>
 
       <h2>Cookies</h2>
       <p>
-        NOFLIX sets no cookies at all — not for tracking, not for sessions, not for preferences.
-        Everything it remembers lives in <code>localStorage</code> and stays on your device.
+        A MineTV não define nenhum cookie — nem para rastreamento, nem para sessões, nem para preferências.
+        Tudo que ela lembra fica no <code>localStorage</code> e permanece no seu aparelho.
       </p>
 
-      <h2>Third parties</h2>
+      <h2>Terceiros</h2>
       <ul>
-        <li><strong>TMDB</strong> — metadata, artwork and trailer ids.</li>
-        <li><strong>TVMaze</strong> and <strong>Jikan (MyAnimeList)</strong> — episode and anime data.</li>
-        <li><strong>YouTube</strong> — trailers play in an embedded, privacy-enhanced player on first click.</li>
-        <li><strong>frameXTV, CineLite, RiveStream</strong> — playback embeds for the main catalogue. Your browser loads content from them directly, so they can see your IP address and set their own storage. Their policies apply, not ours.</li>
-        <li><strong>Vercel</strong> — hosting and standard request logs, retained briefly.</li>
+        <li><strong>TMDB</strong> — metadados, artes e ids de trailers.</li>
+        <li><strong>TVMaze</strong> e <strong>Jikan (MyAnimeList)</strong> — dados de episódios e animes.</li>
+        <li><strong>YouTube</strong> — trailers tocam num player incorporado com privacidade aprimorada no primeiro clique.</li>
+        <li><strong>frameXTV, CineLite, RiveStream</strong> — players incorporados para o catálogo principal. Seu navegador carrega o conteúdo deles diretamente, então eles podem ver seu endereço IP e definir seu próprio armazenamento. Valem as políticas deles, não as nossas.</li>
+        <li><strong>Vercel</strong> — hospedagem e registros padrão de requisição, guardados por pouco tempo.</li>
       </ul>
       <p>
-        We do not sell, share or trade anything, because there is nothing personal to sell: no
-        account, no email, no advertising identifier, no profile of your viewing.
+        Não vendemos, compartilhamos nem trocamos nada, porque não há nada pessoal para vender: sem
+        conta, sem e-mail, sem identificador de publicidade, sem perfil da sua exibição.
       </p>
 
-      <h2>Your rights</h2>
+      <h2>Seus direitos</h2>
       <p>
-        Because the data never leaves your device unless you enable sync, you can exercise every right
-        yourself: export it, edit it or delete it in <strong>Settings → Privacy &amp; data</strong>.
-        What we hold is limited to what your browser stores — so clearing site data is a complete
-        erasure, and there is no server-side copy to request.
+        Como os dados nunca saem do seu aparelho a menos que você ative a sincronização, você pode exercer
+        todos os direitos sozinho: exportar, editar ou apagar em <strong>Configurações → Privacidade e dados</strong>.
+        O que guardamos se limita ao que seu navegador armazena — então limpar os dados do site é um
+        apagamento completo, e não há cópia no servidor para solicitar.
       </p>
 
-      <h2>Children</h2>
+      <h2>Crianças</h2>
       <p>
-        Kids profiles hide mature titles across every shelf, grid and search result, and nothing on
-        this site is aimed at children. No personal information is requested from anyone of any age.
+        Perfis infantis escondem títulos adultos em todas as prateleiras, grades e resultados de busca, e
+        nada neste site é voltado para crianças. Nenhuma informação pessoal é solicitada de ninguém, de
+        nenhuma idade.
       </p>
 
-      <h2>Changes</h2>
+      <h2>Alterações</h2>
       <p>
-        Material changes to this policy will be noted on this page with a new date. Questions can be
-        raised as an issue on the GitHub repository.
+        Mudanças relevantes nesta política serão anotadas nesta página com uma nova data. Dúvidas podem
+        ser levantadas como issue no repositório do GitHub.
       </p>
     </LegalPage>
   );

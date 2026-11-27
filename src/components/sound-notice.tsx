@@ -50,7 +50,7 @@ export function SoundNotice() {
             <MuteIcon width={15} height={15} />
           </span>
           <p className="min-w-0 flex-1 text-[12px] leading-snug text-white/80">
-            This preview frame blocks audio. Open NOFLIX in its own tab to hear everything.
+            Este quadro de prévia bloqueia o áudio. Abra a MineTV na própria aba para ouvir tudo.
           </p>
           <button
             type="button"
@@ -62,7 +62,7 @@ export function SoundNotice() {
           <button
             type="button"
             onClick={close}
-            aria-label="Dismiss"
+            aria-label="Fechar"
             className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
           >
             <CloseIcon width={13} height={13} />

@@ -60,7 +60,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
   };
 
   const save = () => {
-    const label = draft.name.trim() || (kids ? "Kids" : "You");
+    const label = draft.name.trim() || (kids ? "Infantil" : "Você");
     const payload = {
       name: label.slice(0, 18),
       avatar: draft.avatar,
@@ -98,7 +98,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
         <header className="flex items-center justify-between gap-3">
           <Wordmark className="text-2xl md:text-3xl" />
           <span className="rounded-full border border-white/15 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-white/45">
-            {profiles.length ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"}` : "Get started"}
+            {profiles.length ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"}` : "Começar"}
           </span>
         </header>
 
@@ -106,10 +106,10 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
           {mode === "edit" ? (
             <div className="mx-auto w-full max-w-[1000px]">
               <p className="mb-1 text-[11px] uppercase tracking-[0.3em] text-[var(--nf-accent)]">
-                {active ? "Edit profile" : profiles.length ? "New profile" : "Welcome to NOFLIX"}
+                {active ? "Editar perfil" : profiles.length ? "Novo perfil" : "Bem-vindo à MineTV"}
               </p>
               <h1 className="mb-6 font-display text-3xl tracking-wide text-white sm:text-4xl md:text-5xl">
-                {active ? "Make it yours" : profiles.length ? "Add a profile" : "Create your account"}
+                {active ? "Deixe do seu jeito" : profiles.length ? "Add a profile" : "Crie sua conta"}
               </h1>
 
               <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
@@ -123,7 +123,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                     kids={draft.maturity === "kids"}
                   />
                   <p className="mt-4 truncate font-display text-xl tracking-wide text-white">
-                    {draft.name.trim() || (kids ? "Kids" : "Your name")}
+                    {draft.name.trim() || (kids ? "Infantil" : "Seu nome")}
                   </p>
                   <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-white/40">
                     {chosenMaturity.label} · {draft.autoplay ? "Autoplay on" : "Autoplay off"}
@@ -139,13 +139,13 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                 {/* controls */}
                 <div className="space-y-5 rounded-2xl border border-white/10 bg-white/[0.04] p-5 md:p-6">
                   <div>
-                    <Label>Profile name</Label>
+                    <Label>Nome do perfil</Label>
                     <input
                       value={draft.name}
                       onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value }))}
                       onKeyDown={(event) => event.key === "Enter" && save()}
                       maxLength={18}
-                      placeholder={kids ? "Kids" : "Your name"}
+                      placeholder={kids ? "Infantil" : "Seu nome"}
                       className="w-full rounded-lg border border-white/15 bg-black/40 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-[var(--nf-accent)]"
                     />
                   </div>
@@ -182,7 +182,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                   </div>
 
                   <div>
-                    <Label>Colour</Label>
+                    <Label>Cor</Label>
                     <div className="flex flex-wrap items-center gap-2">
                       {ACCENTS.map((colour) => (
                         <button
@@ -214,7 +214,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
 
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <Label className="mb-0">Maturity level</Label>
+                      <Label className="mb-0">Classificação etária</Label>
                       <span className="text-[11px] text-white/35">{chosenMaturity.hint}</span>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
@@ -278,7 +278,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                       onClick={save}
                       className="flex-1 rounded-md bg-[var(--nf-accent)] px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.99]"
                     >
-                      {active ? "Save profile" : kids ? "Start kids space" : "Start watching"}
+                      {active ? "Salvar perfil" : kids ? "Iniciar espaço infantil" : "Começar a assistir"}
                     </button>
                   </div>
                 </div>
@@ -291,7 +291,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
               </h1>
               <p className="mb-9 text-center text-sm text-white/45">
                 {mode === "manage"
-                  ? "Tap a profile to edit it"
+                  ? "Toque em um perfil para editá-lo"
                   : "Pick a profile — or add someone new"}
               </p>
 
@@ -345,7 +345,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
                   onClick={() => setMode(mode === "manage" ? "pick" : "manage")}
                   className="border border-white/25 px-6 py-2 text-[11px] uppercase tracking-[0.22em] text-white/60 transition hover:border-white hover:text-white"
                 >
-                  {mode === "manage" ? "Done" : "Manage profiles"}
+                  {mode === "manage" ? "Concluir" : "Gerenciar perfis"}
                 </button>
               </div>
 
@@ -394,7 +394,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
         </div>
 
         <footer className="pb-2 text-center text-[11px] text-white/25">
-          NOFLIX · profiles, My List and progress stay on this device
+          MineTV · perfis, Minha Lista e progresso ficam neste aparelho
         </footer>
       </div>
     </div>

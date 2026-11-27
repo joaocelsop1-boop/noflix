@@ -63,7 +63,7 @@ export function HomePage() {
           {myList.length > 0 && (
             <ContinueRow
               slugs={myList.slice(0, 12)}
-              title="My List"
+              title="Minha Lista"
               hint={`${myList.length} saved title${myList.length === 1 ? "" : "s"}`}
               showProgress={false}
             />

@@ -473,7 +473,7 @@ export function Player({
   const cycleServer = useCallback(() => {
     const chain = playOrder(title).filter((id) => canPlay(id, title, anilistId));
     if (chain.length < 2) {
-      toast("This is the only source for this title");
+      toast("Esta é a única fonte para este título");
       return;
     }
     const next = chain[(chain.indexOf(player) + 1) % chain.length];
@@ -784,7 +784,7 @@ export function Player({
           nextLabel={nextEp ? nextEpisodeLabel : undefined}
           onError={() => {
             /* títulos do painel não têm embed de reserva (tmdbId 0) — fica
-               no player próprio e o NativePlayer mostra o "Try again" */
+               no player próprio e o NativePlayer mostra o "Tentar novamente" */
             if (isPanelTitle) {
               toast("O stream do painel não respondeu — tente novamente");
               return;
@@ -874,7 +874,7 @@ export function Player({
               <button
                 type="button"
                 onClick={() => router.back()}
-                aria-label="Back"
+                aria-label="Voltar"
                 className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full bg-black/60 text-white/90 backdrop-blur-md transition hover:bg-black/80 hover:text-white"
               >
                 <ArrowLeftIcon width={20} height={20} />
@@ -914,7 +914,7 @@ export function Player({
                   type="button"
                   onClick={() => goTo(nextEp.season, nextEp.episode)}
                   className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full bg-black/60 px-3 text-[12px] font-semibold text-white/90 backdrop-blur-md transition hover:bg-black/80 hover:text-white"
-                  aria-label="Next episode"
+                  aria-label="Próximo episódio"
                 >
                   <NextIcon width={16} height={16} />
                   <span className="hidden sm:inline">Next</span>
@@ -924,7 +924,7 @@ export function Player({
               <button
                 type="button"
                 onClick={() => setMenu((open) => !open)}
-                aria-label="Player options"
+                aria-label="Opções do player"
                 className={cn(
                   "pointer-events-auto flex h-10 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold backdrop-blur-md transition",
                   menu
@@ -1007,7 +1007,7 @@ export function Player({
                   setNativeMode(true);
                   localStorage.setItem("nf.native3", "1");
                   setMenu(false);
-                  toast("Playing in the MineTV player");
+                  toast("Tocando no player MineTV");
                 }}
               />
               {!isPanelTitle && (
@@ -1031,7 +1031,7 @@ export function Player({
                         )}
                       </span>
                     }
-                    subtitle={available ? item.hint : "No stream for this title"}
+                    subtitle={available ? item.hint : "Sem stream para este título"}
                     disabled={!available}
                     onClick={() => changePlayer(item.id)}
                   />
@@ -1042,8 +1042,8 @@ export function Player({
                 Troubleshooting
               </p>
               <Row
-                title="Next server"
-                subtitle="If this one isn't starting"
+                title="Próximo servidor"
+                subtitle="Se este não iniciar"
                 onClick={cycleServer}
               />
               <a
@@ -1072,14 +1072,14 @@ export function Player({
                   </p>
                   <Row
                     active={audio === "sub"}
-                    title="Subbed"
+                    title="Legendado"
                     subtitle="Japanese audio · subtitles on"
                     onClick={() => updateSettings({ animeAudio: "sub" })}
                   />
                   <Row
                     active={audio === "dub"}
-                    title="Dubbed"
-                    subtitle="English audio track"
+                    title="Dublado"
+                    subtitle="Faixa de áudio em inglês"
                     onClick={() => updateSettings({ animeAudio: "dub" })}
                   />
                 </>
@@ -1117,9 +1117,9 @@ export function Player({
                       title={`S${nextEp.season}:E${nextEp.episode} · ${
                         (seasons.find((s) => s.number === nextEp.season)?.episodes.find(
                           (e) => e.number === nextEp.episode,
-                        )?.name) ?? "Next episode"
+                        )?.name) ?? "Próximo episódio"
                       }`}
-                      subtitle="Play next"
+                      subtitle="Reproduzir próximo"
                       onClick={() => goTo(nextEp.season, nextEp.episode)}
                     />
                   ) : (
@@ -1226,7 +1226,7 @@ export function Player({
                     S{nextEp.season}:E{nextEp.episode} ·{" "}
                     {(seasons
                       .find((s) => s.number === nextEp.season)
-                      ?.episodes.find((e) => e.number === nextEp.episode)?.name) ?? "Next episode"}
+                      ?.episodes.find((e) => e.number === nextEp.episode)?.name) ?? "Próximo episódio"}
                   </span>
                   <span className="mt-0.5 block truncate text-[10.5px] text-white/45">
                     {title.name} · {activePlayer.label}
@@ -1308,7 +1308,7 @@ export function Player({
                         </span>
                       </span>
                       <span className="absolute left-1 top-1 rounded-sm bg-black/70 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/85">
-                        {item.kind === "series" ? "Series" : "Film"}
+                        {item.kind === "series" ? "Séries" : "Filme"}
                       </span>
                     </span>
                     <span className="block px-1.5 pb-1.5 pt-1">

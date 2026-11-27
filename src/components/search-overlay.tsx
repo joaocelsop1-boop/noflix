@@ -108,14 +108,14 @@ export function SearchOverlay() {
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Titles, people, genres"
+                placeholder="Títulos, pessoas, gêneros"
                 className="h-full flex-1 bg-transparent text-lg text-white outline-none placeholder:text-white/40 md:text-2xl"
-                aria-label="Search"
+                aria-label="Buscar"
               />
               <button
                 type="button"
                 onClick={() => setSearchOpen(false)}
-                aria-label="Close search"
+                aria-label="Fechar busca"
                 className="focus-brand grid h-10 w-10 place-items-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white"
               >
                 <CloseIcon width={22} height={22} />
@@ -146,7 +146,7 @@ export function SearchOverlay() {
                   ))}
                 </div>
 
-                <h2 className="mb-4 text-lg font-semibold text-white">Explore all genres</h2>
+                <h2 className="mb-4 text-lg font-semibold text-white">Explore todos os gêneros</h2>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {genres.map((genre, i) => (
                     <Link
@@ -169,7 +169,7 @@ export function SearchOverlay() {
                 <p className="mb-5 text-sm text-white/50">
                   {results.length > 0
                     ? `Showing ${results.length} result${results.length === 1 ? "" : "s"} for “${query}”`
-                    : `No results for “${query}”`}
+                    : `Nenhum resultado para “${query}”`}
                 </p>
                 {results.length === 0 ? (
                   <p className="max-w-md text-sm leading-relaxed text-white/60">

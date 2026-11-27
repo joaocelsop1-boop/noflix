@@ -175,16 +175,16 @@ export async function tmdbShelves(): Promise<Shelf[]> {
   const shelves: Shelf[] = [
     {
       id: "live-trending",
-      title: "Trending This Week",
-      hint: "Live from TMDB",
+      title: "Em alta esta semana",
+      hint: "Ao vivo do TMDB",
       items: (trending?.results ?? []).filter((i) => i.media_type !== "person").map((i) => mapTmdb(i)),
     },
-    { id: "live-movies", title: "Popular Movies Right Now", items: (movies?.results ?? []).map((i) => mapTmdb(i, "movie")) },
-    { id: "live-series", title: "Popular Series Right Now", items: (series?.results ?? []).map((i) => mapTmdb(i, "series")) },
+    { id: "live-movies", title: "Filmes populares agora", items: (movies?.results ?? []).map((i) => mapTmdb(i, "movie")) },
+    { id: "live-series", title: "Séries populares agora", items: (series?.results ?? []).map((i) => mapTmdb(i, "series")) },
     {
       id: "live-anime",
-      title: "Trending Anime",
-      hint: "Japanese animation, freshly ranked",
+      title: "Animes em alta",
+      hint: "Animação japonesa, recém-ordenada",
       items: [
         ...(anime?.results ?? []).map((i) => mapTmdb(i, "series", true)),
         ...(anime2?.results ?? []).map((i) => mapTmdb(i, "series", true)),
@@ -192,11 +192,11 @@ export async function tmdbShelves(): Promise<Shelf[]> {
     },
     {
       id: "live-anime-films",
-      title: "Anime Films",
-      hint: "Feature-length animation",
+      title: "Filmes de anime",
+      hint: "Animação de longa-metragem",
       items: (animeFilms?.results ?? []).map((i) => mapTmdb(i, "movie", true)),
     },
-    { id: "live-top-rated", title: "All-Time Top Rated", items: (topRated?.results ?? []).map((i) => mapTmdb(i, "movie")) },
+    { id: "live-top-rated", title: "Mais bem avaliados de todos os tempos", items: (topRated?.results ?? []).map((i) => mapTmdb(i, "movie")) },
   ];
 
   return shelves.filter((shelf) => shelf.items.length > 0);
@@ -234,7 +234,7 @@ export async function tvmazeShelf(): Promise<Shelf | null> {
 
   return {
     id: "live-tvmaze",
-    title: "Highly Rated Series",
+    title: "Séries muito bem avaliadas",
     hint: "Keyless · TVMaze",
     items: shows.map((show) => ({
       id: `tvmaze-${show.id}`,
@@ -281,7 +281,7 @@ export async function jikanShelf(): Promise<Shelf | null> {
 
   return {
     id: "live-jikan",
-    title: "Anime Everyone Is Watching",
+    title: "Animes que todo mundo está assistindo",
     hint: "Keyless · MyAnimeList",
     items: rows.map((item) => ({
       id: `mal-${item.mal_id}`,

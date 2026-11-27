@@ -3,27 +3,27 @@ import { genres, genreSlug } from "@/lib/catalog";
 
 const columns = [
   [
-    { label: "Home", href: "/" },
-    { label: "TV Shows", href: "/tv-shows" },
-    { label: "Movies", href: "/movies" },
+    { label: "Início", href: "/" },
+    { label: "Séries", href: "/tv-shows" },
+    { label: "Filmes", href: "/movies" },
     { label: "Anime", href: "/anime" },
   ],
   [
-    { label: "Browse all titles", href: "/browse" },
-    { label: "My List", href: "/my-list" },
-    { label: "New & Popular", href: "/new-popular" },
+    { label: "Ver todos os títulos", href: "/browse" },
+    { label: "Minha Lista", href: "/my-list" },
+    { label: "Novidades", href: "/new-popular" },
   ],
   [
-    { label: "Settings", href: "/settings" },
-    { label: "Appearance", href: "/settings?tab=appearance" },
-    { label: "Developer status", href: "/settings?tab=developer" },
-    { label: "About NOFLIX", href: "/about" },
+    { label: "Configurações", href: "/settings" },
+    { label: "Aparência", href: "/settings?tab=appearance" },
+    { label: "Status do desenvolvedor", href: "/settings?tab=developer" },
+    { label: "Sobre a MineTV", href: "/about" },
   ],
   [
-    { label: "Privacy policy", href: "/privacy" },
-    { label: "Terms of use", href: "/terms" },
-    { label: "Copyright & DMCA", href: "/dmca" },
-    { label: "Source on GitHub", href: "https://github.com/sdlksdsf/Movie" },
+    { label: "Política de privacidade", href: "/privacy" },
+    { label: "Termos de uso", href: "/terms" },
+    { label: "Direitos autorais e DMCA", href: "/dmca" },
+    { label: "Código no GitHub", href: "https://github.com/sdlksdsf/Movie" },
   ],
 ];
 
@@ -44,7 +44,7 @@ export function Footer() {
           href="/about"
           className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
         >
-          About NOFLIX
+          Sobre a MineTV
         </a>
         </div>
 
@@ -74,14 +74,14 @@ export function Footer() {
 
         <div className="mt-8 space-y-2 text-[11px] leading-relaxed text-white/35">
           <p>
-            A NOFLIX-inspired demo built with Next.js, Tailwind CSS and Framer Motion. All titles,
-            artwork and metadata belong to their respective rights holders.
+            Uma demonstração inspirada na MineTV, feita com Next.js, Tailwind CSS e Framer Motion. Todos os títulos,
+            artes e metadados pertencem aos seus respectivos detentores de direitos.
           </p>
           <p>
-            Playback is delivered through the third-party CineLite embed. If a stream doesn&apos;t
-            start, the source may be temporarily unavailable — try another title or server.
+            A reprodução é entregue pelo player de terceiros CineLite. Se um stream não iniciar,
+            a fonte pode estar temporariamente indisponível — tente outro título ou servidor.
           </p>
-          <p className="pt-2">NOFLIX Clone · Karachi, Pakistan</p>
+          <p className="pt-2">MineTV</p>
         </div>
       </div>
     </footer>

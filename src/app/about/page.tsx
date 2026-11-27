@@ -3,57 +3,57 @@ import Link from "next/link";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "About NOFLIX — the streaming front-end",
+  title: "Sobre a MineTV — o front-end de streaming",
   description:
-    "NOFLIX is an open streaming front-end built with Next.js and TMDB. No accounts, no trackers, playable in any browser.",
+    "MineTV é um front-end de streaming aberto construído com Next.js e TMDB. Sem contas, sem rastreadores, funciona em qualquer navegador.",
 };
 
 export default function Page() {
   return (
-    <LegalPage eyebrow="About" title="A streaming front-end, built for the browser" updated="November 2026">
+    <LegalPage eyebrow="Sobre" title="Um front-end de streaming, feito para o navegador" updated="Novembro de 2026">
       <p>
-        NOFLIX is a Netflix-style viewing experience for the open web. It pulls artwork and metadata
-        from <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a> and
-        episodes from TVMaze and MyAnimeList, then hands playback to independent embed players.
-        Nothing is re-hosted here.
+        MineTV é uma experiência de assistir estilo Netflix para a web aberta. Ela puxa arte e metadados
+        do <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a> e
+        episódios do TVMaze e do MyAnimeList, e entrega a reprodução para players independentes.
+        Nada é hospedado aqui.
       </p>
 
-      <h2>What is inside</h2>
+      <h2>O que tem dentro</h2>
       <ul>
-        <li><strong>Thousands of titles</strong> — a bundled catalogue for instant browsing plus a live TMDB catalogue that pages in as you scroll.</li>
-        <li><strong>Profiles</strong> — twelve vector characters, your own colour, and real maturity levels. Kids profiles only ever see family-safe titles.</li>
-        <li><strong>My List &amp; Continue Watching</strong> — saved per profile, on the device, optionally synced to your own Supabase project.</li>
-        <li><strong>Three stream servers</strong> — frameXTV by default, CineLite as backup, RiveStream as the last resort, with automatic failover.</li>
-        <li><strong>Settings that matter</strong> — accent colour, card density, motion, data saver, default server, quality and language.</li>
-        <li><strong>A developer panel</strong> — live status of every API and stream server, straight from your browser.</li>
+        <li><strong>Milhares de títulos</strong> — um catálogo embutido para navegar na hora, mais um catálogo ao vivo do TMDB que vai carregando conforme você rola.</li>
+        <li><strong>Perfis</strong> — doze personagens em vetor, sua própria cor e níveis de classificação reais. Perfis infantis só veem títulos seguros para a família.</li>
+        <li><strong>Minha Lista &amp; Continuar assistindo</strong> — salvo por perfil, no aparelho, com sincronização opcional para o seu próprio projeto Supabase.</li>
+        <li><strong>Três servidores de stream</strong> — frameXTV como padrão, CineLite como reserva, RiveStream como última opção, com troca automática em caso de falha.</li>
+        <li><strong>Configurações que importam</strong> — cor de destaque, densidade dos cartões, movimento, economia de dados, servidor padrão, qualidade e idioma.</li>
+        <li><strong>Um painel de desenvolvedor</strong> — status ao vivo de cada API e servidor de stream, direto do seu navegador.</li>
       </ul>
 
-      <h2>How it is built</h2>
+      <h2>Como foi construído</h2>
       <p>
-        Next.js 15 (App Router), React 19, Tailwind CSS 4 and Framer Motion, deployed on Vercel.
-        Profiles, lists and progress live in <code>localStorage</code>; when Supabase environment
-        variables are present they are mirrored to a single row per device, protected by row-level
-        security.
+        Next.js 15 (App Router), React 19, Tailwind CSS 4 e Framer Motion, publicado na Vercel.
+        Perfis, listas e progresso ficam no <code>localStorage</code>; quando há variáveis de ambiente
+        do Supabase, eles são espelhados para uma única linha por aparelho, protegida por segurança
+        em nível de linha.
       </p>
 
-      <h2>Try it</h2>
+      <h2>Experimente</h2>
       <ul>
-        <li><Link href="/">Open the home page</Link></li>
-        <li><Link href="/browse">Browse the full catalogue</Link></li>
-        <li><Link href="/settings">Open settings</Link></li>
-        <li><a href="https://github.com/sdlksdsf/Movie" target="_blank" rel="noreferrer">Source on GitHub</a></li>
+        <li><Link href="/">Abrir a página inicial</Link></li>
+        <li><Link href="/browse">Navegar pelo catálogo completo</Link></li>
+        <li><Link href="/settings">Abrir as configurações</Link></li>
+        <li><a href="https://github.com/sdlksdsf/Movie" target="_blank" rel="noreferrer">Código no GitHub</a></li>
       </ul>
 
-      <h2>Credits &amp; disclaimer</h2>
+      <h2>Créditos &amp; aviso</h2>
       <p>
-        All titles, artwork, trailers and videos belong to their respective owners. This project is a
-        technical demonstration of a streaming interface; it does not host, upload or store any video
-        content, and it is not affiliated with Netflix or any studio. If you like something you find
-        here, watch it on the service that made it.
+        Todos os títulos, artes, trailers e vídeos pertencem aos seus respectivos donos. Este projeto é uma
+        demonstração técnica de uma interface de streaming; ele não hospeda, envia ou guarda nenhum conteúdo
+        de vídeo, e não tem vínculo com a Netflix nem com nenhum estúdio. Se gostar de algo que encontrar
+        aqui, assista no serviço que o produziu.
       </p>
       <p>
-        Metadata courtesy of TMDB. This product uses the TMDB API but is not endorsed or certified by
-        TMDB.
+        Metadados por cortesia do TMDB. Este produto usa a API do TMDB, mas não é endossado nem certificado
+        pelo TMDB.
       </p>
     </LegalPage>
   );

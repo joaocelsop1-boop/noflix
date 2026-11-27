@@ -14,7 +14,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const genre = genreFromSlug(slug);
-  return { title: genre ? `${genre} — NOFLIX` : "Browse — NOFLIX" };
+  return { title: genre ? `${genre} — MineTV` : "Navegar — MineTV" };
 }
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {

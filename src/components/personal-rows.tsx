@@ -24,8 +24,8 @@ export function PersonalRows() {
     if (picks.length >= 5) {
       out.push({
         id: "top-picks",
-        title: "Top Picks for You",
-        hint: "Ranked by what you actually watch",
+        title: "Escolhas para você",
+        hint: "Ordenado pelo que você realmente assiste",
         slugs: picks.map((t) => t.slug),
       });
     }
@@ -37,7 +37,7 @@ export function PersonalRows() {
         out.push({
           id: `because-${because.source.slug}`,
           title: `Because You Watched ${because.source.name}`,
-          hint: "Same mood, same genre",
+          hint: "Mesmo clima, mesmo gênero",
           slugs: titles.map((t) => t.slug),
         });
       }

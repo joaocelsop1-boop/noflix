@@ -107,13 +107,13 @@ export function BrowseGrid({
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Filter by title…"
+                  placeholder="Filtrar por título…"
                   className="w-40 rounded border border-white/15 bg-black/40 px-3 py-1.5 text-xs text-white outline-none transition placeholder:text-white/35 focus:border-white/50 md:w-48"
                 />
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as Sort)}
-                  aria-label="Sort titles"
+                  aria-label="Ordenar títulos"
                   className="rounded border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/50"
                 >
                   <option value="popular">Popularity</option>

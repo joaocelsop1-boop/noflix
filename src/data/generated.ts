@@ -32,24 +32,24 @@ type Entry = {
 };
 
 const allowed: Genre[] = [
-  "Action",
-  "Adventure",
-  "Animation",
-  "Comedy",
+  "Ação",
+  "Aventura",
+  "Animação",
+  "Comédia",
   "Crime",
-  "Documentary",
+  "Documentário",
   "Drama",
-  "Family",
-  "Fantasy",
-  "History",
-  "Horror",
-  "Music",
-  "Mystery",
+  "Família",
+  "Fantasia",
+  "História",
+  "Terror",
+  "Música",
+  "Mistério",
   "Romance",
-  "Sci-Fi",
-  "Thriller",
-  "War",
-  "Western",
+  "Ficção científica",
+  "Suspense",
+  "Guerra",
+  "Faroeste",
 ];
 
 const accents = [
@@ -70,9 +70,9 @@ function hash(input: string) {
 }
 
 function maturityFor(entry: Entry) {
-  if (entry.kind === "series") return entry.genres.includes("Horror") ? "TV-MA" : "TV-14";
-  if (entry.genres.includes("Family") || entry.genres.includes("Animation")) return "PG";
-  if (entry.genres.includes("Horror")) return "18+";
+  if (entry.kind === "series") return entry.genres.includes("Terror") ? "TV-MA" : "TV-14";
+  if (entry.genres.includes("Família") || entry.genres.includes("Animação")) return "PG";
+  if (entry.genres.includes("Terror")) return "18+";
   return "16+";
 }
 
@@ -120,7 +120,7 @@ export const generatedTitles: Title[] = allEntries.map((entry) => {
   const isAnime =
     Boolean(entry.anime) ||
     Boolean(entry.anilistId) ||
-    (entry.genres.includes("Animation") && entry.kind === "series");
+    (entry.genres.includes("Animação") && entry.kind === "series");
   return {
     slug: entry.slug,
     tmdbId: entry.tmdbId,
@@ -137,12 +137,12 @@ export const generatedTitles: Title[] = allEntries.map((entry) => {
     match: Math.min(99, Math.round(entry.rating * 10) + 4),
     tagline: entry.kind === "series" ? "Stream the whole story." : "Now streaming.",
     overview: entry.overview,
-    creator: entry.creator ?? (isAnime ? "Japanese animation" : "NOFLIX"),
+    creator: entry.creator ?? (isAnime ? "Animação japonesa" : "MineTV"),
     cast: entry.cast ?? [],
     badge: entry.badge,
     accent: accents[hash(entry.slug) % accents.length],
     featured: entry.featured,
     original: entry.original,
-    format: entry.kind === "series" ? `${seasonCount} Season${seasonCount === 1 ? "" : "s"}` : "Film",
+    format: entry.kind === "series" ? `${seasonCount} Season${seasonCount === 1 ? "" : "s"}` : "Filme",
   } satisfies Title;
 });

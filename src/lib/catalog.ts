@@ -6,10 +6,10 @@ import { allowedFor } from "@/lib/avatars";
 export const allTitles = titles;
 
 /** Genres that are safe for a kids profile. */
-const KIDS_GENRES: Genre[] = ["Family", "Animation", "Comedy", "Adventure", "Fantasy"];
+const KIDS_GENRES: Genre[] = ["Família", "Animação", "Comédia", "Aventura", "Fantasia"];
 
 export function isKidsSafe(title: Title) {
-  if (title.genres.includes("Horror") || title.genres.includes("Crime")) return false;
+  if (title.genres.includes("Terror") || title.genres.includes("Crime")) return false;
   if (!title.genres.some((g) => KIDS_GENRES.includes(g))) return false;
   return !["18+", "TV-MA", "R"].includes(title.maturity);
 }

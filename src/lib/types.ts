@@ -1,24 +1,24 @@
 export type Kind = "movie" | "series";
 
 export type Genre =
-  | "Action"
-  | "Adventure"
-  | "Animation"
-  | "Comedy"
+  | "Ação"
+  | "Aventura"
+  | "Animação"
+  | "Comédia"
   | "Crime"
-  | "Documentary"
+  | "Documentário"
   | "Drama"
-  | "Family"
-  | "Fantasy"
-  | "History"
-  | "Horror"
-  | "Music"
-  | "Mystery"
+  | "Família"
+  | "Fantasia"
+  | "História"
+  | "Terror"
+  | "Música"
+  | "Mistério"
   | "Romance"
-  | "Sci-Fi"
-  | "Thriller"
-  | "War"
-  | "Western";
+  | "Ficção científica"
+  | "Suspense"
+  | "Guerra"
+  | "Faroeste";
 
 export type Title = {
   /** URL-safe unique id, also used for the artwork filename */

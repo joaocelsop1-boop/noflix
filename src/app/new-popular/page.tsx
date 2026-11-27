@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BrowseGrid } from "@/components/browse-grid";
 import { allTitles, topTen } from "@/lib/catalog";
 
-export const metadata: Metadata = { title: "New & Popular — NOFLIX" };
+export const metadata: Metadata = { title: "Novidades — MineTV" };
 
 export default function Page() {
   const ranked = topTen();
@@ -13,7 +13,7 @@ export default function Page() {
   return (
     <BrowseGrid
       titles={[...ranked, ...rest]}
-      heading="New & Popular"
+      heading="Novidades"
       subheading="The top 10 in your region today, plus everything that just landed on the service."
     />
   );
