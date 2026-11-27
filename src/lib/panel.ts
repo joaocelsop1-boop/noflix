@@ -244,11 +244,17 @@ export async function fetchPanelEpg(streamId: number): Promise<PanelEpgProgramme
 export async function createPanelOrder(
   planId: number,
   whatsapp?: string,
+  /** "Gerar novo Pix": força uma cobrança nova na API em vez de devolver o QR do pedido pendente. */
+  forceNew?: boolean,
 ): Promise<PanelOrder> {
   const res = await fetch(apiUrl("/api/panel/order"), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ plan_id: planId, whatsapp: whatsapp || undefined }),
+    body: JSON.stringify({
+      plan_id: planId,
+      whatsapp: whatsapp || undefined,
+      force_new: forceNew ? true : undefined,
+    }),
   });
   const raw = (await readJson<Record<string, unknown>>(res)) ?? {};
   // O PHP responde {success, message, ...} e o front esperava {ok, error}:

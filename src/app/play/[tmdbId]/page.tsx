@@ -76,6 +76,7 @@ export default async function PlayPage({
         initialSeason={Math.max(Number(query.s) || 1, 1)}
         initialEpisode={Math.max(Number(query.e) || 1, 1)}
         seasons={[]}
+        episodePicked={Boolean(query.s || query.e)}
       />
     );
   }
@@ -159,6 +160,7 @@ export default async function PlayPage({
       initialSeason={initialSeason}
       initialEpisode={initialEpisode}
       seasons={usable}
+      episodePicked={Boolean(query.s || query.e)}
       artwork={{
         poster: film?.poster ?? show?.poster ?? anime?.poster ?? query.poster,
         backdrop: film?.backdrop ?? show?.backdrop ?? anime?.backdrop ?? query.backdrop,

@@ -193,6 +193,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $days = max(1, min(3650, intval($_POST['days'] ?? 30)));
         $stmt = $pdo->prepare("UPDATE users SET expires_at = DATE_ADD(GREATEST(NOW(), COALESCE(expires_at, NOW())), INTERVAL ? DAY), status = 'active' WHERE id = ?");
         $stmt->execute([$days, $id]);
+        // Backfill: cliente aprovado antes do fix não tinha plan_id — completa
+        // com o plano do pedido aprovado mais recente, para o menu mostrar
+        // "Plano X · válido até ..." em vez de "Sem plano ativo".
+        $bf = $pdo->prepare("SELECT plan_id FROM orders WHERE user_id = ? AND status = 'approved' ORDER BY approved_at DESC LIMIT 1");
+        $bf->execute([$id]);
+        $bfPlan = $bf->fetchColumn();
+        if ($bfPlan) {
+            $pdo->prepare("UPDATE users SET plan_id = ? WHERE id = ? AND plan_id IS NULL")->execute([(int)$bfPlan, $id]);
+        }
         $msg = "Cliente renovado por mais $days dias com sucesso!";
     }
 
@@ -279,7 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($order && $order['status'] === 'pending') {
             $pdo->prepare("UPDATE orders SET status = 'approved', approved_at = NOW() WHERE id = ?")->execute([$orderId]);
             $days = $order['duration_days'];
-            $pdo->prepare("UPDATE users SET status = 'active', expires_at = DATE_ADD(GREATEST(NOW(), COALESCE(expires_at, NOW())), INTERVAL ? DAY) WHERE id = ?")->execute([$days, $order['user_id']]);
+            // plan_id junto: sem ele o menu mostra "Sem plano ativo" (o
+            // plan_name vem de user.plan_id) mesmo com o plano ativo.
+            $pdo->prepare("UPDATE users SET status = 'active', plan_id = ?, expires_at = DATE_ADD(GREATEST(NOW(), COALESCE(expires_at, NOW())), INTERVAL ? DAY) WHERE id = ?")->execute([$order['plan_id'], $days, $order['user_id']]);
             
             // Comissão de afiliado (% configurado em Servidor Sigma)
             $userStmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");

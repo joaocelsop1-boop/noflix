@@ -523,13 +523,17 @@ switch ($action) {
         $gw = (string)($settings['payment_gateway'] ?? 'mp');
         if (!in_array($gw, ['mp', 'lynx', 'efi', 'asaas', 'manual'], true)) $gw = 'mp';
         if ($gw === 'mp' && empty($settings['mp_access_token'])) $gw = 'manual';
+        // "Gerar novo Pix": o usuário pediu um QR novo — pula o reaproveitamento
+        // do pedido pendente e chama o gateway de novo (sem isso o botão
+        // devolvia o QR antigo, que podia ser de outra configuração).
+        $forceNew = !empty(api_post_field('force_new', ''));
         // Reaproveita pedido pendente recente do MESMO plano e MESMO
         // gateway (evita duplicar QR). Pedido manual não tem QR, então
         // não entra aqui — cada clique gera um pedido novo p/ aprovar.
         $stmt = $pdo->prepare("SELECT * FROM orders WHERE user_id = ? AND plan_id = ? AND status = 'pending' AND gateway = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) ORDER BY id DESC LIMIT 1");
         $stmt->execute([$user['id'], $planId, $gw]);
         $existing = $stmt->fetch();
-        if ($existing && !empty($existing['pix_code'])) {
+        if (!$forceNew && $existing && !empty($existing['pix_code'])) {
             echo json_encode([
                 'success' => true, 'ok' => true, 'mode' => $gw, 'order_id' => (int)$existing['id'],
                 'amount' => (float)$existing['amount'], 'plan_name' => $plan['name'],

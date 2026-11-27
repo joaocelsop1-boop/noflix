@@ -111,10 +111,14 @@ export default function PlanosPage() {
   const subscribe = async (plan: PanelPlan) => {
     setOrderError(null);
     setApproved(false);
+    /* "Gerar novo Pix" (já existe pedido deste plano): força uma cobrança
+       nova na API em vez de devolver o QR antigo. O primeiro "Assinar"
+       continua reaproveitando (proteção contra duplo clique). */
+    const hadOrder = Boolean(order && orderPlan?.id === plan.id);
     setOrder(null);
     setOrderPlan(plan);
     setOrdering(plan.id);
-    const result = await createPanelOrder(plan.id);
+    const result = await createPanelOrder(plan.id, undefined, hadOrder);
     setOrdering(null);
     if (!result.ok) {
       // || em vez de ?? — "" ?? x devolve "" e a tela ficava sem erro nenhum.

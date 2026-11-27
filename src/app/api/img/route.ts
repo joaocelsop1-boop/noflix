@@ -76,6 +76,50 @@ function markDead(url: string): void {
   dead.set(url, Date.now());
 }
 
+/**
+ * Cache positivo em memória (1h, até 150 capas / 48 MB): a capa buscada uma
+ * vez não volta ao host de origem — a inicial abre rápido na segunda visita
+ * e para outros usuários, sem depender só do cache do navegador. O negativo
+ * (capa morta, 10 min) já existia; faltava o positivo, e era ele que deixava
+ * a inicial lenta: cada abertura re-buscava todas as capas nos hosts lentos
+ * do painel. FIFO quando cheio; TTL de 1h por entrada.
+ */
+const IMG_TTL = 60 * 60 * 1000;
+const IMG_MAX_ENTRIES = 150;
+const IMG_MAX_BYTES = 48 * 1024 * 1024;
+const imgCache = new Map<string, { at: number; type: string; body: Uint8Array<ArrayBuffer>; size: number }>();
+let imgCacheBytes = 0;
+
+function imgCacheGet(url: string): { type: string; body: Uint8Array<ArrayBuffer> } | null {
+  const hit = imgCache.get(url);
+  if (!hit) return null;
+  if (Date.now() - hit.at > IMG_TTL) {
+    imgCache.delete(url);
+    imgCacheBytes -= hit.size;
+    return null;
+  }
+  return { type: hit.type, body: hit.body };
+}
+
+function imgCacheSet(url: string, type: string, body: Uint8Array<ArrayBuffer>): void {
+  const size = body.byteLength;
+  if (size <= 0 || size > IMG_MAX_BYTES) return;
+  const prev = imgCache.get(url);
+  if (prev) imgCacheBytes -= prev.size;
+  while (
+    (imgCache.size >= IMG_MAX_ENTRIES || imgCacheBytes + size > IMG_MAX_BYTES) &&
+    imgCache.size > 0
+  ) {
+    const oldest = imgCache.keys().next();
+    if (oldest.done) break;
+    const victim = imgCache.get(oldest.value);
+    if (victim) imgCacheBytes -= victim.size;
+    imgCache.delete(oldest.value);
+  }
+  imgCache.set(url, { at: Date.now(), type, body, size });
+  imgCacheBytes += size;
+}
+
 function tmdbKey(): string {
   return (
     process.env.TMDB_API_KEY ??
@@ -137,6 +181,17 @@ function parse(raw: string | null): string | null {
 }
 
 async function grab(target: string): Promise<Response | null> {
+  const cached = imgCacheGet(target);
+  if (cached) {
+    return new NextResponse(cached.body, {
+      headers: {
+        "content-type": cached.type,
+        "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400",
+        "x-artwork-source": new URL(target).hostname,
+        "x-artwork-cache": "hit",
+      },
+    });
+  }
   try {
     const upstream = await fetch(target, {
       headers: { "user-agent": UA, accept: "image/avif,image/webp,image/*,*/*" },
@@ -147,7 +202,9 @@ async function grab(target: string): Promise<Response | null> {
     if (!upstream.ok || !upstream.body) return null;
     const type = upstream.headers.get("content-type") ?? "";
     if (!type.startsWith("image/")) return null;
-    return new NextResponse(upstream.body, {
+    const body = new Uint8Array(await upstream.arrayBuffer());
+    imgCacheSet(target, type, body);
+    return new NextResponse(body, {
       headers: {
         "content-type": type,
         "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400",

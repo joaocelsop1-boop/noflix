@@ -133,12 +133,15 @@ export function Player({
   initialSeason,
   initialEpisode,
   seasons,
+  episodePicked,
 }: {
   title: Title;
   initialSeason: number;
   initialEpisode: number;
   seasons: Season[];
   artwork?: { poster?: string; backdrop?: string };
+  /** a URL já trouxe temporada+episódio (?s=&e=): deep link, próximo episódio — toca direto */
+  episodePicked?: boolean;
 }) {
   const router = useRouter();
   const { setProgress, progress, toast, settings, updateSettings } = useStore();
@@ -148,6 +151,11 @@ export function Player({
   const anime = isAnimeTitle(title);
   /** título do painel (tmdbId 0 ou panel presente): player próprio, nunca embed */
   const isPanelTitle = title.tmdbId === 0 || Boolean(title.panel);
+  /** séries do painel: sem episódio explícito na URL, o usuário escolhe
+     temporada+episódio ANTES de tocar — nada de S01E01 automático. Filmes
+     e links com ?s=&e= (próximo episódio, deep link) tocam direto. */
+  const needsPick = isPanelTitle && title.kind === "series" && !episodePicked;
+  const [picked, setPicked] = useState(() => !needsPick);
   /** gate de plano: /api/panel/me disse canWatch=false ou o stream deu 403 */
   const [planBlocked, setPlanBlocked] = useState<string | null>(null);
   /** motivo do stream do painel ter falhado (ex.: série sem episódios) */
@@ -174,11 +182,14 @@ export function Player({
      temporadas/episódios vêm do get_series_info do painel, e sem elas o
      menu não mostrava nenhum seletor (sempre S01E01). */
   const [panelSeasons, setPanelSeasons] = useState<Season[]>([]);
+  const [panelSeasonsLoaded, setPanelSeasonsLoaded] = useState(false);
   useEffect(() => {
     if (!isPanelTitle || title.panel?.type !== "series" || title.kind !== "series") return;
     let alive = true;
     void fetchPanelInfo("series", title.panel.id).then((info) => {
-      if (!alive || !info) return;
+      if (!alive) return;
+      setPanelSeasonsLoaded(true);
+      if (!info) return;
       const raw = (info.episodes ?? {}) as Record<string, unknown>;
       const list: Season[] = Object.keys(raw)
         .map((key) => {
@@ -295,7 +306,9 @@ export function Player({
 
   /* our own player: resolve the real stream for this title/episode */
   useEffect(() => {
-    if (!nativeMode) return;
+    /* sem episódio escolhido ainda (seletor de série do painel): não busca
+       o stream — o vídeo só começa depois que o usuário escolhe. */
+    if (!nativeMode || !picked) return;
     let alive = true;
     setNativeState("loading");
     setNativeSources([]);
@@ -403,7 +416,7 @@ export function Player({
     return () => {
       alive = false;
     };
-  }, [nativeMode, title.tmdbId, title.kind, title.panel, isPanelTitle, season, episode, panelRetry]);
+  }, [nativeMode, picked, title.tmdbId, title.kind, title.panel, isPanelTitle, season, episode, panelRetry]);
 
   /* restore the user's chosen source + quality (default: frameXTV) */
   useEffect(() => {
@@ -511,6 +524,8 @@ export function Player({
   /* our player is the default; a title with no resolvable stream falls back */
   const nativeActive = nativeMode && nativeState !== "none";
   const currentSeason = allSeasons.find((s) => s.number === season);
+  /** temporada exibida no seletor (cai para a primeira quando a atual não existe) */
+  const pickerSeason = currentSeason ?? allSeasons[0];
 
   /* ---------------------------------------------------------------- source */
 
@@ -674,6 +689,15 @@ export function Player({
     [title.slug],
   );
 
+  /** escolha no seletor (antes de tocar): vai para o episódio e libera o play */
+  const pickEpisode = useCallback(
+    (s: number, e: number) => {
+      goTo(s, e);
+      setPicked(true);
+    },
+    [goTo],
+  );
+
   useEffect(() => {
     if (!upNext) return;
     if (upNext.left <= 0) {
@@ -793,6 +817,82 @@ export function Player({
       {/* gate de plano: no lugar do player, CTA para /planos */}
       {planBlocked && <PlanGate reason={planBlocked} />}
 
+      {/* séries do painel sem episódio escolhido: seletor de temporada e
+          episódio ANTES de tocar — o vídeo só carrega depois da escolha. */}
+      {!picked && !planBlocked && (
+        <div className="absolute inset-0 z-40 overflow-y-auto bg-[#0f1220] px-4 py-8 md:px-10">
+          <div className="mx-auto max-w-[880px]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
+              Escolher episódio
+            </p>
+            <h1 className="mt-1 text-2xl font-bold leading-tight text-white md:text-3xl">{title.name}</h1>
+            <p className="mt-1 text-[13px] text-white/55">
+              Escolha a temporada e o episódio para assistir.
+            </p>
+            {allSeasons.length === 0 ? (
+              panelSeasonsLoaded ? (
+                <div className="mt-6">
+                  <p className="text-[13px] text-white/55">
+                    O painel não devolveu a lista de episódios desta série.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => pickEpisode(1, 1)}
+                    className="mt-4 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-black transition hover:bg-white/85"
+                  >
+                    Assistir · Temporada 1 · Episódio 1
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-8 flex items-center gap-2.5">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
+                  <p className="text-[13px] font-medium text-white/55">Carregando temporadas e episódios…</p>
+                </div>
+              )
+            ) : (
+              <>
+                {allSeasons.length > 1 && (
+                  <div className="mt-5 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {allSeasons.map((entry) => (
+                      <button
+                        key={entry.number}
+                        type="button"
+                        onClick={() => setSeason(entry.number)}
+                        aria-pressed={entry.number === pickerSeason?.number}
+                        className={
+                          entry.number === pickerSeason?.number
+                            ? "shrink-0 rounded-full border border-white/70 bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white"
+                            : "shrink-0 rounded-full border border-white/10 px-3.5 py-1.5 text-[12.5px] text-white/60 transition hover:border-white/40 hover:text-white"
+                        }
+                      >
+                        {entry.name && !/^Season \d+$/.test(entry.name) ? entry.name : `Temporada ${entry.number}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-4 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
+                  {pickerSeason?.name && !/^Season \d+$/.test(pickerSeason.name)
+                    ? pickerSeason.name
+                    : `Temporada ${pickerSeason?.number ?? season}`}
+                  {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
+                </p>
+                <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+                  {(pickerSeason?.episodes ?? []).map((item) => (
+                    <Row
+                      key={item.number}
+                      active={false}
+                      title={`E${item.number} · ${item.name}`}
+                      subtitle={`${item.runtime} min`}
+                      onClick={() => pickEpisode(pickerSeason?.number ?? season, item.number)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* painel sem stream resolvido (e sem bloqueio de plano): tentar de novo */}
       {!planBlocked && isPanelTitle && nativeMode && nativeState === "none" && (
         <div className="absolute inset-0 z-40 grid place-items-center bg-black/85 px-6 text-center">
@@ -825,7 +925,7 @@ export function Player({
         </div>
       )}
 
-      {nativeActive && nativeState === "ready" && (
+      {picked && nativeActive && nativeState === "ready" && (
         <NativePlayer
           sources={nativeSources}
           isPanel={isPanelTitle}
@@ -862,7 +962,7 @@ export function Player({
         />
       )}
 
-      {!nativeActive && !isPanelTitle && mounted && aniState !== "pending" && (
+      {picked && !nativeActive && !isPanelTitle && mounted && aniState !== "pending" && (
         <iframe
           ref={iframeRef}
           key={src}
