@@ -228,7 +228,8 @@ export function Navbar() {
                           const type = t.panel?.type ?? t.kind;
                           const id = t.panel?.id ?? t.tmdbId;
                           router.push(
-                            appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(t.name)}`),
+                            // tudo22: leva o ano do catálogo na URL (ver panel-home).
+                            appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(t.name)}${t.year ? `&year=${t.year}` : ""}`),
                           );
                         }}
                         className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-white/5"
@@ -272,7 +273,7 @@ export function Navbar() {
             >
               <ProfileAvatar
                 avatar={hydrated && profile ? profile.avatar : "robot"}
-                accent={hydrated && profile ? profile.accent : "#22e6ff"}
+                accent={hydrated && profile ? profile.accent : "#e50914"}
                 rounded="rounded"
                 className="h-8 w-8"
                 kids={hydrated && profile?.kids}

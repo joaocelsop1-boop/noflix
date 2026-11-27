@@ -37,7 +37,7 @@ export const AVATARS: Array<{ id: AvatarId; label: string; kids?: boolean }> = [
 ];
 
 export const ACCENTS = [
-  { id: "red", value: "#ff2bd6", label: "Neon magenta" },
+  { id: "red", value: "#e50914", label: "Neon magenta" },
   { id: "orange", value: "#f97316", label: "Ember" },
   { id: "amber", value: "#f59e0b", label: "Gold" },
   { id: "lime", value: "#84cc16", label: "Lime" },

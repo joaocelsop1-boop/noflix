@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-netflix-red: #ff2bd6;
-  --color-netflix-red-dark: #c40ea8;
+  --color-netflix-red: #e50914;
+  --color-netflix-red-dark: #b00610;
   --color-ink: #0f1220;
-  --color-ink-deep: #07080f;
+  --color-ink-deep: #0d1526;
   --color-panel: #0f1220;
   --color-panel-light: #1b2036;
   --color-muted: #8a90b0;
@@ -20,12 +20,12 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #07080f;
+  background-color: #0d1526;
   color-scheme: dark;
 }
 
 body {
-  background: #07080f;
+  background: #0d1526;
   overscroll-behavior-y: none;
   color: #fff;
   font-family: var(--font-sans);
@@ -36,8 +36,8 @@ body {
 }
 
 ::selection {
-  background: rgba(34, 230, 255, 0.85);
-  color: #07080f;
+  background: rgba(229, 9, 20, 0.85);
+  color: #fff;
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,7 +56,7 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #07080f;
+  background: #0d1526;
 }
 ::-webkit-scrollbar-thumb {
   background: #3a3a3a;
@@ -265,33 +265,33 @@ a,
  * Theme tokens — driven by Settings → Appearance
  * ------------------------------------------------------------------ */
 :root {
-  --nf-accent: #22e6ff;
+  --nf-accent: #e50914;
   --nf-card-w: 186px;
 }
 
 /* Neon CinePlus — mesma paleta do site de vendas (#07080f / #0f1220,
-   ciano #22e6ff, magenta #ff2bd6). Só cores: nenhum layout muda. */
+   ciano #e50914, magenta #e50914). Só cores: nenhum layout muda. */
 :root {
-  --neon-cyan: #22e6ff;
-  --neon-magenta: #ff2bd6;
+  --neon-cyan: #e50914;
+  --neon-magenta: #e50914;
   --neon-green: #25d366;
-  --neon-bg: #07080f;
-  --neon-card: #0f1220;
-  --neon-border: #222842;
+  --neon-bg: #0d1526;
+  --neon-card: #111a2e;
+  --neon-border: #24304d;
 }
 .neon-text {
-  background: linear-gradient(90deg, #22e6ff, #ff2bd6);
+  background: linear-gradient(90deg, #ff6b7a, #e50914);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .btn-neon {
-  background: linear-gradient(90deg, #22e6ff, #ff2bd6);
-  color: #07080f;
-  box-shadow: 0 0 25px rgba(34, 230, 255, 0.35);
+  background: #e50914;
+  color: #fff;
+  box-shadow: 0 0 25px rgba(229, 9, 20, 0.35);
 }
 .btn-neon:hover {
-  box-shadow: 0 0 35px rgba(255, 43, 214, 0.5);
+  box-shadow: 0 0 35px rgba(229, 9, 20, 0.5);
 }
 
 [data-density="compact"] { --nf-card-w: 152px; }

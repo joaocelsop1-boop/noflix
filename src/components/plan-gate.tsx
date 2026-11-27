@@ -12,7 +12,7 @@ export function PlanGate({ reason }: { reason?: string }) {
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-black px-6 text-center">
       <div className="max-w-md">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
           You&apos;re watching · CinePlus
         </p>
         <h2 className="mt-3 text-2xl font-bold text-white md:text-3xl">

@@ -52,12 +52,28 @@ const num = (value: unknown): number | undefined => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
-/** Normaliza para busca: minúsculo e sem acento ("ação" casa com "acao"). */
+/** Normaliza para busca: minúsculo, sem acento ("ação" casa com "acao")
+ * e sem pontuação (":" , "-", etc. viram espaço — "Batman: A Série
+ * Animada" casa com "Batman - A Série Animada" e com "Batman A Série
+ * Animada"). */
 function normText(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Casa a busca com o nome: frase exata normalizada OU todas as palavras
+ * da busca aparecem no nome (em qualquer ordem). A frase cobre o título
+ * exato; as palavras cobrem título digitado sem uma palavra do meio
+ * ("Batman Série Animada" acha "Batman: A Série Animada"). */
+function matchesSearch(name: string, query: string): boolean {
+  const n = normText(name);
+  if (n.includes(query)) return true;
+  const tokens = query.split(" ").filter(Boolean);
+  return tokens.length > 1 && tokens.every((t) => n.includes(t));
 }
 
 /** Cache do catálogo do painel (30 min por aba): o catálogo é o mesmo para
@@ -246,7 +262,7 @@ export async function GET(request: Request) {
   if (usePanel) {
     const all = panelEntries;
     let filtered = all;
-    if (q) filtered = filtered.filter((entry) => normText(entry.name).includes(q));
+    if (q) filtered = filtered.filter((entry) => matchesSearch(entry.name, q));
     if (category) filtered = filtered.filter((entry) => entry.categoryId === category);
     if (audience === "kids") filtered = filtered.filter((entry) => entry.audience === "kids" || isKidsEntry(entry));
     if (audience === "mature") filtered = filtered.filter((entry) => entry.audience === "mature");
@@ -270,7 +286,7 @@ export async function GET(request: Request) {
 
   const all = await buildCatalogue(tab);
   let filtered = all;
-  if (q) filtered = filtered.filter((entry) => normText(entry.name).includes(q));
+  if (q) filtered = filtered.filter((entry) => matchesSearch(entry.name, q));
   if (audience === "kids") filtered = filtered.filter((entry) => entry.audience === "kids" || isKidsEntry(entry));
   if (audience === "mature") filtered = filtered.filter((entry) => entry.audience === "mature");
   if (genre) filtered = filtered.filter((entry) => entry.genres.includes(genre));

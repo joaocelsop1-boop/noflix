@@ -14,6 +14,65 @@ import { ChevronRightIcon, PlayIcon } from "@/components/icons";
 import { ContinueRow } from "@/components/row";
 import { useStore } from "@/components/store";
 import type { CatalogueEntry } from "@/lib/catalogue";
+import { MOVIE_GENRES, SERIES_GENRES } from "@/lib/discover";
+
+/** id TMDB -> nome do genero (pilulas do heroi). */
+const GENRE_NAME = new Map<number, string>([
+  ...MOVIE_GENRES.map((g) => [g.id, g.name] as const),
+  ...SERIES_GENRES.map((g) => [g.id, g.name] as const),
+]);
+
+function heroGenres(entry: CatalogueEntry): string[] {
+  const names: string[] = [];
+  for (const id of entry.genres ?? []) {
+    const name = GENRE_NAME.get(id);
+    if (name && !names.includes(name)) names.push(name);
+    if (names.length >= 3) break;
+  }
+  return names;
+}
+
+/**
+ * Miniatura circular do heroi (estilo Pobreflix): o poster do destaque
+ * num circulo; a ativa ganha anel branco. Clicar troca o heroi na hora.
+ * Capa quebrada some em vez de mostrar um circulo vazio.
+ */
+function HeroThumb({
+  entry,
+  active,
+  onSelect,
+}: {
+  entry: CatalogueEntry;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const [broken, setBroken] = useState(false);
+  const src = artUrl(entry.poster ?? entry.backdrop);
+  if (!src || broken) return null;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`Mostrar ${entry.name}`}
+      aria-current={active}
+      className={cn(
+        "h-11 w-11 shrink-0 overflow-hidden rounded-full transition md:h-[52px] md:w-[52px]",
+        active
+          ? "ring-2 ring-white ring-offset-2 ring-offset-black/60"
+          : "opacity-70 ring-1 ring-white/30 hover:opacity-100 hover:ring-white/60",
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        onError={() => setBroken(true)}
+        className="h-full w-full object-cover"
+      />
+    </button>
+  );
+}
 
 export type PanelHomeData = {
   movies: CatalogueEntry[];
@@ -157,11 +216,25 @@ export async function fetchPanelHomeData(): Promise<{
 function panelPlayUrl(entry: CatalogueEntry): string {
   const type = entry.panel?.type ?? entry.kind;
   const id = entry.panel?.id ?? entry.tmdbId;
-  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`);
+  // tudo22: leva o ano do catálogo na URL — sem ele a página de detalhe
+  // começava com o ano atual (2026) e piscava ao corrigir para o do painel.
+  const yearParam = entry.year ? `&year=${entry.year}` : "";
+  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}${yearParam}`);
 }
 
-/** Cartão de pôster do painel, no mesmo visual das prateleiras do site. */
-function PanelPosterCard({ entry }: { entry: CatalogueEntry }) {
+/**
+ * Cartão de pôster do painel, estilo Pobreflix: cantos arredondados e,
+ * sempre visível embaixo do pôster, o título + estrela amarela com a nota.
+ * (O painel não manda áudio por título, então não há selo DUBLADO/LEGENDADO
+ * — mostrar um seria inventar dado.)
+ */
+function PanelPosterCard({
+  entry,
+  showCaption = true,
+}: {
+  entry: CatalogueEntry;
+  showCaption?: boolean;
+}) {
   const router = useRouter();
   const img = artUrl(entry.poster);
   const initial = (entry.name.trim()[0] ?? "?").toUpperCase();
@@ -169,48 +242,66 @@ function PanelPosterCard({ entry }: { entry: CatalogueEntry }) {
      esperar o erro de rede segurar a fileira */
   const [broken, setBroken] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={() => router.push(panelPlayUrl(entry))}
-      className={cn(
-        "group relative block shrink-0 snap-start overflow-hidden rounded-[4px] bg-[#222] text-left ring-1 ring-white/5 transition-[transform,box-shadow,ring] duration-300 will-change-transform",
-        "w-[var(--nf-card-w,186px)]",
-        "aspect-[2/3] hover:z-10 hover:scale-[1.05] hover:ring-white/30 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)]",
-      )}
-    >
-      {img && !broken ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={img}
-          alt={entry.name}
-          loading="lazy"
-          decoding="async"
-          onError={() => setBroken(true)}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
-        />
-      ) : (
-        <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#2a2a2a] to-[#111] p-2 text-center">
-          <span>
-            <span className="block text-[44px] font-bold leading-none neon-text">{initial}</span>
-            <span className="mt-2 block text-[11px] font-medium leading-tight text-white/80">
-              {entry.name}
+    <div className="w-[var(--nf-card-w,186px)] shrink-0 snap-start">
+      <button
+        type="button"
+        onClick={() => router.push(panelPlayUrl(entry))}
+        className={cn(
+          "group relative block w-full overflow-hidden rounded-lg bg-[#222] text-left ring-1 ring-white/5 transition-[transform,box-shadow,ring] duration-300 will-change-transform",
+          "aspect-[2/3] hover:z-10 hover:scale-[1.05] hover:ring-white/30 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)]",
+        )}
+      >
+        {img && !broken ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt={entry.name}
+            loading="lazy"
+            decoding="async"
+            onError={() => setBroken(true)}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#2a2a2a] to-[#111] p-2 text-center">
+            <span>
+              <span className="block text-[44px] font-bold leading-none neon-text">{initial}</span>
+              <span className="mt-2 block text-[11px] font-medium leading-tight text-white/80">
+                {entry.name}
+              </span>
             </span>
           </span>
+        )}
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/95 via-black/55 to-transparent p-2 pt-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <span className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-white">
+            {entry.name}
+          </span>
+          <span className="flex items-center gap-1 text-[9.5px] text-white/55">
+            {entry.rating ? (
+              <span className="font-semibold text-[#ffc107]">★ {entry.rating.toFixed(1)}</span>
+            ) : null}
+            {entry.year ? <span>· {entry.year}</span> : null}
+            <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
+          </span>
         </span>
+      </button>
+      {showCaption && (
+        <div className="mt-2 min-w-0 px-0.5">
+          <p className="truncate text-[12.5px] font-medium leading-tight text-white/90">
+            {entry.name}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/50">
+            {entry.rating ? (
+              <span className="flex items-center gap-0.5 font-semibold text-white/75">
+                <span className="text-[#ffc107]">★</span>
+                {entry.rating.toFixed(1)}
+              </span>
+            ) : null}
+            {entry.year ? <span>· {entry.year}</span> : null}
+            <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
+          </p>
+        </div>
       )}
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/95 via-black/55 to-transparent p-2 pt-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-        <span className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-white">
-          {entry.name}
-        </span>
-        <span className="flex items-center gap-1 text-[9.5px] text-white/55">
-          {entry.rating ? (
-            <span className="font-semibold text-[#46d369]">{entry.rating.toFixed(1)}</span>
-          ) : null}
-          {entry.year ? <span>· {entry.year}</span> : null}
-          <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
-        </span>
-      </span>
-    </button>
+    </div>
   );
 }
 
@@ -300,7 +391,7 @@ function PanelTop10Row({
             >
               {i + 1}
             </span>
-            <PanelPosterCard entry={entry} />
+            <PanelPosterCard entry={entry} showCaption={false} />
           </div>
         ))}
       </ShelfStrip>
@@ -308,7 +399,7 @@ function PanelTop10Row({
   );
 }
 
-const HERO_ROTATE_MS = 8000;
+const HERO_ROTATE_MS = 15000;
 
 /** Herói rotativo com os filmes do painel (nunca TMDB).
  *
@@ -399,26 +490,38 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
       <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/55 to-transparent" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
 
-      <div className="absolute inset-x-0 bottom-[13%] z-10 px-4 md:px-12">
+      <div className="absolute inset-x-0 bottom-[21%] z-10 px-4 md:px-12">
         <div key={`copy-${active.key}`} className="max-w-[640px]">
-          <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/75">
-            <span className="font-display text-lg leading-none text-netflix-red">N</span>
-            <span>{active.kind === "series" ? "Séries" : "Filme"}</span>
+          <div className="mb-3">
+            <span className="rounded-sm bg-[#e50914] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
+              {active.kind === "series" ? "Série" : "Filme"}
+            </span>
           </div>
           <h1 className="font-display text-[clamp(2.4rem,6vw,5.2rem)] leading-[0.92] tracking-[0.01em] text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.7)]">
             {active.name}
           </h1>
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-white/85">
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-white/85">
             {active.rating ? (
-              <span className="font-semibold text-[#46d369]">{active.rating.toFixed(1)}</span>
+              <span className="flex items-center gap-1 font-semibold text-white">
+                <span className="text-[#ffc107]">★</span>
+                {active.rating.toFixed(1)}
+              </span>
             ) : null}
             {active.year ? <span>{active.year}</span> : null}
+            {heroGenres(active).map((g) => (
+              <span
+                key={g}
+                className="rounded-full border border-white/25 bg-black/30 px-2.5 py-0.5 text-[11px] font-medium text-white/85"
+              >
+                {g}
+              </span>
+            ))}
             <span className="hidden rounded bg-white/15 px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-[0.16em] sm:inline">
               HD
             </span>
           </div>
           {active.overview ? (
-            <p className="mt-4 line-clamp-3 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]">
+            <p className="mt-4 line-clamp-2 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]">
               {active.overview}
             </p>
           ) : null}
@@ -426,32 +529,29 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
             <button
               type="button"
               onClick={() => router.push(panelPlayUrl(active))}
-              className="focus-brand flex items-center gap-2 rounded-[4px] bg-white px-6 py-3 text-[15px] font-semibold text-black transition duration-200 hover:bg-white/85 active:scale-[0.98]"
+              className="focus-brand flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[15px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition duration-200 hover:bg-[#f6121f] active:scale-[0.98]"
             >
-              <PlayIcon width={20} height={20} />
-              Assistir
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                <PlayIcon width={12} height={12} className="text-[#e50914]" />
+              </span>
+              Assistir Agora
             </button>
           </div>
         </div>
       </div>
 
       {slides.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5">
-          {slides.map((s, i) => (
-            <button
-              key={s.key}
-              type="button"
-              aria-label={`Mostrar ${s.name}`}
-              onClick={() => setIndex(i)}
-              className="h-1 overflow-hidden rounded-full bg-white/25"
-              style={{ width: i === index ? 26 : 10 }}
-            >
-              <span
-                className="block h-full w-full origin-left bg-white"
-                style={{ transform: i === index ? "scaleX(1)" : "scaleX(0)" }}
+        <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center md:bottom-5">
+          <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto px-4 md:gap-3">
+            {slides.map((s, i) => (
+              <HeroThumb
+                key={s.key}
+                entry={s}
+                active={i === index}
+                onSelect={() => setIndex(i)}
               />
-            </button>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </section>

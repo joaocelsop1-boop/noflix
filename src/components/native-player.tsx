@@ -70,11 +70,14 @@ export function NativePlayer({
   onNext,
   nextLabel,
   isPanel = false,
+  poster,
 }: {
   sources: NativeSource[];
   title: string;
   startAt?: number | null;
   autoPlay?: boolean;
+  /** tudo23: backdrop grande como fundo do player (16:9) antes do vídeo */
+  poster?: string;
   onTick?: (state: { current: number; total: number }) => void;
   onEnded?: () => void;
   onError?: () => void;
@@ -321,8 +324,8 @@ export function NativePlayer({
       /* tudo21: a fonte atual veio do watchdog (troca por trava no meio) e
          não carregou — volta para a fonte de onde veio, na posição atual,
          em vez de mostrar erro. (tudo20 voltava sempre para o MP4 porque o
-         MP4 era a 1ª fonte; agora o HLS é a 1ª fonte, então a volta é
-         genérica: volta para trialRef.from.) */
+         MP4 era a 1ª fonte; no tudo22 o MP4 voltou a ser a 1ª fonte, então
+         a volta é genérica: volta para trialRef.from.) */
       if (trialRef.current && sourceIndex === trialRef.current.to) {
         const back = trialRef.current.from;
         trialRef.current = null;
@@ -381,9 +384,12 @@ export function NativePlayer({
          manifest não carregasse nem desse erro, o player ficava preso
          em "Conectando ao Painel…" para sempre (o retry interno do
          hls.js sozinho levava minutos). 25s, igual ao MP4; limpa no
-         primeiro `playing`, igual ao MP4. No tudo21 o HLS virou 1ª fonte,
-         então o manifesto ganhou um timer PRÓPRIO de 10s (abaixo, em
-         MEDIA_ATTACHED): sem manifesto em 10s, cai para o MP4 na hora. */
+         primeiro `playing`, igual ao MP4. No tudo21 o HLS era a 1ª fonte
+         e o manifesto ganhou um timer PRÓPRIO de 10s (abaixo, em
+         MEDIA_ATTACHED): sem manifesto em 10s, cai para o MP4 na hora.
+         No tudo22 o MP4 voltou a ser a 1ª fonte (o painel não serve HLS
+         para VOD) e o timer de 10s continua valendo quando o HLS entra
+         como socorro. */
       stalls.src = window.setTimeout(() => {
         if (video.readyState < 2) escalate();
       }, 25_000);
@@ -697,9 +703,10 @@ export function NativePlayer({
   /**
    * tudo21: trava no MEIO da reprodução — troca para a PRÓXIMA fonte na
    * posição atual (tudo20 só trocava MP4→HLS porque o MP4 era a 1ª fonte;
-   * agora o HLS é a 1ª fonte, então a troca é genérica: HLS travou → tenta
-   * o MP4; MP4 travou → não há próxima, recarrega). Devolve false se não
-   * houver próxima fonte para tentar.
+   * a troca é genérica: MP4 travou → tenta o HLS; HLS travou → não há
+   * próxima, recarrega). No tudo22 o MP4 voltou a ser a 1ª fonte (o
+   * painel não serve HLS para VOD). Devolve false se não houver próxima
+   * fonte para tentar.
    */
   const switchStallToNext = useCallback(() => {
     const list = playableRef.current;
@@ -721,7 +728,7 @@ export function NativePlayer({
    * Mid-playback stall watchdog (tudo20, generalizado no tudo21): se
    * currentTime congela ~8s enquanto o vídeo deveria tocar, a 1ª vez
    * recarrega a mesma fonte na última posição; na 2ª trava troca para a
-   * OUTRA fonte (HLS travou → MP4; MP4 travou → não há outra, recarrega).
+   * OUTRA fonte (MP4 travou → HLS; HLS travou → não há outra, recarrega).
    * Até 3 recuperações automáticas, com 15s de cooldown entre elas;
    * depois disso, mostra a tela de falha.
    */
@@ -990,6 +997,7 @@ export function NativePlayer({
         ref={videoEl}
         playsInline
         preload="auto"
+        poster={poster}
         className="h-full w-full bg-black object-contain"
       />
 

@@ -12,7 +12,7 @@ import { fetchPanelMe } from "@/lib/panel";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const genreColors = [
-  "#22e6ff",
+  "#e50914",
   "#1f6feb",
   "#7a1fa2",
   "#0f9d58",
@@ -59,7 +59,9 @@ async function searchPanel(
 function panelPlayUrl(entry: CatalogueEntry): string {
   const type = entry.panel?.type ?? entry.kind;
   const id = entry.panel?.id ?? entry.tmdbId;
-  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`);
+  // tudo22: leva o ano do catálogo na URL (ver panel-home).
+  const yearParam = entry.year ? `&year=${entry.year}` : "";
+  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}${yearParam}`);
 }
 
 /**

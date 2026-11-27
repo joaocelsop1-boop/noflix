@@ -152,10 +152,11 @@ export function Player({
   const anime = isAnimeTitle(title);
   /** título do painel (tmdbId 0 ou panel presente): player próprio, nunca embed */
   const isPanelTitle = title.tmdbId === 0 || Boolean(title.panel);
-  /** séries do painel: sem episódio explícito na URL, o usuário escolhe
-     temporada+episódio ANTES de tocar — nada de S01E01 automático. Filmes
-     e links com ?s=&e= (próximo episódio, deep link) tocam direto. */
-  const needsPick = isPanelTitle && title.kind === "series" && !episodePicked;
+  /** painel: sem episódio explícito na URL, o usuário vê a visão de detalhe
+     (capa, sinopse, temporada/episódio) ANTES de tocar — nada de S01E01
+     automático e nenhum filme que começa sem mostrar a capa. Links com
+     ?s=&e= (próximo episódio, deep link) tocam direto. */
+  const needsPick = isPanelTitle && !episodePicked;
   const [picked, setPicked] = useState(() => !needsPick);
   /** gate de plano: /api/panel/me disse canWatch=false ou o stream deu 403 */
   const [planBlocked, setPlanBlocked] = useState<string | null>(null);
@@ -248,6 +249,48 @@ export function Player({
     };
   }, [isPanelTitle, title, episodePicked]);
 
+  /* tudo23: metadados do filme vindos do painel (get_vod_info: capa,
+     sinopse, gênero, duração) — alimentam a visão de detalhe antes de
+     tocar, igual à da série. */
+  const [movieMeta, setMovieMeta] = useState<{
+    cover?: string;
+    plot?: string;
+    genre?: string;
+    duration?: number;
+    year?: number;
+  }>({});
+  useEffect(() => {
+    if (!isPanelTitle || title.panel?.type !== "movie" || title.kind !== "movie") return;
+    let alive = true;
+    void fetchPanelInfo("movie", title.panel.id).then((info) => {
+      if (!alive || !info) return;
+      const meta = (info.info ?? {}) as Record<string, unknown>;
+      const movieData = (info.movie_data ?? {}) as Record<string, unknown>;
+      const relYear = Number(String(meta.releaseDate ?? "").slice(0, 4)) || undefined;
+      /* duração: o painel manda segundos (7200) ou "2:00:00" — vira minutos */
+      const rawDur = meta.duration ?? movieData.duration;
+      let duration: number | undefined;
+      if (typeof rawDur === "number" && rawDur > 0) {
+        duration = rawDur > 600 ? Math.round(rawDur / 60) : Math.round(rawDur);
+      } else if (typeof rawDur === "string" && rawDur.includes(":")) {
+        const parts = rawDur.split(":").map(Number);
+        if (parts.length === 3 && parts.every(Number.isFinite)) {
+          duration = parts[0] * 60 + parts[1];
+        }
+      }
+      setMovieMeta({
+        cover: typeof meta.cover === "string" && meta.cover ? meta.cover : undefined,
+        plot: typeof meta.plot === "string" && meta.plot.trim() ? meta.plot.trim() : undefined,
+        genre: typeof meta.genre === "string" && meta.genre.trim() ? meta.genre.trim() : undefined,
+        duration,
+        year: relYear,
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isPanelTitle, title]);
+
   /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
 
@@ -255,13 +298,24 @@ export function Player({
      senão o que o título já traz; nunca inventa texto. */
   const detailSynopsis =
     panelMeta.plot ??
+    movieMeta.plot ??
     (title.overview && !title.overview.includes("transmitindo do seu painel")
       ? title.overview
       : undefined);
-  const detailYear = panelMeta.year ?? title.year;
+  // tudo22: 0 = ano desconhecido (nunca mostra o ano atual como chute) —
+  // o ano só aparece quando é o do painel ou o da URL, nunca 2026 piscando.
+  const detailYear = panelMeta.year ?? movieMeta.year ?? (title.year > 0 ? title.year : undefined);
   const detailGenre =
     panelMeta.genre ??
+    movieMeta.genre ??
     (title.genres?.length ? title.genres.join(" · ") : undefined);
+  const detailDuration = movieMeta.duration;
+  /** capa da visão de detalhe e do poster do player: do painel quando há. */
+  const detailCover = panelMeta.cover ?? movieMeta.cover;
+  /** poster do player (backdrop grande como fundo enquanto carrega). */
+  const playerPoster = detailCover
+    ? apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)
+    : undefined;
 
   /* Sessão única (tudo20): confere de 30 em 30s se esta sessão continua
      válida — se outro aparelho entrou, a sessão cai e o usuário vê a
@@ -281,6 +335,9 @@ export function Player({
      mais só dentro do menu "Painel": ele abre sozinho ao abrir a série e tem
      botão próprio e claro no topo do player. */
   const [episodesOpen, setEpisodesOpen] = useState(false);
+  /* tudo23: abas da visão de detalhe (Episódios / Saiba mais) e "Ler mais" da sinopse */
+  const [detailTab, setDetailTab] = useState<"episodios" | "saiba">("episodios");
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   /* temporada exibida no sheet (null = segue a temporada que está tocando) */
   const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
@@ -890,7 +947,7 @@ export function Player({
       {sessionEnded && (
         <div className="absolute inset-0 z-40 grid place-items-center bg-black px-6 text-center">
           <div className="max-w-md">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
               Você está assistindo · CinePlus
             </p>
             <h2 className="mt-3 text-2xl font-bold text-white md:text-3xl">
@@ -920,9 +977,9 @@ export function Player({
         <div className="absolute inset-0 z-40 overflow-y-auto bg-black">
           {/* Hero: capa/backdrop da série */}
           <div className="relative h-[42vh] min-h-[260px] w-full overflow-hidden sm:h-[54vh]">
-            {panelMeta.cover ? (
+            {detailCover ? (
               <img
-                src={apiUrl(`/api/img?u=${encodeURIComponent(panelMeta.cover)}`)}
+                src={apiUrl(`/api/img?u=${encodeURIComponent(detailCover)}`)}
                 alt={title.name}
                 className="h-full w-full object-cover"
               />
@@ -950,8 +1007,8 @@ export function Player({
 
           {/* Conteúdo */}
           <div className="relative mx-auto -mt-20 w-full max-w-[880px] px-4 pb-12 sm:-mt-24 md:px-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#22e6ff]">
-              Série
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#e50914]">
+              {title.kind === "series" ? "Série" : "Filme"}
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[1.1]">
               {title.name}
@@ -959,19 +1016,48 @@ export function Player({
             <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/60">
               {detailYear ? <span>{detailYear}</span> : null}
               {detailGenre ? <span>{detailGenre}</span> : null}
-              {allSeasons.length > 0 && (
+              {detailDuration ? <span>{detailDuration} min</span> : null}
+              {title.kind === "series" && allSeasons.length > 0 && (
                 <span>
                   {allSeasons.length} {allSeasons.length === 1 ? "temporada" : "temporadas"}
                 </span>
               )}
             </p>
             {detailSynopsis ? (
-              <p className="mt-3 max-w-[640px] text-[14px] leading-relaxed text-white/75">
-                {detailSynopsis}
-              </p>
+              <div className="mt-3 max-w-[640px]">
+                <p
+                  className={cn(
+                    "text-[14px] leading-relaxed text-white/75",
+                    !synopsisExpanded && "line-clamp-2",
+                  )}
+                >
+                  {detailSynopsis}
+                </p>
+                {detailSynopsis.length > 180 && (
+                  <button
+                    type="button"
+                    onClick={() => setSynopsisExpanded((v) => !v)}
+                    className="mt-1 text-[13px] font-semibold text-white/90 underline-offset-2 hover:underline"
+                  >
+                    {synopsisExpanded ? "Ler menos" : "Ler mais"}
+                  </button>
+                )}
+              </div>
             ) : null}
 
-            {allSeasons.length === 0 ? (
+            {title.kind === "movie" ? (
+              /* filme: só o CTA vermelho em pílula — a sinopse já está acima */
+              <button
+                type="button"
+                onClick={() => setPicked(true)}
+                className="mt-6 flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition hover:bg-[#f6121f] active:scale-[0.98]"
+              >
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                  <PlayIcon width={12} height={12} className="text-[#e50914]" />
+                </span>
+                Assistir Agora
+              </button>
+            ) : allSeasons.length === 0 ? (
               panelSeasonsLoaded ? (
                 <div className="mt-8">
                   <p className="text-[13px] text-white/55">
@@ -980,9 +1066,12 @@ export function Player({
                   <button
                     type="button"
                     onClick={() => pickEpisode(1, 1)}
-                    className="mt-4 rounded-md bg-white px-6 py-3 text-[14px] font-bold text-black transition hover:bg-white/85"
+                    className="mt-4 flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition hover:bg-[#f6121f] active:scale-[0.98]"
                   >
-                    Assistir · Temporada 1 · Episódio 1
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                      <PlayIcon width={12} height={12} className="text-[#e50914]" />
+                    </span>
+                    Assistir Agora
                   </button>
                 </div>
               ) : (
@@ -1001,51 +1090,119 @@ export function Player({
                     const first = pickerSeason?.episodes[0];
                     if (pickerSeason && first) pickEpisode(pickerSeason.number, first.number);
                   }}
-                  className="mt-6 flex items-center gap-2 rounded-md bg-white px-6 py-3 text-[14px] font-bold text-black transition hover:bg-white/85"
+                  className="mt-6 flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition hover:bg-[#f6121f] active:scale-[0.98]"
                 >
-                  <PlayIcon width={16} height={16} />
-                  Assistir
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                    <PlayIcon width={12} height={12} className="text-[#e50914]" />
+                  </span>
+                  Assistir Agora
                 </button>
 
-                {allSeasons.length > 1 && (
-                  <div className="mt-7 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {allSeasons.map((entry) => (
-                      <button
-                        key={entry.number}
-                        type="button"
-                        onClick={() => setSeason(entry.number)}
-                        aria-pressed={entry.number === pickerSeason?.number}
-                        className={
-                          entry.number === pickerSeason?.number
-                            ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
-                            : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
-                        }
-                      >
-                        {entry.name && !/^Season \d+$/.test(entry.name)
-                          ? entry.name
-                          : `Temporada ${entry.number}`}
-                      </button>
-                    ))}
+                {/* abas: só as que têm conteúdo real (sem inventar elenco) */}
+                <div className="mt-8 flex gap-6 border-b border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setDetailTab("episodios")}
+                    aria-pressed={detailTab === "episodios"}
+                    className={cn(
+                      "-mb-px border-b-2 pb-2.5 text-[14px] font-bold transition",
+                      detailTab === "episodios"
+                        ? "border-[#e50914] text-white"
+                        : "border-transparent text-white/45 hover:text-white/75",
+                    )}
+                  >
+                    Episódios
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailTab("saiba")}
+                    aria-pressed={detailTab === "saiba"}
+                    className={cn(
+                      "-mb-px border-b-2 pb-2.5 text-[14px] font-bold transition",
+                      detailTab === "saiba"
+                        ? "border-[#e50914] text-white"
+                        : "border-transparent text-white/45 hover:text-white/75",
+                    )}
+                  >
+                    Saiba mais
+                  </button>
+                </div>
+
+                {detailTab === "episodios" ? (
+                  <>
+                    {allSeasons.length > 1 && (
+                      <div className="mt-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {allSeasons.map((entry) => (
+                          <button
+                            key={entry.number}
+                            type="button"
+                            onClick={() => setSeason(entry.number)}
+                            aria-pressed={entry.number === pickerSeason?.number}
+                            className={
+                              entry.number === pickerSeason?.number
+                                ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
+                                : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
+                            }
+                          >
+                            {entry.name && !/^Season \d+$/.test(entry.name)
+                              ? entry.name
+                              : `Temporada ${entry.number}`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
+                      {pickerSeason?.name && !/^Season \d+$/.test(pickerSeason.name)
+                        ? pickerSeason.name
+                        : `Temporada ${pickerSeason?.number ?? season}`}
+                      {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
+                    </p>
+                    <div className="mt-1">
+                      {(pickerSeason?.episodes ?? []).map((item) => (
+                        <EpisodeRow
+                          key={item.number}
+                          number={item.number}
+                          name={item.name}
+                          runtime={item.runtime}
+                          overview={item.overview}
+                          onClick={() => pickEpisode(pickerSeason?.number ?? season, item.number)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-5 max-w-[640px]">
+                    {detailSynopsis ? (
+                      <p className="text-[14px] leading-relaxed text-white/75">{detailSynopsis}</p>
+                    ) : (
+                      <p className="text-[13px] text-white/55">Sem sinopse no painel.</p>
+                    )}
+                    <dl className="mt-5 space-y-2 text-[13px]">
+                      {detailYear ? (
+                        <div className="flex gap-3">
+                          <dt className="w-24 shrink-0 text-white/40">Ano</dt>
+                          <dd className="text-white/85">{detailYear}</dd>
+                        </div>
+                      ) : null}
+                      {detailGenre ? (
+                        <div className="flex gap-3">
+                          <dt className="w-24 shrink-0 text-white/40">Gêneros</dt>
+                          <dd className="text-white/85">{detailGenre}</dd>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-3">
+                        <dt className="w-24 shrink-0 text-white/40">Temporadas</dt>
+                        <dd className="text-white/85">{allSeasons.length}</dd>
+                      </div>
+                      <div className="flex gap-3">
+                        <dt className="w-24 shrink-0 text-white/40">Episódios</dt>
+                        <dd className="text-white/85">
+                          {allSeasons.reduce((n, entry) => n + entry.episodes.length, 0)}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 )}
-                <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
-                  {pickerSeason?.name && !/^Season \d+$/.test(pickerSeason.name)
-                    ? pickerSeason.name
-                    : `Temporada ${pickerSeason?.number ?? season}`}
-                  {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
-                </p>
-                <div className="mt-1">
-                  {(pickerSeason?.episodes ?? []).map((item) => (
-                    <EpisodeRow
-                      key={item.number}
-                      number={item.number}
-                      name={item.name}
-                      runtime={item.runtime}
-                      overview={item.overview}
-                      onClick={() => pickEpisode(pickerSeason?.number ?? season, item.number)}
-                    />
-                  ))}
-                </div>
               </>
             )}
           </div>
@@ -1088,6 +1245,7 @@ export function Player({
         <NativePlayer
           sources={nativeSources}
           isPanel={isPanelTitle}
+          poster={playerPoster}
           title={`${title.name}${title.kind === "series" ? ` · S${season} E${episode}` : ""}`}
           startAt={startAt}
           onTick={({ current, total }) => {
@@ -1206,7 +1364,7 @@ export function Player({
 
               <div className="max-w-[42vw] rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md">
                 {isPanelTitle && (
-                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#22e6ff]">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#e50914]">
                     Você está assistindo
                   </p>
                 )}
@@ -1216,7 +1374,7 @@ export function Player({
                 <p className="truncate text-[10.5px] leading-tight text-white/55">
                   {title.kind === "series"
                     ? `S${season} · E${episode}${nextEp ? " · próximo pronto" : ""}`
-                    : `${title.year} · ${title.maturity}`}
+                    : `${title.year > 0 ? `${title.year} · ` : ""}${title.maturity}`}
                 </p>
               </div>
             </motion.div>
@@ -1875,7 +2033,7 @@ function EpisodeRow({
         ) : null}
       </span>
       {active ? (
-        <span className="mt-1 shrink-0 rounded-full bg-[var(--nf-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-black">
+        <span className="mt-1 shrink-0 rounded-full bg-[var(--nf-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
           Assistindo
         </span>
       ) : (

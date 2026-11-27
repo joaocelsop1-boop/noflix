@@ -58,7 +58,9 @@ export default async function PlayPage({
       live: panelType === "live",
       kind: panelType === "movie" ? "movie" : "series",
       name: query.title?.slice(0, 120) ?? `Canal ${panelId}`,
-      year: Number(query.year) || new Date().getFullYear(),
+      // tudo22: ano desconhecido é 0 (não mostra ano) — antes caía para o
+      // ano atual (2026) e a série piscava 2026 antes de corrigir para 1992.
+      year: Number(query.year) || 0,
       genres: [],
       maturity: "16+",
       rating: 8,
@@ -67,7 +69,7 @@ export default async function PlayPage({
       overview: `${query.title ?? "Conteúdo do painel"} — transmitindo do seu painel.`,
       creator: "CinePlus",
       cast: [],
-      accent: "#22e6ff",
+      accent: "#e50914",
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
     };
     return (
@@ -104,7 +106,7 @@ export default async function PlayPage({
   const name =
     show?.name ?? film?.name ?? anime?.name ?? query.title?.slice(0, 120) ?? `Title ${id}`;
   const year =
-    show?.year ?? film?.year ?? anime?.year ?? (Number(query.year) || new Date().getFullYear());
+    show?.year ?? film?.year ?? anime?.year ?? (Number(query.year) || 0);
 
   const title: Title = {
     slug: `external-${id}`,

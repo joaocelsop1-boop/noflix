@@ -296,7 +296,8 @@ export function LiveCatalogue({
                   // Item do painel: abre o player do painel (stream do Xtream).
                   if (item.panel) {
                     router.push(
-                      appUrl(`/play/0?panel=1&type=${item.panel.type}&id=${item.panel.id}&title=${encodeURIComponent(item.name)}`),
+                      // tudo22: leva o ano do catálogo na URL (ver panel-home).
+                      appUrl(`/play/0?panel=1&type=${item.panel.type}&id=${item.panel.id}&title=${encodeURIComponent(item.name)}${item.year ? `&year=${item.year}` : ""}`),
                     );
                     return;
                   }

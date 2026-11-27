@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 import { appUrl } from "@/lib/paths";
 
 /** how long each banner holds the stage */
-const ROTATE_MS = 8000;
+const ROTATE_MS = 15000;
 
 const stagger = {
   hidden: {},
@@ -113,7 +113,7 @@ export function Billboard() {
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
 
       {/* content — one keyed block, so backdrop and copy always agree */}
-      <div className="absolute inset-x-0 bottom-[13%] z-10 px-4 md:px-12">
+      <div className="absolute inset-x-0 bottom-[21%] z-10 px-4 md:px-12">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={`copy-${active.slug}`}
@@ -124,14 +124,12 @@ export function Billboard() {
             className="max-w-[640px]"
           >
             <motion.div variants={stagger} initial="hidden" animate="show">
-              <motion.div
-                variants={rise}
-                className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/75"
-              >
-                <span className="font-display text-lg leading-none text-netflix-red">N</span>
-                <span>{active.anime ? "Anime" : active.kind === "series" ? "Séries" : "Filme"}</span>
+              <motion.div variants={rise} className="mb-3">
+                <span className="rounded-sm bg-[#e50914] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
+                  {active.anime ? "Anime" : active.kind === "series" ? "Série" : "Filme"}
+                </span>
                 {active.badge && (
-                  <span className="rounded-sm bg-[var(--nf-accent)] px-1.5 py-[1px] text-[9px] font-bold tracking-[0.12em] text-white">
+                  <span className="ml-2 rounded-sm bg-[var(--nf-accent)] px-1.5 py-1 text-[9px] font-bold tracking-[0.12em] text-white">
                     {active.badge}
                   </span>
                 )}
@@ -149,6 +147,12 @@ export function Billboard() {
                 className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-white/85"
               >
                 <span className="font-semibold text-[#46d369]">{active.match}% Match</span>
+                {active.rating ? (
+                  <span className="flex items-center gap-1 font-semibold text-white">
+                    <span className="text-[#ffc107]">★</span>
+                    {active.rating.toFixed(1)}
+                  </span>
+                ) : null}
                 <span>{active.year}</span>
                 <span className="rounded border border-white/40 px-1.5 py-[1px] text-[11px] uppercase tracking-wide">
                   {active.maturity}
@@ -170,10 +174,12 @@ export function Billboard() {
                 <button
                   type="button"
                   onClick={() => router.push(appUrl(`/watch/${active.kind}/${active.slug}`))}
-                  className="focus-brand flex items-center gap-2 rounded-[4px] bg-white px-6 py-3 text-[15px] font-semibold text-black transition duration-200 hover:bg-white/85 active:scale-[0.98]"
+                  className="focus-brand flex items-center gap-2.5 rounded-full bg-[#e50914] px-6 py-3 text-[15px] font-bold text-white shadow-[0_8px_30px_rgba(229,9,20,0.45)] transition duration-200 hover:bg-[#f6121f] active:scale-[0.98]"
                 >
-                  <PlayIcon width={20} height={20} />
-                  Assistir
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
+                    <PlayIcon width={12} height={12} className="text-[#e50914]" />
+                  </span>
+                  Assistir Agora
                 </button>
                 <button
                   type="button"
@@ -213,59 +219,35 @@ export function Billboard() {
         </span>
       </div>
 
-      {/* rotation rail — the active marker fills over the hold time */}
-      <div className="absolute right-3 top-1/2 z-10 hidden -translate-y-1/2 flex-col items-center gap-2 md:right-6 md:flex">
-        {features.map((f, i) => (
-          <button
-            key={f.slug}
-            type="button"
-            aria-label={`Show ${f.name}`}
-            aria-current={i === index}
-            onClick={() => go(i)}
-            className="group relative flex h-8 w-4 items-center justify-center"
-          >
-            <span
+      {/* miniaturas circulares dos destaques (estilo Pobreflix) — elas SAO a
+          navegacao do carrossel: a ativa ganha anel branco, clicar troca na hora */}
+      <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center md:bottom-5">
+        <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto px-4 md:gap-3">
+          {features.map((f, i) => (
+            <button
+              key={f.slug}
+              type="button"
+              aria-label={`Mostrar ${f.name}`}
+              aria-current={i === index}
+              onClick={() => go(i)}
               className={cn(
-                "absolute inset-y-0 w-[3px] overflow-hidden rounded-full transition-colors duration-300",
-                i === index ? "bg-white/25" : "bg-white/20 group-hover:bg-white/50",
+                "h-11 w-11 shrink-0 overflow-hidden rounded-full transition md:h-[52px] md:w-[52px]",
+                i === index
+                  ? "ring-2 ring-white ring-offset-2 ring-offset-black/60"
+                  : "opacity-70 ring-1 ring-white/30 hover:opacity-100 hover:ring-white/60",
               )}
             >
-              {i === index && (
-                <motion.span
-                  key={`fill-${index}`}
-                  initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ duration: ROTATE_MS / 1000, ease: "linear" }}
-                  className="absolute inset-0 origin-top bg-white"
-                />
-              )}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* mobile rail */}
-      <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 md:hidden">
-        {features.map((f, i) => (
-          <button
-            key={f.slug}
-            type="button"
-            aria-label={`Show ${f.name}`}
-            onClick={() => go(i)}
-            className="h-1 overflow-hidden rounded-full bg-white/25"
-            style={{ width: i === index ? 26 : 10 }}
-          >
-            {i === index && (
-              <motion.span
-                key={`mfill-${index}`}
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: ROTATE_MS / 1000, ease: "linear" }}
-                className="block h-full w-full origin-left bg-white"
+              <Artwork
+                slug={f.slug}
+                name={f.name}
+                kind="poster"
+                accent={f.accent}
+                tmdbId={f.tmdbId}
+                sizes="60px"
               />
-            )}
-          </button>
-        ))}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

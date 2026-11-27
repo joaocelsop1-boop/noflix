@@ -96,7 +96,7 @@ export default function LoginPage() {
   if (checking) {
     return (
       <main className="grid min-h-screen place-items-center bg-black">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#22e6ff]" />
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
       </main>
     );
   }
@@ -140,7 +140,7 @@ export default function LoginPage() {
         </div>
 
         {sessionNotice && (
-          <div className="mt-6 rounded-md border border-[#22e6ff]/40 bg-[#22e6ff]/10 px-4 py-3 text-[13px] leading-relaxed text-white/85">
+          <div className="mt-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-4 py-3 text-[13px] leading-relaxed text-white/85">
             Sua sessão foi encerrada porque você entrou em outro aparelho. Entre
             novamente para continuar assistindo.
           </div>
@@ -159,7 +159,7 @@ export default function LoginPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
-                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
               />
             </label>
           )}
@@ -175,7 +175,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@email.com"
-              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
             />
           </label>
 
@@ -191,7 +191,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
             />
           </label>
 
@@ -206,13 +206,13 @@ export default function LoginPage() {
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
                 placeholder="(00) 00000-0000"
-                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#22e6ff]"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
               />
             </label>
           )}
 
           {error && (
-            <p role="alert" className="rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
+            <p role="alert" className="rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {error}
             </p>
           )}

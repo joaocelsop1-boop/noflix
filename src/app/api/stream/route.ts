@@ -209,15 +209,16 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
     streamExt = wanted.ext || streamExt;
   }
 
-  /* tudo21 — HLS é a 1ª fonte de novo (igual ao tudo18), MAS com a
-     proteção que faltava lá: o NativePlayer agora tem timeout DURO de 10s
-     no carregamento do manifesto HLS — se o painel não servir .m3u8 para
-     VOD, ou o manifesto não chegar em 10s, o player cai para o MP4 NA
-     HORA, sem ficar preso em "Conectando ao Painel…". O MP4 continua
-     como fallback garantido (é o caminho que já provou tocar). O HLS em
-     1º é o que deixa o webplayer liso igual a um app nativo (ExoPlayer):
-     vídeo em pedacinhos, com troca de qualidade sozinha quando a internet
-     oscila, em vez de congelar. Ao vivo continua igual (uma fonte HLS só). */
+  /* tudo22 — MP4 volta a ser a 1ª fonte para VOD (como no tudo20): o
+     teste ao vivo do tudo21 provou que este painel NÃO serve HLS para
+     VOD — o HLS tentava por 10s, falhava e só então caía para o MP4,
+     custando ~10s em cada início (~20s no total; era ~16s no tudo19).
+     HLS-primeiro não traz benefício neste painel, só atraso. O HLS
+     continua como socorro (watchdog do tudo20: na 2ª trava troca para
+     o HLS na posição, com o timeout duro de 10s no manifesto — nunca
+     fica preso em "Conectando…", o erro do tudo18 não volta). O buffer
+     agressivo do hls.js (tudo21) continua valendo quando o HLS entra.
+     Ao vivo continua igual (uma fonte HLS só). */
   if (type === "live") {
     const liveParams = new URLSearchParams({ type, id: String(streamId) });
     const liveUrl = apiUrl(`/php/stream.php?${liveParams.toString()}`);
@@ -255,17 +256,17 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
           provider: "panel",
           label: "Painel",
           quality: "FHD",
-          type: "m3u8",
-          url: hlsUrl,
-          proxy: hlsUrl,
+          type: "mp4",
+          url: mp4Url,
+          proxy: mp4Url,
         },
         {
           provider: "panel",
           label: "Painel",
           quality: "FHD",
-          type: "mp4",
-          url: mp4Url,
-          proxy: mp4Url,
+          type: "m3u8",
+          url: hlsUrl,
+          proxy: hlsUrl,
         },
       ],
     },

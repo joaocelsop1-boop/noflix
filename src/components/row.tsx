@@ -181,7 +181,8 @@ export function PosterCard({
   const saved = inList(title.slug);
 
   return (
-    <div className="relative flex items-end">
+    <div className="relative">
+      <div className="flex items-end">
       {rank && (
         <span
           aria-hidden
@@ -198,7 +199,7 @@ export function PosterCard({
         onPointerLeave={scheduleClose}
         onClick={() => openTitle(title.slug)}
         className={cn(
-          "group relative block shrink-0 snap-start overflow-hidden rounded-[4px] bg-[#222] text-left ring-1 ring-white/5 transition-[transform,box-shadow,ring] duration-300 will-change-transform",
+          "group relative block shrink-0 snap-start overflow-hidden rounded-lg bg-[#222] text-left ring-1 ring-white/5 transition-[transform,box-shadow,ring] duration-300 will-change-transform",
           "w-[var(--nf-card-w,186px)]",
           "aspect-[2/3] hover:z-10 hover:scale-[1.05] hover:ring-white/30 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)]",
         )}
@@ -247,6 +248,19 @@ export function PosterCard({
           </span>
         )}
       </button>
+      </div>
+
+      {/* legenda visível abaixo do pôster (estilo Pobreflix): título + ★ nota + ano */}
+      <div className={cn("mt-1.5", rank ? "ml-[48px] md:ml-[62px]" : "")}>
+        <p className="line-clamp-1 px-0.5 text-[11px] font-semibold text-white/90">{title.name}</p>
+        <p className="flex items-center gap-1.5 px-0.5 text-[10px] text-white/50">
+          {title.rating > 0 && (
+            <span className="font-semibold text-[#f5c518]">★ {title.rating.toFixed(1)}</span>
+          )}
+          {title.year > 0 && <span>{title.year}</span>}
+          <span className="uppercase tracking-[0.1em]">{shortMeta(title)}</span>
+        </p>
+      </div>
 
       {mounted &&
         createPortal(
@@ -366,7 +380,7 @@ export function PosterTile({ title, className }: { title: Title; className?: str
       type="button"
       onClick={() => openTitle(title.slug)}
       className={cn(
-        "group relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#222] text-left ring-1 ring-white/5 transition duration-300 will-change-transform hover:z-10 hover:scale-[1.03] hover:ring-white/40",
+        "group relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-[#222] text-left ring-1 ring-white/5 transition duration-300 will-change-transform hover:z-10 hover:scale-[1.03] hover:ring-white/40",
         className,
       )}
     >

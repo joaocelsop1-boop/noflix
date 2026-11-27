@@ -17,7 +17,7 @@ export function Wordmark({
   const content = (
     <span
       className={cn(
-        "wordmark select-none neon-text drop-shadow-[0_2px_10px_rgba(34,230,255,0.35)]",
+        "wordmark select-none neon-text drop-shadow-[0_2px_10px_rgba(229,9,20,0.35)]",
         className,
       )}
       aria-label="CinePlus"

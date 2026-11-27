@@ -296,22 +296,32 @@ function login_throttle_check($pdo, $email) {
     }
     return '';
 }
+// tudo22: devolve a mensagem de bloqueio quando ESTA falha travou a conta
+// (5ª tentativa). Antes a função só gravava o bloqueio e o login respondia
+// "inválidos" na 5ª, então o bloqueio só aparecia na 6ª tentativa.
 function login_throttle_fail($pdo, $email) {
     $email = strtolower(trim((string)$email));
-    if ($email === '') return;
+    if ($email === '') return '';
     try {
         ensure_login_attempts_table($pdo);
         $now = time();
         $pdo->prepare("INSERT INTO login_attempts (email, attempts, lock_until, updated_at) VALUES (?, 1, 0, ?) ON DUPLICATE KEY UPDATE attempts = attempts + 1, updated_at = VALUES(updated_at)")->execute([$email, $now]);
         $pdo->prepare("UPDATE login_attempts SET lock_until = ?, attempts = 0 WHERE email = ? AND attempts >= 5")->execute([$now + 900, $email]);
+        $stmt = $pdo->prepare("SELECT lock_until FROM login_attempts WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        if ((int)($stmt->fetchColumn() ?: 0) > $now) {
+            return 'Muitas tentativas de login. Tente novamente em 15 minuto(s).';
+        }
     } catch (Throwable $e) {
         $n = intval($_SESSION['login_attempts'] ?? 0) + 1;
         $_SESSION['login_attempts'] = $n;
         if ($n >= 5) {
             $_SESSION['login_lock_until'] = time() + 900;
             $_SESSION['login_attempts'] = 0;
+            return 'Muitas tentativas de login. Tente novamente em 15 minuto(s).';
         }
     }
+    return '';
 }
 function login_throttle_reset($pdo, $email) {
     $email = strtolower(trim((string)$email));

@@ -37,8 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php');
         exit;
     }
-    login_throttle_fail($pdo, $email);
-    $erro = 'E-mail ou senha de administrador incorretos.';
+    // tudo22: a 5ª falha já trava — mostra o bloqueio nela, não só na 6ª.
+    $justLocked = login_throttle_fail($pdo, $email);
+    $erro = $justLocked !== '' ? $justLocked : 'E-mail ou senha de administrador incorretos.';
     }
 }
 ?>

@@ -143,7 +143,7 @@ export default function PlanosPage() {
   if (checking) {
     return (
       <main className="grid min-h-screen place-items-center bg-black">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#22e6ff]" />
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
       </main>
     );
   }
@@ -153,7 +153,7 @@ export default function PlanosPage() {
       <Navbar />
       <main className="min-h-screen bg-[#07080f] pb-16 pt-24 md:pt-28">
         <div className="mx-auto max-w-[1100px] px-4 md:px-12">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#22e6ff]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
             CinePlus · Planos
           </p>
           <h1 className="mt-1 font-display text-[clamp(1.6rem,4vw,2.6rem)] leading-none text-white">
@@ -165,7 +165,7 @@ export default function PlanosPage() {
           </p>
 
           {loadError && (
-            <p role="alert" className="mt-6 rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
+            <p role="alert" className="mt-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {loadError}
             </p>
           )}
@@ -185,18 +185,18 @@ export default function PlanosPage() {
                   data-plan-id={plan.id}
                   className={cn(
                     "relative flex flex-col rounded-xl border bg-[#0f1220] p-6",
-                    recommended ? "border-[#22e6ff] shadow-[0_0_40px_rgba(34,230,255,0.25)]" : "border-white/10",
-                    selected && "ring-2 ring-[#22e6ff]",
-                    preselected && !selected && "ring-2 ring-[#22e6ff]/60",
+                    recommended ? "border-[#e50914] shadow-[0_0_40px_rgba(229,9,20,0.25)]" : "border-white/10",
+                    selected && "ring-2 ring-[#e50914]",
+                    preselected && !selected && "ring-2 ring-[#e50914]/60",
                   )}
                 >
                   {recommended && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-[#ff2bd6] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-[#e50914] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
                       Recomendado
                     </span>
                   )}
                   {preselected && !recommended && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-[#ff2bd6] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-[#e50914] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
                       Selecionado
                     </span>
                   )}
@@ -224,7 +224,7 @@ export default function PlanosPage() {
           </div>
 
           {orderError && (
-            <p role="alert" className="mt-6 rounded-md border border-[#ff2bd6]/40 bg-[#ff2bd6]/10 px-3 py-2 text-sm text-[#ff9ecf]">
+            <p role="alert" className="mt-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff9ecf]">
               {orderError}
             </p>
           )}

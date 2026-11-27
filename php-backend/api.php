@@ -943,9 +943,15 @@ switch ($action) {
             session_write_close();
             echo json_encode(['ok' => true, 'user' => $loginPayload, 'canWatch' => $loginCanWatch]);
         } else {
-            login_throttle_fail($pdo, $loginEmail);
+            // tudo22: a 5ª falha já trava — devolve a mensagem de bloqueio
+            // nela, não só na 6ª tentativa.
+            $justLocked = login_throttle_fail($pdo, $loginEmail);
             session_write_close();
-            api_auth_error('E-mail ou senha inválidos.', 401);
+            if ($justLocked !== '') {
+                api_auth_error($justLocked, 429);
+            } else {
+                api_auth_error('E-mail ou senha inválidos.', 401);
+            }
         }
         break;
 
