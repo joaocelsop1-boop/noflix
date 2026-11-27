@@ -12,25 +12,25 @@ import { Wordmark } from "@/components/wordmark";
 import { ProfileAvatar } from "@/components/avatar";
 import { cn } from "@/lib/cn";
 import { artUrl } from "@/lib/img";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const links = [
-  { href: "/", label: "Início" },
-  { href: "/tv-shows", label: "Séries" },
-  { href: "/movies", label: "Filmes" },
-  { href: "/anime", label: "Anime" },
-  { href: "/new-popular", label: "Novidades" },
-  { href: "/browse", label: "Navegar" },
-  { href: "/my-list", label: "Minha Lista" },
+  { href: appUrl("/"), label: "Início" },
+  { href: appUrl("/tv-shows"), label: "Séries" },
+  { href: appUrl("/movies"), label: "Filmes" },
+  { href: appUrl("/anime"), label: "Anime" },
+  { href: appUrl("/new-popular"), label: "Novidades" },
+  { href: appUrl("/browse"), label: "Navegar" },
+  { href: appUrl("/my-list"), label: "Minha Lista" },
 ];
 
 const mobileLinks = [
-  { href: "/tv-shows", label: "Séries" },
-  { href: "/movies", label: "Filmes" },
-  { href: "/anime", label: "Anime" },
-  { href: "/browse", label: "Navegar" },
-  { href: "/my-list", label: "Minha Lista" },
+  { href: appUrl("/tv-shows"), label: "Séries" },
+  { href: appUrl("/movies"), label: "Filmes" },
+  { href: appUrl("/anime"), label: "Anime" },
+  { href: appUrl("/browse"), label: "Navegar" },
+  { href: appUrl("/my-list"), label: "Minha Lista" },
 ];
 
 export function Navbar() {
@@ -157,7 +157,7 @@ export function Navbar() {
 
           {hydrated && profile?.kids && (
             <Link
-              href="/settings?tab=profile"
+              href={appUrl("/settings?tab=profile")}
               className="hidden rounded bg-[#22c55e]/20 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#86efac] sm:block"
             >
               Kids
@@ -202,7 +202,7 @@ export function Navbar() {
                           const type = t.panel?.type ?? t.kind;
                           const id = t.panel?.id ?? t.tmdbId;
                           router.push(
-                            `/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(t.name)}`,
+                            appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(t.name)}`),
                           );
                         }}
                         className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-white/5"
@@ -287,7 +287,7 @@ export function Navbar() {
                       </p>
                       <div className="mt-2 flex gap-2">
                         <Link
-                          href="/planos"
+                          href={appUrl("/planos")}
                           onClick={() => setMenu(null)}
                           className="rounded-md btn-neon px-3 py-1.5 text-xs font-bold transition"
                         >
@@ -311,14 +311,14 @@ export function Navbar() {
                   ) : (
                     <div className="border-b border-white/10 px-4 py-2">
                       <Link
-                        href="/login"
+                        href={appUrl("/login")}
                         onClick={() => setMenu(null)}
                         className="block py-1 text-sm font-semibold text-white transition hover:underline"
                       >
                         Entrar / Criar conta
                       </Link>
                       <Link
-                        href="/planos"
+                        href={appUrl("/planos")}
                         onClick={() => setMenu(null)}
                         className="block py-1 text-sm text-white/90 transition hover:underline"
                       >
@@ -362,21 +362,21 @@ export function Navbar() {
                       Gerenciar perfis
                     </button>
                     <Link
-                      href="/my-list"
+                      href={appUrl("/my-list")}
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >
                       Minha Lista
                     </Link>
                     <Link
-                      href="/browse"
+                      href={appUrl("/browse")}
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >
                       Ver todos os títulos
                     </Link>
                     <Link
-                      href="/settings"
+                      href={appUrl("/settings")}
                       onClick={() => setMenu(null)}
                       className="block px-4 py-2 text-white/90 transition hover:underline"
                     >

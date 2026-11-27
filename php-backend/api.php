@@ -24,7 +24,12 @@ header('Content-Type: application/json; charset=utf-8');
 
 function api_error($msg, $code = 403) {
     http_response_code($code);
-    echo json_encode(['error' => true, 'message' => $msg]);
+    // Mesmo formato das actions novas ({ok:false, error:"..."}): o front
+    // extrai `error` como string — com boolean `true` o React não renderiza
+    // nada e a tela ficava com a barra de erro vazia. Nenhum fluxo checa
+    // `error === true` (verificado: admin.php, src/lib, middleware só usam
+    // `error` como string ou `ok`).
+    echo json_encode(['ok' => false, 'error' => $msg, 'message' => $msg]);
     exit;
 }
 
@@ -502,13 +507,13 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Método inválido.', 405);
         $user = current_user($pdo);
         if (!$user) api_error('Login necessário.', 401);
-        $planId = intval($_POST['plan_id'] ?? 0);
+        $planId = intval(api_post_field('plan_id', 0));
         $stmt = $pdo->prepare("SELECT * FROM plans WHERE id = ? AND active = 1 LIMIT 1");
         $stmt->execute([$planId]);
         $plan = $stmt->fetch();
         if (!$plan) api_error('Plano inválido.', 400);
         // WhatsApp opcional do checkout
-        $wa = trim($_POST['whatsapp'] ?? '');
+        $wa = trim((string)api_post_field('whatsapp', ''));
         if ($wa !== '' && $wa !== ($user['whatsapp'] ?? '')) {
             $pdo->prepare("UPDATE users SET whatsapp = ? WHERE id = ?")->execute([$wa, $user['id']]);
         }
@@ -660,9 +665,10 @@ switch ($action) {
         api_require_login();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Método inválido.', 405);
         $user = current_user($pdo);
-        $type = in_array($_POST['type'] ?? '', ['movie', 'series', 'live'], true) ? $_POST['type'] : 'movie';
-        $streamId = intval($_POST['stream_id'] ?? 0);
-        $rating = intval($_POST['rating'] ?? 0);
+        $rateType = (string)api_post_field('type', '');
+        $type = in_array($rateType, ['movie', 'series', 'live'], true) ? $rateType : 'movie';
+        $streamId = intval(api_post_field('stream_id', 0));
+        $rating = intval(api_post_field('rating', 0));
         if ($streamId <= 0 || $rating < 1 || $rating > 5) api_error('Avaliação inválida.', 400);
         $pdo->prepare("INSERT INTO user_ratings (user_id, stream_type, stream_id, rating) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating)")->execute([$user['id'], $type, $streamId, $rating]);
         echo json_encode(['success' => true, 'rating' => $rating]);
@@ -683,7 +689,7 @@ switch ($action) {
         api_require_login();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Método inválido.', 405);
         $user = current_user($pdo);
-        $pixKey = trim($_POST['pix_key'] ?? '');
+        $pixKey = trim((string)api_post_field('pix_key', ''));
         $pdo->prepare("UPDATE users SET pix_key = ? WHERE id = ?")->execute([$pixKey, $user['id']]);
         echo json_encode(['success' => true]);
         break;
@@ -696,7 +702,7 @@ switch ($action) {
             break;
         }
         $user = current_user($pdo);
-        $pass = $_POST['password'] ?? '';
+        $pass = (string)api_post_field('password', '');
         if ($user && password_verify($pass, $user['password'])) {
             session_start();
             $_SESSION['adult_ok'] = 1;

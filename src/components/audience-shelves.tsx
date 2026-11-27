@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { artUrl } from "@/lib/img";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "@/components/store";
@@ -52,9 +52,9 @@ const SHELVES: Shelf[] = [
 ];
 
 const cardUrl = (entry: Entry) =>
-  `/play/${entry.tmdbId}?kind=${entry.kind}${entry.anime ? "&anime=1" : ""}&title=${encodeURIComponent(
+  appUrl(`/play/${entry.tmdbId}?kind=${entry.kind}${entry.anime ? "&anime=1" : ""}&title=${encodeURIComponent(
     entry.name,
-  )}${entry.year ? `&year=${entry.year}` : ""}${entry.poster ? `&poster=${encodeURIComponent(entry.poster)}` : ""}`;
+  )}${entry.year ? `&year=${entry.year}` : ""}${entry.poster ? `&poster=${encodeURIComponent(entry.poster)}` : ""}`);
 
 export function AudienceShelves() {
   const { profile } = useStore();

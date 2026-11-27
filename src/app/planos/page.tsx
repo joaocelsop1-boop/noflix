@@ -15,6 +15,7 @@ import {
   type PanelPlan,
 } from "@/lib/panel";
 import { cn } from "@/lib/cn";
+import { appUrl } from "@/lib/paths";
 
 /**
  * Planos do painel: cards com nome, preço, duração e selo RECOMENDADO.
@@ -49,7 +50,7 @@ export default function PlanosPage() {
     void fetchPanelMe().then((me) => {
       if (!alive) return;
       if (!me?.loggedIn) {
-        router.replace("/login");
+        router.replace(appUrl("/login"));
         return;
       }
       setChecking(false);
@@ -302,7 +303,7 @@ export default function PlanosPage() {
                 Seu plano {orderPlan?.name ?? ""} já está ativo. Bom filme!
               </p>
               <Link
-                href="/browse"
+                href={appUrl("/browse")}
                 className="mt-5 inline-block rounded-md btn-neon px-6 py-3 text-sm font-bold transition"
               >
                 Assistir agora

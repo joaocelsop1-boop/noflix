@@ -24,6 +24,7 @@ import {
   similarTo,
 } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
+import { appUrl } from "@/lib/paths";
 
 export function TitleModal() {
   const { activeSlug, openTitle } = useStore();
@@ -68,9 +69,11 @@ function ModalBody({
     const e = opts?.episode ?? 1;
     onClose();
     router.push(
-      title.kind === "series"
-        ? `/watch/series/${title.slug}?s=${s}&e=${e}`
-        : `/watch/movie/${title.slug}`,
+      appUrl(
+        title.kind === "series"
+          ? `/watch/series/${title.slug}?s=${s}&e=${e}`
+          : `/watch/movie/${title.slug}`,
+      ),
     );
   };
 

@@ -37,7 +37,7 @@ import {
 } from "@/lib/players";
 import { anilistIdFor } from "@/lib/anime-ids";
 import { NativePlayer, type NativeSource } from "@/components/native-player";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import { PlanGate } from "@/components/plan-gate";
 import { fetchPanelMe, fetchPanelInfo } from "@/lib/panel";
 import type { Season, Title } from "@/lib/types";
@@ -668,7 +668,7 @@ export function Player({
       setEpisode(e);
       setMenu(false);
       if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", `/watch/series/${title.slug}?s=${s}&e=${e}`);
+        window.history.replaceState(null, "", appUrl(`/watch/series/${title.slug}?s=${s}&e=${e}`));
       }
     },
     [title.slug],
@@ -1356,7 +1356,7 @@ export function Player({
                   <button
                     key={item.slug}
                     type="button"
-                    onClick={() => router.push(`/watch/${item.kind}/${item.slug}`)}
+                    onClick={() => router.push(appUrl(`/watch/${item.kind}/${item.slug}`))}
                     className="group relative overflow-hidden rounded-[4px] bg-[#1b1b1b] text-left ring-1 ring-white/5 transition duration-200 hover:z-10 hover:ring-white/40"
                   >
                     <span className="relative block aspect-[2/3] w-full overflow-hidden">

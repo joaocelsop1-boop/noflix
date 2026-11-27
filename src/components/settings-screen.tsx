@@ -11,6 +11,7 @@ import { useStore } from "@/components/store";
 import { ACCENTS, MATURITY, type MaturityLevel } from "@/lib/avatars";
 import { PLAYERS, QUALITIES } from "@/lib/players";
 import { cn } from "@/lib/cn";
+import { appUrl } from "@/lib/paths";
 
 const TABS = [
   { id: "profile", label: "Perfis" },
@@ -36,7 +37,7 @@ export function SettingsScreen() {
 
   const select = (id: TabId) => {
     setTab(id);
-    router.replace(`/settings?tab=${id}`, { scroll: false });
+    router.replace(appUrl(`/settings?tab=${id}`), { scroll: false });
   };
 
   return (
@@ -258,7 +259,7 @@ function ProfilesPanel() {
                   type="button"
                   onClick={() => {
                     setProfile(item);
-                    router.push("/");
+                    router.push(appUrl("/"));
                   }}
                   className="rounded border border-white/20 px-2.5 py-1 text-[11px] text-white/75 transition hover:border-white hover:text-white"
                 >
@@ -282,7 +283,7 @@ function ProfilesPanel() {
           type="button"
           onClick={() => {
             setProfile(null);
-            router.push("/");
+            router.push(appUrl("/"));
           }}
           className="mt-4 rounded-md border border-white/20 px-4 py-2 text-[12.5px] text-white/80 transition hover:border-white hover:text-white"
         >
@@ -604,7 +605,7 @@ function PrivacyPanel() {
                 onClick={() => {
                   clearEverything();
                   setConfirming(false);
-                  router.push("/");
+                  router.push(appUrl("/"));
                 }}
                 className="rounded bg-[#ff5c5c] px-2 py-1 text-[11.5px] font-semibold text-black"
               >
@@ -629,11 +630,11 @@ function PrivacyPanel() {
           <li>· Playback is handled by third-party embeds — they see your IP, we don&apos;t.</li>
           <li>
             · Read the{" "}
-            <Link href="/privacy" className="text-[var(--nf-accent)] hover:underline">
+            <Link href={appUrl("/privacy")} className="text-[var(--nf-accent)] hover:underline">
               privacy policy
             </Link>{" "}
             and{" "}
-            <Link href="/terms" className="text-[var(--nf-accent)] hover:underline">
+            <Link href={appUrl("/terms")} className="text-[var(--nf-accent)] hover:underline">
               terms
             </Link>
             .
@@ -648,10 +649,10 @@ function PrivacyPanel() {
 
 function AboutPanel() {
   const links = [
-    { href: "/about", label: "Sobre a CinePlus", hint: "O que é isto e como funciona" },
-    { href: "/privacy", label: "Política de privacidade", hint: "O que é guardado e onde" },
-    { href: "/terms", label: "Termos de uso", hint: "As regras de uso" },
-    { href: "/dmca", label: "Direitos autorais e DMCA", hint: "Informações de remoção" },
+    { href: appUrl("/about"), label: "Sobre a CinePlus", hint: "O que é isto e como funciona" },
+    { href: appUrl("/privacy"), label: "Política de privacidade", hint: "O que é guardado e onde" },
+    { href: appUrl("/terms"), label: "Termos de uso", hint: "As regras de uso" },
+    { href: appUrl("/dmca"), label: "Direitos autorais e DMCA", hint: "Informações de remoção" },
   ];
 
   return (

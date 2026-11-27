@@ -94,7 +94,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#07080f] px-4 py-10">
-      <Link href="/" aria-label="CinePlus home">
+      <Link href={appUrl("/")} aria-label="CinePlus home">
         <Wordmark className="text-[34px] md:text-[40px]" />
       </Link>
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">

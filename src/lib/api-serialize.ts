@@ -1,6 +1,7 @@
 import { backdropSrc, posterSrc, seasonsFor, similarTo, shortMeta, getTitle } from "@/lib/catalog";
 import { seasonsForTmdb } from "@/lib/seasons";
 import type { Title } from "@/lib/types";
+import { appUrl } from "@/lib/paths";
 
 /** Compact payload used by the JSON API + the live search overlay. */
 export function serializeTitle(t: Title) {
@@ -22,8 +23,8 @@ export function serializeTitle(t: Title) {
     meta: shortMeta(t),
     poster: posterSrc(t.slug),
     backdrop: backdropSrc(t.slug),
-    watchPath: `/watch/${t.kind}/${t.slug}`,
-    titlePath: `/title/${t.slug}`,
+    watchPath: appUrl(`/watch/${t.kind}/${t.slug}`),
+    titlePath: appUrl(`/title/${t.slug}`),
     trailerTmdbId: t.tmdbId,
   };
 }

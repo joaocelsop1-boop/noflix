@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/legal-page";
+import { appUrl } from "@/lib/paths";
 
 export const metadata: Metadata = {
   title: "Sobre a CinePlus",
@@ -40,9 +41,9 @@ export default function Page() {
 
       <h2>Comece agora</h2>
       <ul>
-        <li><Link href="/">Abrir a página inicial</Link></li>
-        <li><Link href="/browse">Navegar pelo catálogo completo</Link></li>
-        <li><Link href="/settings">Abrir as configurações</Link></li>
+        <li><Link href={appUrl("/")}>Abrir a página inicial</Link></li>
+        <li><Link href={appUrl("/browse")}>Navegar pelo catálogo completo</Link></li>
+        <li><Link href={appUrl("/settings")}>Abrir as configurações</Link></li>
       </ul>
     </LegalPage>
   );

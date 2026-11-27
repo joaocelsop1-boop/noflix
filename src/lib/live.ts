@@ -32,6 +32,7 @@ export type LiveItem = {
 };
 
 import { TMDB_API_KEY } from "@/lib/tmdb-key";
+import { appUrl } from "@/lib/paths";
 
 const KEY_STORAGE = "nf.tmdb";
 
@@ -349,5 +350,5 @@ export function playHref(item: PlayableRef): string | null {
   }
   if (item.year) params.set("year", String(item.year));
   if (item.poster) params.set("poster", item.poster);
-  return `/play/${path}?${params.toString()}`;
+  return appUrl(`/play/${path}?${params.toString()}`);
 }

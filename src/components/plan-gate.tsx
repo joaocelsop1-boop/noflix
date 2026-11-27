@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { appUrl } from "@/lib/paths";
 
 /**
  * CTA de plano (frameXTV): mostrado no lugar do player quando o usuário
@@ -23,13 +24,13 @@ export function PlanGate({ reason }: { reason?: string }) {
         </p>
         <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
           <Link
-            href="/planos"
+            href={appUrl("/planos")}
             className="rounded-md btn-neon px-6 py-3 text-sm font-bold transition"
           >
             Ver planos
           </Link>
           <Link
-            href="/login"
+            href={appUrl("/login")}
             className="rounded-md border border-white/25 px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-white/60 hover:text-white"
           >
             Entrar

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/wordmark";
+import { appUrl } from "@/lib/paths";
 
 export default function NotFound() {
   return (
@@ -13,7 +14,7 @@ export default function NotFound() {
           Desculpe, não encontramos essa página. Você vai encontrar muita coisa para explorar na página inicial.
         </p>
         <Link
-          href="/"
+          href={appUrl("/")}
           className="mt-8 inline-flex rounded bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/85"
         >
           Início CinePlus

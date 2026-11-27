@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { artUrl } from "@/lib/img";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import { fetchPanelMe } from "@/lib/panel";
 import { cn } from "@/lib/cn";
 import { Footer } from "@/components/footer";
@@ -157,7 +157,7 @@ export async function fetchPanelHomeData(): Promise<{
 function panelPlayUrl(entry: CatalogueEntry): string {
   const type = entry.panel?.type ?? entry.kind;
   const id = entry.panel?.id ?? entry.tmdbId;
-  return `/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`;
+  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`);
 }
 
 /** Cartão de pôster do painel, no mesmo visual das prateleiras do site. */
@@ -499,8 +499,8 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
         <PanelHero entries={heroEntries} />
 
         <div className="relative z-10 -mt-[9vh] pb-10">
-          <PanelTop10Row title="Top 10 Filmes" href="/movies" entries={visible.topMovies} />
-          <PanelTop10Row title="Top 10 Séries" href="/tv-shows" entries={visible.topSeries} />
+          <PanelTop10Row title="Top 10 Filmes" href={appUrl("/movies")} entries={visible.topMovies} />
+          <PanelTop10Row title="Top 10 Séries" href={appUrl("/tv-shows")} entries={visible.topSeries} />
 
           {myList.length > 0 && (
             <ContinueRow
@@ -515,21 +515,21 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
             id="panel-movies"
             title="Filmes"
             hint={`${visible.movies.length.toLocaleString("pt-BR")} filmes do seu servidor`}
-            href="/movies"
+            href={appUrl("/movies")}
             entries={visible.movies}
           />
           <PanelRow
             id="panel-series"
             title="Séries"
             hint={`${visible.series.length.toLocaleString("pt-BR")} séries do seu servidor`}
-            href="/tv-shows"
+            href={appUrl("/tv-shows")}
             entries={visible.series}
           />
           <PanelRow
             id="panel-anime"
             title="Anime"
             hint={`${visible.anime.length.toLocaleString("pt-BR")} animes do seu servidor`}
-            href="/anime"
+            href={appUrl("/anime")}
             entries={visible.anime}
           />
         </div>

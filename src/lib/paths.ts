@@ -1,15 +1,17 @@
 /**
- * Base path do app em produção: o app vive em cineplus.shop/app (o site de
- * vendas fica na raiz cineplus.shop/). Tem que ser igual ao `basePath` do
- * next.config.ts — mude nos dois lugares juntos.
+ * Prefixo do app em produção: o app vive em cineplus.shop/app (o site de
+ * vendas fica na raiz cineplus.shop/).
  *
- * O Next.js prefixa o basePath AUTOMATICAMENTE em: Link href, router.push /
- * router.replace, redirect() do servidor e usePathname (que devolve o
- * caminho SEM o basePath). O que NÃO é prefixado e precisa deste helper:
+ * NÃO há mais `basePath` no next.config.ts: o Traefik (Coolify, Path /app)
+ * tira o /app antes de repassar ao Next.js, então o Next.js recebe os
+ * caminhos sem o prefixo e o basePath daria 404 em tudo. Por isso TODA
+ * URL que o navegador pede tem que levar o /app na mão, via estes helpers:
+ *   • Link href, router.push / router.replace — usar appUrl("/...")
  *   • fetch("/api/...") — o navegador pediria na raiz e cairia no site
  *   • window.location.href = "..." — navegação crua, sem prefixo
  *   • URLs que o servidor devolve ao cliente (/php/stream.php, /api/hls)
  *   • caminhos de assets locais (/img/...) usados como <img src>
+ * Os assets estáticos usam assetPrefix "/app" no next.config.ts.
  */
 export const BASE_PATH = "/app";
 

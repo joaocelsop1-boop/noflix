@@ -19,6 +19,7 @@ import { useStore } from "@/components/store";
 import { getTitle, shortMeta, topTen } from "@/lib/catalog";
 import type { Row as RowType, Title } from "@/lib/types";
 import { cn } from "@/lib/cn";
+import { appUrl } from "@/lib/paths";
 
 export function Row({ row, priority = false }: { row: RowType; priority?: boolean }) {
   const items = (row.ranked ? topTen() : row.slugs.map(getTitle).filter(Boolean)) as Title[];
@@ -38,7 +39,7 @@ export function Row({ row, priority = false }: { row: RowType; priority?: boolea
           </span>
         )}
         <Link
-          href={row.ranked ? "/new-popular" : "/browse"}
+          href={row.ranked ? appUrl("/new-popular") : appUrl("/browse")}
           className="ml-auto flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#54b9c5] opacity-0 transition-all duration-300 group-hover/row:opacity-100"
         >
           Explorar tudo
@@ -297,7 +298,7 @@ export function PosterCard({
                 <div className="flex items-center gap-2 px-3 pb-1 pt-3">
                   <button
                     type="button"
-                    onClick={() => router.push(`/watch/${title.kind}/${title.slug}`)}
+                    onClick={() => router.push(appUrl(`/watch/${title.kind}/${title.slug}`))}
                     aria-label={`Play ${title.name}`}
                     className="grid h-8 w-8 place-items-center rounded-full bg-white text-black transition hover:bg-white/80"
                   >

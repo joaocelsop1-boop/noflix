@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer";
 import { PosterTile } from "@/components/row";
 import { useStore } from "@/components/store";
 import { getTitle } from "@/lib/catalog";
+import { appUrl } from "@/lib/paths";
 
 export default function MyListPage() {
   const { myList, hydrated } = useStore();
@@ -37,7 +38,7 @@ export default function MyListPage() {
                 lista fica neste navegador, sem precisar de conta.
               </p>
               <Link
-                href="/browse"
+                href={appUrl("/browse")}
                 className="mt-6 rounded bg-netflix-red px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-netflix-red-dark"
               >
                 Navegar pelo catálogo

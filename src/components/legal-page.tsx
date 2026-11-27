@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { ReactNode } from "react";
+import { appUrl } from "@/lib/paths";
 
 export function LegalPage({
   eyebrow,
@@ -33,11 +34,11 @@ export function LegalPage({
 
           <div className="mt-10 flex flex-wrap gap-2 border-t border-white/10 pt-5 text-[12px]">
             {[
-              { href: "/about", label: "Sobre" },
-              { href: "/privacy", label: "Privacidade" },
-              { href: "/terms", label: "Termos" },
-              { href: "/dmca", label: "Direitos autorais" },
-              { href: "/settings", label: "Configurações" },
+              { href: appUrl("/about"), label: "Sobre" },
+              { href: appUrl("/privacy"), label: "Privacidade" },
+              { href: appUrl("/terms"), label: "Termos" },
+              { href: appUrl("/dmca"), label: "Direitos autorais" },
+              { href: appUrl("/settings"), label: "Configurações" },
             ].map((link) => (
               <Link
                 key={link.href}

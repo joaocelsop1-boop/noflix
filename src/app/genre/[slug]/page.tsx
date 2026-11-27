@@ -6,6 +6,7 @@ import {
   categorySlug,
   fetchPanelCategories,
 } from "@/lib/panel-categories";
+import { appUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ async function findCategory(slug: string): Promise<{
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const found = await findCategory(slug);
-  if (!found) redirect("/browse");
+  if (!found) redirect(appUrl("/browse"));
   return (
     <LiveCatalogue
       initialCategory={{ id: found.id, tab: found.tab }}

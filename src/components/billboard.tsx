@@ -8,6 +8,7 @@ import { CheckIcon, InfoIcon, PlayIcon, PlusIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
 import { heroTitles, shortMeta } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
+import { appUrl } from "@/lib/paths";
 
 /** how long each banner holds the stage */
 const ROTATE_MS = 8000;
@@ -168,7 +169,7 @@ export function Billboard() {
               <motion.div variants={rise} className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => router.push(`/watch/${active.kind}/${active.slug}`)}
+                  onClick={() => router.push(appUrl(`/watch/${active.kind}/${active.slug}`))}
                   className="focus-brand flex items-center gap-2 rounded-[4px] bg-white px-6 py-3 text-[15px] font-semibold text-black transition duration-200 hover:bg-white/85 active:scale-[0.98]"
                 >
                   <PlayIcon width={20} height={20} />

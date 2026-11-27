@@ -59,11 +59,12 @@ async function isLoggedIn(request: NextRequest): Promise<boolean | null> {
 export async function middleware(request: NextRequest) {
   const loggedIn = await isLoggedIn(request);
   if (loggedIn === false) {
-    // O redirect cru perderia o basePath (/app) e cairia na raiz (o site).
-    // O pathname do NextURL NÃO leva o basePath: ele é prefixado na hora de
-    // formatar a URL — pôr "/app/login" aqui duplicava para /app/app/login.
+    // Sem basePath no next.config.ts, o Next.js NÃO prefixa /app aqui:
+    // o redirect tem que levar o /app explícito, senão cai na raiz (o site).
+    // (Antes, com basePath, o pathname NÃO levava o basePath e ele era
+    // prefixado ao formatar — pôr "/app/login" duplicava para /app/app/login.)
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/app/login";
     return NextResponse.redirect(url);
   }
   // loggedIn === null means the panel could not be reached: let it through.

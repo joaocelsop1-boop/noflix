@@ -1,11 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // O app vive em cineplus.shop/app (o site de vendas fica na raiz):
-  // todas as rotas, assets e APIs do app passam a ser /app/*. O Next.js
-  // prefixa o basePath sozinho em Link/router/redirect/usePathname; fetch,
-  // window.location e URLs devolvidas ao cliente usam src/lib/paths.ts.
-  basePath: "/app",
+  // O app vive em cineplus.shop/app (o site de vendas fica na raiz).
+  // O Traefik (Coolify, Path /app) tira o prefixo /app antes de repassar
+  // ao Next.js — por isso NÃO há basePath aqui: com basePath o Next.js
+  // esperaria o /app e daria 404 em tudo (o prefixo já foi tirado).
+  // O prefixo /app continua nas URLs que o navegador pede, de dois jeitos:
+  //   • assetPrefix "/app" — assets estáticos (/app/_next/...) chegam ao
+  //     app (o Traefik tira o /app e o Next.js serve /_next/...);
+  //   • src/lib/paths.ts (appUrl/apiUrl) — links, router.push, fetch e
+  //     window.location prefixam /app na mão, pois sem basePath o Next.js
+  //     não prefixa nada sozinho.
+  assetPrefix: "/app",
   // Allow the sandbox preview host(s) to talk to the dev server without
   // Next.js rejecting the request as a cross-origin dev request.
   allowedDevOrigins: ["*.e2b.app", "*.arena.ai", "localhost:3000", "127.0.0.1:3000"],

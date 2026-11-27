@@ -15,6 +15,7 @@ import {
   type LiveItem,
   type Shelf,
 } from "@/lib/live";
+import { appUrl } from "@/lib/paths";
 
 /**
  * Shelves fed by the live APIs (TMDB when a key is present, Jikan otherwise).
@@ -65,7 +66,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
       return;
     }
     router.push(
-      `/play/${tmdbId}?title=${encodeURIComponent(item.name)}&kind=series&year=${item.year ?? ""}&poster=${encodeURIComponent(item.poster ?? "")}`,
+      appUrl(`/play/${tmdbId}?title=${encodeURIComponent(item.name)}&kind=series&year=${item.year ?? ""}&poster=${encodeURIComponent(item.poster ?? "")}`),
     );
   };
 
@@ -88,7 +89,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
     if (anilistId) params.set("anilist", String(anilistId));
     if (item.year) params.set("year", String(item.year));
     if (item.poster) params.set("poster", item.poster);
-    router.push(`/play/${path}?${params.toString()}`);
+    router.push(appUrl(`/play/${path}?${params.toString()}`));
   };
 
   /** one entry point so anime always carries its AniList id (never the TMDB route) */
@@ -96,7 +97,7 @@ export function LiveRows({ variant = "home" }: { variant?: "home" | "anime" }) {
     if (item.malId || item.anime) return playAnime(item);
     if (item.tmdbId) {
       router.push(
-        `/play/${item.tmdbId}?title=${encodeURIComponent(item.name)}&kind=${item.kind}&year=${item.year ?? ""}&poster=${encodeURIComponent(item.poster ?? "")}`,
+        appUrl(`/play/${item.tmdbId}?title=${encodeURIComponent(item.name)}&kind=${item.kind}&year=${item.year ?? ""}&poster=${encodeURIComponent(item.poster ?? "")}`),
       );
       return;
     }

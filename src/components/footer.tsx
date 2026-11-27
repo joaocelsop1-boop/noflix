@@ -2,29 +2,29 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 
 const columns = [
   [
-    { label: "Início", href: "/" },
-    { label: "Séries", href: "/tv-shows" },
-    { label: "Filmes", href: "/movies" },
-    { label: "Anime", href: "/anime" },
+    { label: "Início", href: appUrl("/") },
+    { label: "Séries", href: appUrl("/tv-shows") },
+    { label: "Filmes", href: appUrl("/movies") },
+    { label: "Anime", href: appUrl("/anime") },
   ],
   [
-    { label: "Ver todos os títulos", href: "/browse" },
-    { label: "Minha Lista", href: "/my-list" },
-    { label: "Novidades", href: "/new-popular" },
+    { label: "Ver todos os títulos", href: appUrl("/browse") },
+    { label: "Minha Lista", href: appUrl("/my-list") },
+    { label: "Novidades", href: appUrl("/new-popular") },
   ],
   [
-    { label: "Configurações", href: "/settings" },
-    { label: "Aparência", href: "/settings?tab=appearance" },
-    { label: "Sobre a CinePlus", href: "/about" },
+    { label: "Configurações", href: appUrl("/settings") },
+    { label: "Aparência", href: appUrl("/settings?tab=appearance") },
+    { label: "Sobre a CinePlus", href: appUrl("/about") },
   ],
   [
-    { label: "Política de privacidade", href: "/privacy" },
-    { label: "Termos de uso", href: "/terms" },
-    { label: "Direitos autorais e DMCA", href: "/dmca" },
+    { label: "Política de privacidade", href: appUrl("/privacy") },
+    { label: "Termos de uso", href: appUrl("/terms") },
+    { label: "Direitos autorais e DMCA", href: appUrl("/dmca") },
   ],
 ];
 
@@ -76,7 +76,7 @@ export function Footer() {
       <div className="mx-auto max-w-[1100px]">
         <div className="mb-6 flex items-center gap-4 text-white/80">
           <a
-            href="/about"
+            href={appUrl("/about")}
             className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
           >
             Sobre a CinePlus

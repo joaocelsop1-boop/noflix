@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { artUrl } from "@/lib/img";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { CloseIcon, SearchIcon } from "@/components/icons";
@@ -59,7 +59,7 @@ async function searchPanel(
 function panelPlayUrl(entry: CatalogueEntry): string {
   const type = entry.panel?.type ?? entry.kind;
   const id = entry.panel?.id ?? entry.tmdbId;
-  return `/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`;
+  return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}`);
 }
 
 /**
@@ -191,7 +191,7 @@ export function SearchOverlay() {
                   sua conta para procurar.
                 </p>
                 <Link
-                  href="/login"
+                  href={appUrl("/login")}
                   onClick={() => setSearchOpen(false)}
                   className="mt-5 inline-block rounded-md btn-neon px-5 py-2.5 text-[13.5px] font-semibold transition"
                 >

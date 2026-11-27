@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { artUrl } from "@/lib/img";
-import { apiUrl } from "@/lib/paths";
+import {apiUrl, appUrl} from "@/lib/paths";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -282,14 +282,14 @@ export function LiveCatalogue({
                   // Item do painel: abre o player do painel (stream do Xtream).
                   if (item.panel) {
                     router.push(
-                      `/play/0?panel=1&type=${item.panel.type}&id=${item.panel.id}&title=${encodeURIComponent(item.name)}`,
+                      appUrl(`/play/0?panel=1&type=${item.panel.type}&id=${item.panel.id}&title=${encodeURIComponent(item.name)}`),
                     );
                     return;
                   }
                   router.push(
-                    `/play/${item.tmdbId}?title=${encodeURIComponent(item.name)}&kind=${
+                    appUrl(`/play/${item.tmdbId}?title=${encodeURIComponent(item.name)}&kind=${
                       item.kind === "series" ? "series" : "movie"
-                    }${item.anime ? "&anime=1" : ""}&year=${item.year ?? ""}`,
+                    }${item.anime ? "&anime=1" : ""}&year=${item.year ?? ""}`),
                   );
                 }}
                 style={{ contentVisibility: "auto", containIntrinsicSize: "260px 390px" }}
@@ -347,7 +347,7 @@ export function LiveCatalogue({
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
                 <a
-                  href="/browse"
+                  href={appUrl("/browse")}
                   className="rounded-full bg-white px-4 py-1.5 text-[12.5px] font-semibold text-black transition hover:bg-white/85"
                 >
                   Navegar pelo catálogo

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { appUrl } from "@/lib/paths";
 
 /**
  * A página de play TMDB não existe mais no fluxo do usuário: todo o
@@ -6,5 +7,5 @@ import { redirect } from "next/navigation";
  * antigo para /watch/... cai no Navegar (catálogo do painel).
  */
 export default function WatchPage() {
-  redirect("/browse");
+  redirect(appUrl("/browse"));
 }
