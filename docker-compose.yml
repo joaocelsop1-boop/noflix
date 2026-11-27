@@ -5,8 +5,8 @@
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       # URL interna do backend PHP (dentro da rede do compose).
       # O front Next.js fala com o PHP por aqui; o navegador nunca vê essa URL.
@@ -18,10 +18,10 @@ services:
 
   php:
     build: ./php-backend
-    ports:
-      # Admin e API PHP expostos localmente; no Coolify, exponha este
-      # serviço num domínio próprio (ex.: php.seudominio.com) ou porta.
-      - "8080:80"
+    expose:
+      # No Coolify, dê a este serviço um domínio próprio (ex.: php.seudominio.com).
+      # Não publique porta no host — o Coolify/Traefik roteia.
+      - "80"
     environment:
       - DB_HOST=db
       - DB_NAME=${DB_NAME:-minetv}
