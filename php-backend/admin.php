@@ -135,6 +135,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Pagamentos salvos! Gateway ativo: " . strtoupper($gw) . ". Use o botão \"Testar\" para conferir a chave antes de mandar o cliente pagar.";
     }
 
+    // Salvar suporte (seção Suporte na aba Servidor Sigma) — SEMPRE salva,
+    // sem testar o painel: o contato não depende do painel, e o admin tem
+    // que conseguir trocar o WhatsApp/Telegram mesmo com o painel fora do ar.
+    // WhatsApp: só dígitos (com DDD). Telegram: sem "@" na frente.
+    // Vazios = botão "Suporte" não aparece no app.
+    elseif ($action === 'save_support') {
+        $wa = preg_replace('/\D+/', '', trim($_POST['support_whatsapp'] ?? ''));
+        $tg = ltrim(trim($_POST['support_telegram'] ?? ''), '@');
+        $stmt = $pdo->prepare("UPDATE settings SET support_whatsapp = ?, support_telegram = ? WHERE id = 1");
+        $stmt->execute([$wa, $tg]);
+        $msg = "Suporte salvo! " . ($wa !== '' || $tg !== '' ? "O botão \"Suporte\" aparece no app (menu da conta e rodapé)." : "Sem contato preenchido, o botão \"Suporte\" não aparece no app.");
+    }
+
     // Limpar cache do catálogo (força puxar tudo de novo do painel) — SÓ
     // apaga se o painel responder. Antes apagava sem checar: com o painel
     // fora do ar, o catálogo sumia e não tinha como reconstruir.
@@ -535,6 +548,30 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
             <button type="button" onclick="testSigmaConnection()" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded text-sm transition">Testar Conexão</button>
           </div>
           <p class="text-[11px] text-gray-500 mt-2">O teste usa a URL digitada no campo acima — não precisa salvar antes de testar. O resultado mostra qual URL foi testada.</p>
+        </form>
+
+        <!-- SUPORTE: contato do botão "Suporte" do app (menu da conta e rodapé).
+             Formulário próprio: salva sempre, sem testar o painel. -->
+        <form method="POST" class="mt-8 border-t border-gray-800 pt-6">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+          <input type="hidden" name="form_action" value="save_support">
+          <h4 class="text-base font-semibold text-white mb-1">Suporte</h4>
+          <p class="text-sm text-gray-400 mb-4">Contato do botão "Suporte" que aparece no app, no menu da conta e no rodapé. Preencha um dos dois (o WhatsApp tem prioridade). Deixe os dois vazios para o botão não aparecer.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">WhatsApp do suporte:</label>
+              <input type="text" name="support_whatsapp" value="<?= htmlspecialchars($settings['support_whatsapp'] ?? '') ?>" placeholder="5511999999999" inputmode="numeric" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">Número com DDD, só dígitos (sem "+" nem espaços). Ex.: 5511999999999.</p>
+            </div>
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Telegram do suporte:</label>
+              <input type="text" name="support_telegram" value="<?= htmlspecialchars($settings['support_telegram'] ?? '') ?>" placeholder="cineplus_suporte" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">Usuário do Telegram, sem "@". Ex.: cineplus_suporte. Só é usado se o WhatsApp estiver vazio.</p>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Suporte</button>
+          </div>
         </form>
 
         <div id="test-result-box" class="mt-6 p-4 rounded-lg bg-gray-900 border border-gray-800 hidden text-sm"></div>

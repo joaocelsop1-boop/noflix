@@ -23,6 +23,11 @@ export type PanelMe = {
   loggedIn: boolean;
   user: PanelUser | null;
   canWatch: boolean;
+  /** Contato de suporte configurado no admin (aba Servidor Sigma, seção Suporte). */
+  support?: {
+    whatsapp?: string | null;
+    telegram?: string | null;
+  };
 };
 
 export type PanelPlan = {

@@ -8,6 +8,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CloseIcon,
+  ListIcon,
   NextIcon,
   PlayIcon,
   SubtitlesIcon,
@@ -245,6 +246,13 @@ export function Player({
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
 
   const [menu, setMenu] = useState(false);
+  /* tudo17: painel de episódios visível (bottom sheet) — o seletor não vive
+     mais só dentro do menu "Painel": ele abre sozinho ao abrir a série e tem
+     botão próprio e claro no topo do player. */
+  const [episodesOpen, setEpisodesOpen] = useState(false);
+  const episodesAutoOpened = useRef(false);
+  /* temporada exibida no sheet (null = segue a temporada que está tocando) */
+  const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -544,6 +552,27 @@ export function Player({
   const currentSeason = allSeasons.find((s) => s.number === season);
   /** temporada exibida no seletor (cai para a primeira quando a atual não existe) */
   const pickerSeason = currentSeason ?? allSeasons[0];
+  /** temporada exibida no sheet de episódios (tudo17) */
+  const sheetSeasonData =
+    allSeasons.find((s) => s.number === (sheetSeason ?? season)) ?? allSeasons[0];
+
+  /* tudo17: ao abrir uma série, a lista de episódios aparece de cara (o
+     vídeo continua tocando atrás/embaixo do painel) — o usuário vê como
+     escolher sem precisar adivinhar nenhum menu. Só 1x por abertura de
+     página, e nunca em deep link com episódio explícito (?s=&e=). */
+  useEffect(() => {
+    if (
+      title.kind !== "series" ||
+      episodePicked ||
+      !picked ||
+      allSeasons.length === 0 ||
+      episodesAutoOpened.current
+    )
+      return;
+    episodesAutoOpened.current = true;
+    setSheetSeason(null);
+    setEpisodesOpen(true);
+  }, [title.kind, episodePicked, picked, allSeasons.length]);
 
   /* ---------------------------------------------------------------- source */
 
@@ -750,20 +779,21 @@ export function Player({
   }, [poke]);
 
   useEffect(() => {
-    if (menu) {
+    if (menu || episodesOpen) {
       setChrome(true);
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
     } else {
       poke();
     }
-  }, [menu, poke]);
+  }, [menu, episodesOpen, poke]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const el = event.target as HTMLElement | null;
       if (el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
       if (event.key === "Escape") {
-        if (menu) setMenu(false);
+        if (episodesOpen) setEpisodesOpen(false);
+        else if (menu) setMenu(false);
         else router.back();
         return;
       }
@@ -771,7 +801,7 @@ export function Player({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menu, router, nextEp, goTo]);
+  }, [menu, episodesOpen, router, nextEp, goTo]);
 
   /* --------------------------------------------------------------- actions */
 
@@ -1101,6 +1131,29 @@ export function Player({
                 >
                   <NextIcon width={16} height={16} />
                   <span className="hidden sm:inline">Próximo</span>
+                </button>
+              )}
+
+              {/* tudo17: botão grande e claro de episódios — fora do menu
+                  "Painel", sempre visível no topo do player para séries. */}
+              {title.kind === "series" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSheetSeason(null);
+                    setEpisodesOpen((open) => !open);
+                  }}
+                  aria-label="Episódios"
+                  aria-pressed={episodesOpen}
+                  className={cn(
+                    "pointer-events-auto flex h-10 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold backdrop-blur-md transition",
+                    episodesOpen
+                      ? "bg-white text-black"
+                      : "bg-black/60 text-white/85 hover:bg-black/80 hover:text-white",
+                  )}
+                >
+                  <ListIcon width={16} height={16} />
+                  <span className="hidden sm:inline">Episódios</span>
                 </button>
               )}
 
@@ -1525,6 +1578,157 @@ export function Player({
           )}
         </AnimatePresence>
       </div>
+
+      {/* tudo17: seletor de episódios VISÍVEL — bottom sheet com temporadas e
+          episódios. Abre sozinho ao abrir a série (o vídeo continua tocando
+          acima) e pelo botão "Episódios" do topo. Tocar num episódio troca e
+          toca ele na hora; o episódio atual fica destacado. Filmes não têm
+          este painel. */}
+      <AnimatePresence>
+        {episodesOpen && title.kind === "series" && (
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 60 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            role="dialog"
+            aria-label="Episódios"
+            className="absolute inset-x-0 bottom-0 z-40 mx-auto flex max-h-[68vh] w-full max-w-[880px] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-white/10 bg-[#0f1220]/[0.98] shadow-2xl backdrop-blur-xl"
+          >
+            <div className="flex items-start justify-between gap-3 px-4 pb-1 pt-4 md:px-6">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                  Episódios
+                </p>
+                <h2 className="mt-0.5 truncate text-[16px] font-bold text-white md:text-lg">
+                  {title.name}
+                </h2>
+                <p className="mt-0.5 text-[12px] text-white/55">
+                  {allSeasons.length > 0
+                    ? `Assistindo: Temporada ${season} · Episódio ${episode}`
+                    : "Carregando temporadas e episódios…"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEpisodesOpen(false)}
+                aria-label="Fechar episódios"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+              >
+                <CloseIcon width={16} height={16} />
+              </button>
+            </div>
+
+            {allSeasons.length === 0 ? (
+              panelSeasonsLoaded ? (
+                <div className="px-4 pb-6 pt-2 md:px-6">
+                  <p className="text-[13px] text-white/55">
+                    O painel não devolveu a lista de episódios desta série.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      pickEpisode(1, 1);
+                      setEpisodesOpen(false);
+                    }}
+                    className="mt-4 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-black transition hover:bg-white/85"
+                  >
+                    Assistir · Temporada 1 · Episódio 1
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-4 py-6 md:px-6">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
+                  <p className="text-[13px] font-medium text-white/55">
+                    Carregando temporadas e episódios…
+                  </p>
+                </div>
+              )
+            ) : (
+              <>
+                {allSeasons.length > 1 && (
+                  <div className="mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden">
+                    {allSeasons.map((entry) => (
+                      <button
+                        key={entry.number}
+                        type="button"
+                        onClick={() => setSheetSeason(entry.number)}
+                        aria-pressed={entry.number === (sheetSeasonData?.number ?? season)}
+                        className={
+                          entry.number === (sheetSeasonData?.number ?? season)
+                            ? "shrink-0 rounded-full border border-white/70 bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white"
+                            : "shrink-0 rounded-full border border-white/10 px-3.5 py-1.5 text-[12.5px] text-white/60 transition hover:border-white/40 hover:text-white"
+                        }
+                      >
+                        {entry.name && !/^Season \d+$/.test(entry.name)
+                          ? entry.name
+                          : `Temporada ${entry.number}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="px-4 pt-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40 md:px-6">
+                  {sheetSeasonData?.name && !/^Season \d+$/.test(sheetSeasonData.name)
+                    ? sheetSeasonData.name
+                    : `Temporada ${sheetSeasonData?.number ?? season}`}
+                  {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
+                </p>
+                <div className="mt-2 flex-1 overflow-y-auto px-2 pb-4 md:px-4">
+                  {(sheetSeasonData?.episodes ?? []).map((item) => {
+                    const active =
+                      sheetSeasonData?.number === season && item.number === episode;
+                    return (
+                      <button
+                        key={item.number}
+                        type="button"
+                        onClick={() => {
+                          goTo(sheetSeasonData?.number ?? season, item.number);
+                          setEpisodesOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition",
+                          active ? "bg-white/10" : "hover:bg-white/5",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid h-9 w-9 shrink-0 place-items-center rounded-md text-[12px] font-bold",
+                            active
+                              ? "bg-[var(--nf-accent)] text-white"
+                              : "bg-white/10 text-white/80",
+                          )}
+                        >
+                          {active ? <PlayIcon width={13} height={13} /> : `E${item.number}`}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              "block truncate text-[13px]",
+                              active ? "text-white" : "text-white/85",
+                            )}
+                          >
+                            E{item.number} · {item.name}
+                          </span>
+                          {item.runtime > 0 && (
+                            <span className="block text-[11px] text-white/40">
+                              {item.runtime} min
+                            </span>
+                          )}
+                        </span>
+                        {active && (
+                          <span className="shrink-0 rounded-sm bg-[#46d369] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black">
+                            Assistindo
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

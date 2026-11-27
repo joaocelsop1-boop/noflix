@@ -60,6 +60,11 @@ function get_settings($pdo) {
         'efi_sandbox' => 0,
         'asaas_api_key' => '',
         'asaas_sandbox' => 0,
+        // Suporte: contato mostrado no botão "Suporte" do app (menu da
+        // conta e rodapé). Vazios = botão não aparece. O admin preenche
+        // na aba Servidor Sigma, seção Suporte.
+        'support_whatsapp' => '',
+        'support_telegram' => '',
     ];
     ensure_payment_columns($pdo);
     $stmt = $pdo->query("SELECT * FROM settings WHERE id = 1 LIMIT 1");
@@ -90,6 +95,8 @@ function ensure_payment_columns($pdo) {
         'efi_sandbox' => "TINYINT(1) NOT NULL DEFAULT 0",
         'asaas_api_key' => "VARCHAR(255) NOT NULL DEFAULT ''",
         'asaas_sandbox' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'support_whatsapp' => "VARCHAR(30) NOT NULL DEFAULT ''",
+        'support_telegram' => "VARCHAR(100) NOT NULL DEFAULT ''",
     ];
     try {
         foreach ($settingsCols as $col => $def) {

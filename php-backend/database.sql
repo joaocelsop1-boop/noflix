@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `efi_sandbox` TINYINT(1) NOT NULL DEFAULT 0,
   `asaas_api_key` VARCHAR(255) NOT NULL DEFAULT '',
   `asaas_sandbox` TINYINT(1) NOT NULL DEFAULT 0,
+  `support_whatsapp` VARCHAR(30) NOT NULL DEFAULT '',
+  `support_telegram` VARCHAR(100) NOT NULL DEFAULT '',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

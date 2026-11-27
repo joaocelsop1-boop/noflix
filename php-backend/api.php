@@ -884,6 +884,11 @@ switch ($action) {
             'loggedIn' => $meUser !== null,
             'user' => $meUser ? api_public_user($pdo, $meUser) : null,
             'canWatch' => user_can_watch($meUser),
+            // Suporte (contato do admin): público, é o botão "Suporte" do app.
+            'support' => [
+                'whatsapp' => trim((string)($settings['support_whatsapp'] ?? '')),
+                'telegram' => trim((string)($settings['support_telegram'] ?? '')),
+            ],
         ]);
         break;
 

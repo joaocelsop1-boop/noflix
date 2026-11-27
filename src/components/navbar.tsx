@@ -13,6 +13,7 @@ import { ProfileAvatar } from "@/components/avatar";
 import { cn } from "@/lib/cn";
 import { artUrl } from "@/lib/img";
 import {apiUrl, appUrl} from "@/lib/paths";
+import { supportUrl } from "@/lib/support";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const links = [
@@ -26,6 +27,7 @@ const links = [
 ];
 
 const mobileLinks = [
+  { href: appUrl("/"), label: "Início" },
   { href: appUrl("/tv-shows"), label: "Séries" },
   { href: appUrl("/movies"), label: "Filmes" },
   { href: appUrl("/anime"), label: "Anime" },
@@ -39,6 +41,7 @@ export function Navbar() {
   const { profile, profiles, setProfile, setSearchOpen, hydrated } = useStore();
   const { me, refresh: refreshMe } = usePanelMe();
   const panelUser = me?.loggedIn ? me.user : null;
+  const support = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState<null | "profile" | "bell">(null);
   /** novidades do painel (sino): os 3 primeiros filmes do servidor */
@@ -128,7 +131,13 @@ export function Navbar() {
         {/* mobile: compact links — one <li> per link so they can never collide */}
         <ul className="no-scrollbar -mx-1 flex flex-1 items-center gap-5 overflow-x-auto px-1 text-[13px] lg:hidden">
           {mobileLinks.map((link) => {
-            const active = pathname.startsWith(link.href);
+            // "Início" (href /app) só é ativo na home: pathname é "/" no
+            // 1º carregamento (Traefik tira o /app) e "/app" após navegar.
+            // startsWith("/app") marcaria Início em TODAS as páginas.
+            const active =
+              link.href === appUrl("/")
+                ? pathname === "/" || pathname === appUrl("/")
+                : pathname.startsWith(link.href);
             return (
               <li key={link.href} className="shrink-0">
                 <Link
@@ -382,6 +391,25 @@ export function Navbar() {
                     >
                       Configurações
                     </Link>
+                    <a
+                      href={appUrl("/cineplus.apk")}
+                      download
+                      onClick={() => setMenu(null)}
+                      className="block px-4 py-2 text-white/90 transition hover:underline"
+                    >
+                      Baixar aplicativo
+                    </a>
+                    {support && (
+                      <a
+                        href={support}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setMenu(null)}
+                        className="block px-4 py-2 text-white/90 transition hover:underline"
+                      >
+                        Suporte
+                      </a>
+                    )}
                   </div>
                 </motion.div>
               )}

@@ -160,3 +160,15 @@ export const DownloadIcon: Icon = (props) => (
     <path d="M4 20h16" />
   </svg>
 );
+
+/** tudo17: ícone de lista de episódios (botão "Episódios" do player) */
+export const ListIcon: Icon = (props) => (
+  <svg {...base(props)}>
+    <path d="M8.5 6h12" />
+    <path d="M8.5 12h12" />
+    <path d="M8.5 18h12" />
+    <path d="M3.5 6h.01" />
+    <path d="M3.5 12h.01" />
+    <path d="M3.5 18h.01" />
+  </svg>
+);

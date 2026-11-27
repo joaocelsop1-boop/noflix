@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {apiUrl, appUrl} from "@/lib/paths";
+import { supportUrl } from "@/lib/support";
+import { usePanelMe } from "@/lib/use-panel-me";
 
 const columns = [
   [
@@ -33,6 +35,9 @@ export function Footer() {
   const [panelCategories, setPanelCategories] = useState<
     Array<{ name: string; slug: string }>
   >([]);
+  /** Contato de suporte (admin): o botão só aparece quando preenchido. */
+  const { me } = usePanelMe();
+  const support = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
 
   useEffect(() => {
     let alive = true;
@@ -74,13 +79,30 @@ export function Footer() {
   return (
     <footer className="mt-10 border-t border-white/5 px-4 pb-16 pt-10 text-[13px] text-[#808080] md:px-12">
       <div className="mx-auto max-w-[1100px]">
-        <div className="mb-6 flex items-center gap-4 text-white/80">
+        <div className="mb-6 flex flex-wrap items-center gap-4 text-white/80">
           <a
             href={appUrl("/about")}
             className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
           >
             Sobre a CinePlus
           </a>
+          <a
+            href={appUrl("/cineplus.apk")}
+            download
+            className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
+          >
+            Baixar aplicativo
+          </a>
+          {support && (
+            <a
+              href={support}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
+            >
+              Suporte
+            </a>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-y-3 sm:grid-cols-4">

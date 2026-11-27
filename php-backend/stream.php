@@ -281,4 +281,13 @@ if ($type === 'live') {
 }
 
 if (!in_array($ext, $ALLOWED_EXTS, true)) $ext = 'mp4';
+/* tudo18: VOD em HLS — a playlist .m3u8 tem que passar por serve_playlist
+   (busca + REESCREVE as URLs dos segmentos para stream.php?seg=), senão a
+   playlist chegaria crua ao navegador com as URLs do painel (usuário/senha
+   expostos) e os segmentos iriam diretos. O serve_passthrough NÃO reescreve
+   nada — ele só repassa o corpo. Vale para filme e série (o ao vivo já ia
+   por serve_playlist acima). */
+if ($ext === 'm3u8') {
+    serve_playlist(panel_stream_url($type, $id . '.m3u8'));
+}
 serve_passthrough(panel_stream_url($type, $id . '.' . $ext), $ext);
