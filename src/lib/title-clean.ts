@@ -6,10 +6,16 @@
  *   "Baby Looney Tunes (2002) (2002)"
  *   "Os Desajustados de Seul [L] (2024) (2024)"
  *   "18 Rosas [Lançamento] (2026)"
+ *   "1 12 Rodadas" / "2 242310" (índice de lista na frente)
+ *   "Ladies First 2026 · 2025" (ano duplicado no fim)
+ *   "S Spontaneous.2020" (letra solta + ano com ponto)
  *
  * A exibição (e a busca no TMDB) usa o nome limpo + o ano separado.
- * Só tira o que está no FIM do título: "[...]" e "(AAAA)" repetidos.
- * Um ano no meio do nome ("2001: Uma Odisseia no Espaço") fica intacto.
+ * Só tira o que está no FIM do título: "[...]", "(AAAA)", ".AAAA" e ano
+ * solto repetidos — e um índice/letra solta na FRENTE, quando o resto
+ * mostra que não faz parte do título. Um ano no meio do nome
+ * ("2001: Uma Odisseia no Espaço") fica intacto, e artigo inicial
+ * ("A Cacada", "Os Desajustados") nunca é removido.
  */
 
 export type CleanedTitle = {
@@ -46,8 +52,61 @@ export function cleanTitle(raw: string): CleanedTitle {
     }
     break;
   }
+  /* tudo27: ano no fim SEM parênteses, repetido ou com ponto.
+     "Ladies First 2026 · 2025" vira "Ladies First" + 2025 (o último ano
+     é o do campo ano do painel; o primeiro é o que já estava no nome).
+     "Spontaneous.2020" vira "Spontaneous" + 2020. Regra segura: ano com
+     ponto ou com "·" sempre sai (é sufixo de arquivo/lista, não do
+     título); ano solto com espaço SÓ sai se outro ano já foi tirado
+     (ano duplicado) — sozinho, "Blade Runner 2049" fica intacto, porque
+     2049 faz parte do título. */
+  /* só o loop de ano solto/ponto liga este flag — o "(AAAA)" do parêntese
+     não conta, senão "A Dois Passos do Assassino (2024)" perderia o "A". */
+  let strippedTrailingYear = false;
+  for (;;) {
+    // ".2020" ou "· 2025" — sufixo, sempre tira.
+    let m = s.match(/(?:\.|·)\s*(\d{4})\s*$/);
+    if (m) {
+      const y = Number(m[1]);
+      if (y >= 1900 && y <= 2100) {
+        if (year === undefined) year = y;
+        strippedTrailingYear = true;
+        s = s.slice(0, m.index ?? 0).trim();
+        continue;
+      }
+    }
+    // " 2026" solto — só no caso duplicado (já tirou outro ano antes).
+    if (strippedTrailingYear) {
+      m = s.match(/\s+(\d{4})\s*$/);
+      if (m) {
+        const y = Number(m[1]);
+        if (y >= 1900 && y <= 2100) {
+          if (year === undefined) year = y;
+          s = s.slice(0, m.index ?? 0).trim();
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  /* tudo27: índice de lista na frente do título ("1 12 Rodadas",
+     "2 242310") — um número curto seguido de outro número é o índice da
+     lista, não o título. Só tira quando o próximo token também começa
+     com dígito: "12 Rodadas" e "3 Ninjas" ficam intactos. */
+  for (let i = 0; i < 2; i++) {
+    const m = s.match(/^(\d{1,2})\s+(?=\d)/);
+    if (!m) break;
+    s = s.slice(m[0].length).trim();
+  }
+  /* tudo27: letra solta na frente ("S Spontaneous.2020") — só tira
+     quando um ano foi tirado do fim: a letra é um prefixo estranho do
+     painel, não o título. Sem ano no fim, o artigo fica ("A Cacada"). */
+  if (strippedTrailingYear) {
+    const m = s.match(/^[A-Za-z]\s+(?=\S)/);
+    if (m) s = s.slice(m[0].length).trim();
+  }
   // Sobra de pontuação depois das remoções ("Título -", "Título :").
-  s = s.replace(/[\s\-–—:]+$/, "").trim();
+  s = s.replace(/[\s\-–—:.]+$/, "").trim();
   s = s.replace(/\s{2,}/g, " ").trim();
   return { title: s, year };
 }

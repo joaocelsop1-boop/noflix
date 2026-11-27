@@ -13,7 +13,8 @@ import { getTitle, visibleFor } from "@/lib/catalog";
 import { useEffect, useMemo, useState } from "react";
 import {
   PanelHome,
-  fetchPanelHomeData,
+  fetchPanelHomeBase,
+  fetchPanelHomeTop10,
   type PanelHomeData,
 } from "@/components/panel-home";
 
@@ -21,6 +22,14 @@ import {
  * Início com o catálogo curado (TMDB) — usada quando o usuário não está
  * logado ou o painel não tem filmes/séries. Quando o painel tem conteúdo,
  * a Início mostra SÓ o painel (ver PanelHome).
+ *
+ * tudo27 (item 8): as fileiras daqui ("Escolhas para você", "Infantil e
+ * Família", "Em alta", "Top 10", "Originais CinePlus") são DIFERENTES das
+ * da home logada DE PROPÓSITO — não é bug. O visitante não tem painel nem
+ * conta: não há catálogo dele para mostrar, então ele vê o catálogo curado
+ * de demonstração. Alinhar as duas seria mostrar ao visitante o painel de
+ * outro usuário, ou esconder do assinante os 31 mil títulos do servidor
+ * dele. Não mexer.
  */
 function TmdbHome() {
   const { myList, profile, progress } = useStore();
@@ -106,14 +115,24 @@ export function HomePage() {
   const [panelData, setPanelData] = useState<PanelHomeData | null>(null);
   const [attempt, setAttempt] = useState(0);
 
+  /* tudo27 (item 5): home em DOIS estágios — a base (herói + fileiras)
+     aparece assim que chega, e o Top 10 completa depois. Antes, um único
+     fetchPanelHomeData esperava base + Top 10 (com as chamadas de
+     categoria) antes de mostrar qualquer coisa: 20–30 s de skeleton. */
   useEffect(() => {
     let alive = true;
     setMode("checking");
-    void fetchPanelHomeData().then(({ loggedIn, data }) => {
+    void fetchPanelHomeBase().then(({ loggedIn, data }) => {
       if (!alive) return;
       if (data) {
         setPanelData(data);
         setMode("panel");
+        /* estágio 2, em segundo plano: o Top 10 entra quando chegar — as
+           fileiras aparecem sozinhas (lista vazia = fileira escondida). */
+        void fetchPanelHomeTop10(data.movies, data.series).then((top) => {
+          if (!alive) return;
+          setPanelData((prev) => (prev ? { ...prev, ...top } : prev));
+        });
       } else if (loggedIn) {
         /* logado mas o painel não devolveu nada: erro em PT-BR, nunca
            cair para o TMDB silenciosamente */

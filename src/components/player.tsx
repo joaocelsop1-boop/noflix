@@ -251,6 +251,14 @@ export function Player({
   }>({});
   useEffect(() => {
     if (!isPanelTitle || title.panel?.type !== "series" || title.kind !== "series") return;
+    /* tudo27 (item 1): limpa os dados da série ANTERIOR antes de buscar os
+       da nova — sem isso, a sinopse/gênero/temporadas velhas ficavam na
+       tela até o fetch novo voltar (o bug "dados trocados"). A `key` no
+       Player já remonta o componente, mas o reset aqui cobre qualquer
+       reutilização sem key. */
+    setPanelMeta({});
+    setPanelSeasons([]);
+    setPanelSeasonsLoaded(false);
     let alive = true;
     void fetchPanelInfo("series", title.panel.id).then((info) => {
       if (!alive) return;
@@ -315,6 +323,11 @@ export function Player({
   }>({});
   useEffect(() => {
     if (!isPanelTitle || title.panel?.type !== "movie" || title.kind !== "movie") return;
+    /* tudo27 (item 1): limpa os dados do filme ANTERIOR antes de buscar os
+       do novo — era o `movieMeta` velho (17 min, sinopse e gênero de
+       Bressan) que ficava sob o título "Il corpo" até o get_vod_info novo
+       voltar. */
+    setMovieMeta({});
     let alive = true;
     void fetchPanelInfo("movie", title.panel.id).then((info) => {
       if (!alive || !info) return;
@@ -344,6 +357,17 @@ export function Player({
       alive = false;
     };
   }, [isPanelTitle, title]);
+
+  /* tudo27 (item 1): temporada/episódio/escolha resetam quando o título
+     muda — sem isso, navegar de uma série para outra mantinha a temporada
+     e o "já escolhi" do título anterior. (A `key` no Player já remonta o
+     componente; isto cobre reutilização sem key.) */
+  useEffect(() => {
+    setSeason(initialSeason);
+    setEpisode(initialEpisode);
+    setPicked(!needsPick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title.slug]);
 
   /* temporadas efetivas: as da página (TMDB/anime) ou as do painel */
   const allSeasons = seasons.length > 0 ? seasons : panelSeasons;
@@ -499,6 +523,9 @@ export function Player({
   const [similar, setSimilar] = useState<CatalogueEntry[]>([]);
   useEffect(() => {
     if (!isPanelTitle || (!similarCategory && !similarGenre)) return;
+    /* tudo27 (item 1): limpa o "Mais como este" do título anterior — sem
+       isso, os cartões velhos ficavam até o catálogo novo voltar. */
+    setSimilar([]);
     let alive = true;
     const params = new URLSearchParams({
       tab: title.kind === "series" ? "series" : "movie",
@@ -1486,19 +1513,53 @@ export function Player({
               </>
             )}
             {/* tudo26: "Elenco" — créditos do TMDB (foto, ator, personagem).
-                Só aparece quando o TMDB devolve elenco; sem inventar. */}
-            {cast && cast.length > 0 && (
-              <section className="mt-10">
-                <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] md:text-[19px]">
-                  Elenco
-                </h2>
-                <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {cast.map((member) => (
-                    <CastMember key={member.name} member={member} />
-                  ))}
-                </div>
-              </section>
-            )}
+                Só aparece quando o TMDB devolve elenco; sem inventar.
+                tudo27 (item 2): o `cast` do servidor primeiro; se ele vier
+                vazio, usa o do hook do cliente (segunda chance — o resolve
+                do cliente pode ter conseguido o credits quando o do servidor
+                falhou). Enquanto nenhum dos dois resolveu, mostra um
+                esqueleto "Carregando elenco…" em vez de sumir: antes, a
+                seção só existia quando o cast já vinha pronto, e um credits
+                lento parecia "sem elenco". */}
+            {(() => {
+              const displayCast =
+                cast && cast.length > 0 ? cast : tmdbDetail?.cast;
+              const castLoading =
+                isPanelTitle && !displayCast && tmdbDetail === undefined;
+              if (displayCast && displayCast.length > 0) {
+                return (
+                  <section className="mt-10">
+                    <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] md:text-[19px]">
+                      Elenco
+                    </h2>
+                    <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {displayCast.map((member) => (
+                        <CastMember key={member.name} member={member} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              }
+              if (castLoading) {
+                return (
+                  <section className="mt-10">
+                    <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] md:text-[19px]">
+                      Elenco
+                    </h2>
+                    <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {[0, 1, 2, 3, 4].map((i) => (
+                        <div key={i} className="w-[88px] shrink-0 text-center">
+                          <div className="mx-auto h-16 w-16 animate-pulse rounded-full bg-white/10" />
+                          <div className="mx-auto mt-2 h-3 w-14 animate-pulse rounded bg-white/10" />
+                          <div className="mx-auto mt-1 h-2.5 w-10 animate-pulse rounded bg-white/10" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              }
+              return null;
+            })()}
             {/* tudo26: "Mais como este" — títulos reais do painel, da mesma
                 categoria/gênero. Só aparece quando há pelo menos 3. */}
             {similar.length >= 3 && (

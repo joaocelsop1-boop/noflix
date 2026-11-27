@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { autoReloadOnce } from "@/lib/auto-reload";
+
 /**
  * tudo24: limite de erro do login — a página /app/login quebrou 1x na
  * primeira carga ("Application error — A client-side exception has
@@ -8,6 +11,12 @@
  * sem causa no código da página). Com o limite, em vez da tela de erro
  * genérica do Next.js, o usuário vê uma tela nossa com "Tentar
  * novamente" — que recarrega só o segmento.
+ *
+ * tudo27 (item 3): a fronteira agora recarrega UMA vez sozinha ao montar
+ * (mesmo flag do script inline do layout — um só por sessão), em vez de
+ * mostrar a tela de erro de cara. Erro transitório de chunk some sem o
+ * usuário ver nada; erro que persiste aparece a tela com o botão (o
+ * reload já foi usado, não entra em loop).
  */
 export default function LoginError({
   reset,
@@ -15,6 +24,9 @@ export default function LoginError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    autoReloadOnce();
+  }, []);
   return (
     <main className="grid min-h-screen place-items-center bg-[#07080f] px-4">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1220] p-6 text-center shadow-2xl md:p-8">

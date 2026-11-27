@@ -68,6 +68,9 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/browse/:path*",
+    /* tudo27 (item 4): /search agora existe — sem isto, um visitante
+       abria a busca sem login e só via resultado vazio. */
+    "/search/:path*",
     "/movies/:path*",
     "/tv-shows/:path*",
     "/anime/:path*",

@@ -33,7 +33,7 @@ const SCRIPT = `(function(){
   } catch (e) {
     /* private mode: still show it, the CSS timeout below cleans up */
   }
-  window.setTimeout(kill, 1500); /* tudo26: intro 2,5s -> 1,5s (menos tela preta a cada navegação) */
+  window.setTimeout(kill, 900); /* tudo27: intro 1,5s -> 0,9s — o splash não pode cobrir conteúdo carregado; o BootKiller tira antes, na hidratação, e este timer é só o teto */
 })();`;
 
 export function BootIntro() {

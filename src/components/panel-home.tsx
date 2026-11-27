@@ -207,8 +207,27 @@ async function fetchTop10(
  * logado e, quando sim, os dados — para a Início NUNCA cair para o
  * catálogo curado (TMDB) silenciosamente quando o painel falha: logado
  * sem painel mostra erro, não filme em inglês.
+ *
+ * tudo27 (item 5): em DOIS estágios — a base (filmes + séries +
+ * lançamentos) primeiro, o Top 10 depois. Antes, a home esperava TUDO
+ * (base + 2 Top 10, cada um com suas chamadas de categoria) antes de
+ * mostrar qualquer coisa: 20–30 s de "Carregando seu catálogo…". Agora
+ * o herói e as fileiras aparecem assim que a base chega, e as fileiras
+ * Top 10 entram depois (a fileira some com lista vazia e aparece quando
+ * os dados chegam — PanelRow/PanelTop10Row retornam null sem entradas).
  */
 export async function fetchPanelHomeData(): Promise<{
+  loggedIn: boolean;
+  data: PanelHomeData | null;
+}> {
+  const base = await fetchPanelHomeBase();
+  if (!base.data) return base;
+  const top = await fetchPanelHomeTop10(base.data.movies, base.data.series);
+  return { loggedIn: true, data: { ...base.data, ...top } };
+}
+
+/** Estágio 1 — base da home (herói + fileiras). Top 10 vem vazio. */
+export async function fetchPanelHomeBase(): Promise<{
   loggedIn: boolean;
   data: PanelHomeData | null;
 }> {
@@ -222,11 +241,19 @@ export async function fetchPanelHomeData(): Promise<{
     fetchLancamentosMovies(),
   ]);
   if (movies.length === 0 && series.length === 0) return { loggedIn: true, data: null };
+  return { loggedIn: true, data: { movies, series, heroMovies, topSeries: [], topMovies: [] } };
+}
+
+/** Estágio 2 — Top 10 (filmes e séries) para completar a home. */
+export async function fetchPanelHomeTop10(
+  movies: CatalogueEntry[],
+  series: CatalogueEntry[],
+): Promise<{ topMovies: CatalogueEntry[]; topSeries: CatalogueEntry[] }> {
   const [topMovies, topSeries] = await Promise.all([
     fetchTop10("movie", ["lancamentos", "pedidos", "cinema"], movies),
     fetchTop10("series", ["lancamentos", "pedidos", "netflix"], series),
   ]);
-  return { loggedIn: true, data: { movies, series, heroMovies, topSeries, topMovies } };
+  return { topMovies, topSeries };
 }
 
 function panelPlayUrl(entry: CatalogueEntry): string {
@@ -285,7 +312,10 @@ export function PanelPosterCard({
   });
   const displayName = cleanTitle(entry.name).title;
   const img = artUrl(meta?.poster ?? entry.poster);
-  const rating = meta?.rating ?? entry.rating;
+  /* tudo27 (item 6): nota SÓ do TMDB — o `entry.rating` do painel é o "8
+     falso" do Xtream e oscilava 8.0 -> 7.6 quando o TMDB resolvia. Sem
+     match do TMDB (ainda resolvendo ou sem match), não mostra ★. */
+  const rating = meta?.rating;
   const year = entry.year ?? meta?.year;
   const initial = (displayName.trim()[0] ?? "?").toUpperCase();
   /* capa morta no servidor de imagens: mostra o fallback na hora, sem
@@ -387,7 +417,8 @@ function Top10Caption({ entry }: { entry: CatalogueEntry }) {
     kind: entry.kind,
   });
   const displayName = cleanTitle(entry.name).title;
-  const rating = meta?.rating ?? entry.rating;
+  /* tudo27 (item 6): nota SÓ do TMDB — nunca o "8 falso" do painel. */
+  const rating = meta?.rating;
   const year = entry.year ?? meta?.year;
   return (
     <div className="ml-16 mt-2 w-[var(--nf-card-w,186px)] min-w-0 px-0.5 md:ml-[86px]">
@@ -674,7 +705,10 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
   const bg = bgCandidates[Math.min(bgIdx, bgCandidates.length - 1)];
   if (!active) return null;
   const displayName = cleanTitle(active.name).title;
-  const displayRating = activeMeta?.rating ?? active.rating;
+  /* tudo27 (item 6): nota SÓ do TMDB — o `active.rating` do painel (8)
+     aparecia antes do TMDB carregar e depois trocava para 7.6: era a
+     oscilação ★8.0/★7.6 do herói. Enquanto o TMDB resolve, não mostra ★. */
+  const displayRating = activeMeta?.rating;
   const displayYear = activeMeta?.year ?? active.year;
   const displayOverview = activeMeta?.overview ?? active.overview;
   const displayGenres =

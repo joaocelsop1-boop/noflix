@@ -5,6 +5,7 @@ import "./globals.css";
 import { StoreProvider } from "@/components/store";
 import { AppShell } from "@/components/app-shell";
 import { BootIntro } from "@/components/boot-intro";
+import { BootKiller } from "@/components/boot-killer";
 import { ChunkReload } from "@/components/chunk-reload";
 
 export const metadata: Metadata = {
@@ -30,7 +31,7 @@ export const viewport: Viewport = {
  */
 const CRITICAL_CSS = `
 html,body{background:#141414;color:#fff;margin:0;min-height:100%}
-#nf-boot{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;background:#000;animation:nf-boot-out .5s ease-in 2.05s forwards}
+#nf-boot{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;background:#000;animation:nf-boot-out .5s ease-in 0.9s forwards}
 .nf-boot-glow{position:absolute;width:70vmin;height:70vmin;border-radius:9999px;background:rgba(229,9,20,.35);filter:blur(130px);opacity:0;animation:nf-boot-glow 2.4s ease-in-out forwards}
 .nf-boot-bars{position:absolute;display:flex;align-items:center;gap:8px;height:120px}
 .nf-boot-bars i{display:block;width:14px;height:100%;border-radius:2px;background:#e50914;transform:scaleY(0);transform-origin:center;animation:nf-boot-bar 1.5s ease-in-out forwards}
@@ -50,6 +51,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" style={{ backgroundColor: "#141414", colorScheme: "dark" }}>
       <head>
+        {/* tudo27 (item 3): listeners de erro de chunk instalados ANTES de
+            qualquer chunk carregar. O ChunkReload (tudo25) só registra os
+            dele num useEffect — depois da hidratação — então um chunk que
+            falha DURANTE a carga inicial do login disparava o erro sem
+            nenhum listener no ar e a tela de erro aparecia. Este script
+            roda durante o parse do HTML, antes de qualquer JS do app:
+            num erro de chunk, faz UM reload duro por sessão (mesmo flag
+            "nf-chunk-reload-done" do ChunkReload e das fronteiras de erro)
+            e nunca entra em loop. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var F='nf-chunk-reload-done';function bad(m){m=(m||'').toLowerCase();return m.indexOf('loading chunk')>-1||m.indexOf('chunkloaderror')>-1||m.indexOf('failed to fetch dynamically imported module')>-1||m.indexOf('importing a module script failed')>-1||m.indexOf('unable to load')>-1||m.indexOf('load failed')>-1;}function once(){try{if(sessionStorage.getItem(F))return;sessionStorage.setItem(F,'1');}catch(e){return;}window.location.reload();}window.addEventListener('error',function(e){var t=e.target;if((t&&(t.tagName==='SCRIPT'||t.tagName==='LINK'))||bad(e.message||''))once();},true);window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=typeof r==='string'?r:(r&&r.message)||'';if(bad(m))once();});}catch(e){}})();`,
+          }}
+        />
         <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="" />
         <link rel="preconnect" href="https://m.media-amazon.com" crossOrigin="" />
         <link rel="preconnect" href="https://images.metahub.space" crossOrigin="" />
@@ -64,6 +79,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* tudo25: reload guardado quando um chunk pós-deploy falha —
             o "Application error" do login na primeira tentativa. */}
         <ChunkReload />
+        {/* tudo27 (item 5): tira o splash na hidratação — ver boot-killer.tsx */}
+        <BootKiller />
         {/* server-rendered so the title card is the first paint, never a flash */}
         <BootIntro />
         <StoreProvider>

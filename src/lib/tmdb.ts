@@ -264,16 +264,27 @@ export function parseCastMembers(
   return out.length > 0 ? out : undefined;
 }
 
-/** Créditos do TMDB (/movie|tv/{id}/credits) — fail open. */
+/**
+ * Créditos do TMDB (/movie|tv/{id}/credits) — fail open, com 1 retry.
+ * tudo27: `failed` distingue "o TMDB não devolveu nada" (rede/timeout —
+ * transitório, vale tentar de novo) de "o título não tem elenco listado"
+ * (cast undefined com failed=false — aí o sem-elenco é real e pode ser
+ * cacheado). Antes, uma falha transitória caía no mesmo `undefined` e o
+ * meta era cacheado SEM elenco por 7 dias — por isso o Elenco aparecia
+ * num dia e sumia no outro para o mesmo título.
+ */
 async function fetchCast(
   id: number,
   type: "movie" | "tv",
   key: string,
-): Promise<TmdbCastMember[] | undefined> {
-  const data = await limited(() =>
-    tmdbFetch(`/${type}/${id}/credits`, { language: "pt-BR" }, key),
-  );
-  return parseCastMembers(data);
+): Promise<{ cast?: TmdbCastMember[]; failed: boolean }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const data = await limited(() =>
+      tmdbFetch(`/${type}/${id}/credits`, { language: "pt-BR" }, key),
+    );
+    if (data) return { cast: parseCastMembers(data), failed: false };
+  }
+  return { cast: undefined, failed: true };
 }
 
 function toMeta(item: SearchItem, runtime?: number, cast?: TmdbCastMember[]): TmdbMeta {
@@ -337,7 +348,7 @@ async function resolveFresh(
      126 min; "A Noiva Cadáver" 2005 tem 77 min) — rejeita e tenta a
      próxima tentativa. */
   panelDuration?: number,
-): Promise<TmdbMeta | null> {
+): Promise<{ meta: TmdbMeta | null; skipCache?: boolean }> {
   const primary: "movie" | "tv" = kind === "series" ? "tv" : "movie";
   const secondary: "movie" | "tv" = primary === "movie" ? "tv" : "movie";
   // Tentativas em ordem: tipo certo + pt-BR + ano → sem ano → en-US + ano →
@@ -369,7 +380,15 @@ async function resolveFresh(
       if (!best || s > best.score) best = { item, score: s };
     }
     if (best && best.score >= MIN_SCORE) {
-      const runtime = details ? await fetchRuntime(best.item.id, a.type, key) : undefined;
+      /* tudo27: runtime e elenco em PARALELO (eram sequenciais — o elenco
+         só começava depois do runtime, e sob carga do semáforo o credits
+         batia no timeout de 8s). */
+      const [runtime, castRes] = details
+        ? await Promise.all([
+            fetchRuntime(best.item.id, a.type, key),
+            fetchCast(best.item.id, a.type, key),
+          ])
+        : [undefined, { cast: undefined, failed: false } as const];
       /* tudo26: duração do TMDB muito diferente da do arquivo do painel
          = filme errado com o mesmo nome. Rejeita e tenta a próxima
          tentativa (sem ano, outro idioma...). */
@@ -379,11 +398,15 @@ async function resolveFresh(
       /* tudo26: elenco — só no detalhe (details=true), junto com o
          runtime, e só depois que o match passou no check de duração.
          Vai no mesmo cache do resto (chave com "|d"). */
-      const cast = details ? await fetchCast(best.item.id, a.type, key) : undefined;
-      return toMeta(best.item, runtime, cast);
+      const meta = toMeta(best.item, runtime, castRes.cast);
+      /* tudo27: o elenco falhou por rede/timeout (não por falta de elenco)
+         — NÃO cacheia este meta: a próxima abertura do detalhe tenta o
+         credits de novo, em vez de servir 7 dias de "sem elenco". */
+      if (details && castRes.failed) return { meta, skipCache: true };
+      return { meta };
     }
   }
-  return null;
+  return { meta: null };
 }
 
 /* Cache em memória (500 entradas, evicção FIFO simples). */
@@ -478,7 +501,7 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
     return disk;
   }
 
-  const meta = await resolveFresh(
+  const { meta, skipCache } = await resolveFresh(
     title,
     year,
     ref.kind,
@@ -486,7 +509,9 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
     key,
     typeof ref.duration === "number" && ref.duration > 0 ? ref.duration : undefined,
   );
-  memSet(cacheKey, meta);
-  await writeDisk(cacheKey, meta);
+  if (!skipCache) {
+    memSet(cacheKey, meta);
+    await writeDisk(cacheKey, meta);
+  }
   return meta;
 }

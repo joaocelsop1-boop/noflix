@@ -136,6 +136,12 @@ export default async function PlayPage({
       meta?.genres?.[0] ? tmdbGenreId(meta.genres[0]) : undefined;
     return (
       <Player
+        /* tudo27 (item 1): `key` por título — sem ela, ir de um filme para
+           outro pelo "Mais como este" REUTILIZAVA o Player e o estado velho
+           (movieMeta/panelMeta/similar/temporada) continuava na tela sob o
+           título novo (Bressan sob "Il corpo"). Com a key, o React desmonta
+           o Player e monta um novo do zero para cada título. */
+        key={panelTitle.slug}
         title={panelTitle}
         initialSeason={Math.max(Number(query.s) || 1, 1)}
         initialEpisode={Math.max(Number(query.e) || 1, 1)}
@@ -227,6 +233,9 @@ export default async function PlayPage({
 
   return (
     <Player
+      /* tudo27 (item 1): mesma key por título — vale para os títulos TMDB
+         também (navegar de um para outro sem dados trocados). */
+      key={title.slug}
       title={title}
       initialSeason={initialSeason}
       initialEpisode={initialEpisode}

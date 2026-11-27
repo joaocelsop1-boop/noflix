@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { autoReloadOnce } from "@/lib/auto-reload";
+
 /**
  * tudo25: erro global (raiz) — o "Application error" do /app/login
  * aparecia na primeira tentativa e só sumia com reload manual. O
@@ -7,6 +10,11 @@
  * estoura na raiz (chunk novo pós-deploy, hidratação) não tinha
  * fronteira nenhuma. Esta cobre a raiz e dá ao usuário um botão de
  * recarregar, em vez de uma página morta.
+ *
+ * tudo27 (item 3): igual ao login/error.tsx — recarrega UMA vez sozinha
+ * ao montar (mesmo flag do script inline do layout — um só por sessão).
+ * Erro transitório some sem o usuário ver a tela; erro que persiste
+ * mostra a tela com os botões.
  */
 export default function GlobalError({
   error,
@@ -15,6 +23,9 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    autoReloadOnce();
+  }, []);
   return (
     <html lang="pt-BR" style={{ backgroundColor: "#0d1526", colorScheme: "dark" }}>
       <body className="min-h-screen bg-[#0d1526] text-white antialiased">

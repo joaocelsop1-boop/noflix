@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { autoReloadOnce } from "@/lib/auto-reload";
 
 /**
  * tudo25: o "Application error" do /app/login na primeira tentativa (3ª
@@ -13,9 +14,15 @@ import { useEffect } from "react";
  * rejeição de import dinâmico), faz UM reload duro guardado por
  * sessionStorage — nunca em loop. Se não for chunk, nada acontece e o
  * erro segue para a fronteira global (global-error.tsx).
+ *
+ * tudo27: este componente só cobre erros DEPOIS da hidratação — os
+ * listeners vivem num useEffect, que só roda depois que a página
+ * hidratou. Um chunk que falha DURANTE a carga inicial (o caso do login
+ * na 1ª tentativa) dispara o erro antes de qualquer listener existir.
+ * Por isso o layout agora instala os mesmos listeners num script inline
+ * no <head> (antes de qualquer chunk) — este fica como reforço para os
+ * chunks carregados depois (navegação, imports dinâmicos).
  */
-const FLAG = "nf-chunk-reload-done";
-
 function isChunkError(message: string): boolean {
   const m = message.toLowerCase();
   return (
@@ -30,14 +37,10 @@ function isChunkError(message: string): boolean {
 
 export function ChunkReload() {
   useEffect(() => {
+    /* tudo27: o reload é o do helper partilhado (mesmo flag do script
+       inline do layout e das fronteiras de erro — um só por sessão). */
     const reloadOnce = () => {
-      try {
-        if (sessionStorage.getItem(FLAG)) return;
-        sessionStorage.setItem(FLAG, "1");
-      } catch {
-        return;
-      }
-      window.location.reload();
+      autoReloadOnce();
     };
 
     const onError = (event: ErrorEvent) => {
