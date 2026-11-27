@@ -1,0 +1,359 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { Artwork } from "@/components/artwork";
+import { BellIcon, ChevronDownIcon, SearchIcon } from "@/components/icons";
+import { useStore } from "@/components/store";
+import { usePanelMe } from "@/lib/use-panel-me";
+import { formatDateBR, panelLogout } from "@/lib/panel";
+import { Wordmark } from "@/components/wordmark";
+import { ProfileAvatar } from "@/components/avatar";
+import { cn } from "@/lib/cn";
+import { allTitles } from "@/lib/catalog";
+
+const links = [
+  { href: "/", label: "Home" },
+  { href: "/tv-shows", label: "TV Shows" },
+  { href: "/movies", label: "Movies" },
+  { href: "/anime", label: "Anime" },
+  { href: "/live", label: "Ao vivo" },
+  { href: "/new-popular", label: "New & Popular" },
+  { href: "/browse", label: "Browse" },
+  { href: "/my-list", label: "My List" },
+];
+
+const mobileLinks = [
+  { href: "/tv-shows", label: "TV Shows" },
+  { href: "/movies", label: "Movies" },
+  { href: "/anime", label: "Anime" },
+  { href: "/live", label: "Ao vivo" },
+  { href: "/browse", label: "Browse" },
+  { href: "/my-list", label: "My List" },
+];
+
+export function Navbar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { profile, profiles, setProfile, setSearchOpen, hydrated } = useStore();
+  const { me, refresh: refreshMe } = usePanelMe();
+  const panelUser = me?.loggedIn ? me.user : null;
+  const [scrolled, setScrolled] = useState(false);
+  const [menu, setMenu] = useState<null | "profile" | "bell">(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const ticking = useRef(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      window.requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 24);
+        ticking.current = false;
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setMenu(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (!shellRef.current?.contains(event.target as Node)) setMenu(null);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const notifications = allTitles.slice(0, 3);
+
+  return (
+    <header
+      ref={shellRef}
+      className={cn(
+        "fixed inset-x-0 top-0 z-50 transition-[background-color,backdrop-filter,box-shadow] duration-500",
+        scrolled
+          ? "bg-[#141414]/95 shadow-[0_8px_30px_rgba(0,0,0,0.55)] backdrop-blur-md"
+          : "bg-gradient-to-b from-black/85 via-black/45 to-transparent",
+      )}
+    >
+      <nav className="mx-auto flex h-[68px] w-full items-center gap-4 px-4 md:gap-7 md:px-12">
+        <Wordmark className="text-[22px] md:text-[26px]" />
+
+        <ul className="hidden items-center gap-5 text-[13.5px] xl:gap-6 lg:flex">
+          {links.map((link) => {
+            const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+            return (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className={cn(
+                    "focus-brand whitespace-nowrap transition-colors duration-200",
+                    active ? "font-semibold text-white" : "text-[#e5e5e5]/85 hover:text-white",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* mobile: compact links — one <li> per link so they can never collide */}
+        <ul className="no-scrollbar -mx-1 flex flex-1 items-center gap-5 overflow-x-auto px-1 text-[13px] lg:hidden">
+          {mobileLinks.map((link) => {
+            const active = pathname.startsWith(link.href);
+            return (
+              <li key={link.href} className="shrink-0">
+                <Link
+                  href={link.href}
+                  className={cn(
+                    "whitespace-nowrap transition-colors",
+                    active ? "font-semibold text-white" : "text-white/80 hover:text-white",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="ml-auto flex items-center gap-3 md:gap-5">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search titles"
+            className="focus-brand grid h-9 w-9 place-items-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white"
+          >
+            <SearchIcon width={19} height={19} />
+          </button>
+
+          {hydrated && profile?.kids && (
+            <Link
+              href="/settings?tab=profile"
+              className="hidden rounded bg-[#22c55e]/20 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#86efac] sm:block"
+            >
+              Kids
+            </Link>
+          )}
+
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Notifications"
+              onClick={() => setMenu((m) => (m === "bell" ? null : "bell"))}
+              className="focus-brand relative grid h-9 w-9 place-items-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white"
+            >
+              <BellIcon width={19} height={19} />
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-netflix-red" />
+            </button>
+            <AnimatePresence>
+              {menu === "bell" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute right-0 top-12 w-[320px] overflow-hidden rounded-md border border-white/15 bg-[#191919]/98 py-2 shadow-2xl backdrop-blur-xl"
+                >
+                  <p className="px-4 pb-2 text-xs uppercase tracking-[0.18em] text-white/40">
+                    New arrivals
+                  </p>
+                  {notifications.map((t) => (
+                    <button
+                      key={t.slug}
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        router.push(`/title/${t.slug}`);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-white/5"
+                    >
+                      <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded">
+                        <Artwork slug={t.slug} name={t.name} accent={t.accent} sizes="60px" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-white">{t.name}</span>
+                        <span className="block text-xs text-white/50">
+                          {t.badge ?? "Now streaming"} · {t.year}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenu((m) => (m === "profile" ? null : "profile"))}
+              className="focus-brand flex items-center gap-2 rounded-md p-0.5 transition hover:opacity-90"
+              aria-label="Account menu"
+            >
+              <ProfileAvatar
+                avatar={hydrated && profile ? profile.avatar : "robot"}
+                accent={hydrated && profile ? profile.accent : "#e50914"}
+                rounded="rounded"
+                className="h-8 w-8"
+                kids={hydrated && profile?.kids}
+              />
+              <ChevronDownIcon
+                width={16}
+                height={16}
+                className={cn("hidden transition-transform sm:block", menu === "profile" && "rotate-180")}
+              />
+            </button>
+
+            <AnimatePresence>
+              {menu === "profile" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute right-0 top-12 w-[240px] overflow-hidden rounded-md border border-white/15 bg-[#191919]/98 shadow-2xl backdrop-blur-xl"
+                >
+                  {/* conta do painel: nome + plano + validade + sair */}
+                  {panelUser ? (
+                    <div className="border-b border-white/10 px-4 py-3">
+                      <p className="truncate text-sm font-semibold text-white">{panelUser.name}</p>
+                      <p className="truncate text-xs text-white/50">{panelUser.email}</p>
+                      <p className="mt-1 text-xs text-white/70">
+                        {panelUser.plan_name ? (
+                          <>
+                            Plano <span className="font-semibold text-white">{panelUser.plan_name}</span>
+                            {" · válido até "}
+                            <span className="font-semibold text-white">
+                              {formatDateBR(panelUser.expires_at)}
+                            </span>
+                          </>
+                        ) : (
+                          "Sem plano ativo"
+                        )}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <Link
+                          href="/planos"
+                          onClick={() => setMenu(null)}
+                          className="rounded-md bg-[#e50914] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#f6121d]"
+                        >
+                          Ver planos
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void panelLogout().then(() => {
+                              void refreshMe();
+                              setMenu(null);
+                              router.refresh();
+                            });
+                          }}
+                          className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/50 hover:text-white"
+                        >
+                          Sair
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-b border-white/10 px-4 py-2">
+                      <Link
+                        href="/login"
+                        onClick={() => setMenu(null)}
+                        className="block py-1 text-sm font-semibold text-white transition hover:underline"
+                      >
+                        Entrar / Criar conta
+                      </Link>
+                      <Link
+                        href="/planos"
+                        onClick={() => setMenu(null)}
+                        className="block py-1 text-sm text-white/90 transition hover:underline"
+                      >
+                        Ver planos
+                      </Link>
+                    </div>
+                  )}
+                  <div className="py-2">
+                    {profiles
+                      .filter((p) => p.id !== profile?.id)
+                      .slice(0, 2)
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setProfile(p);
+                            setMenu(null);
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-white/90 transition hover:underline"
+                        >
+                          <ProfileAvatar
+                            avatar={p.avatar}
+                            accent={p.accent}
+                            rounded="rounded"
+                            className="h-8 w-8"
+                          />
+                          {p.name}
+                        </button>
+                      ))}
+                  </div>
+                  <div className="border-t border-white/10 py-2 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfile(null);
+                        setMenu(null);
+                      }}
+                      className="block w-full px-4 py-2 text-left text-white/90 transition hover:underline"
+                    >
+                      Manage Profiles
+                    </button>
+                    <Link
+                      href="/my-list"
+                      onClick={() => setMenu(null)}
+                      className="block px-4 py-2 text-white/90 transition hover:underline"
+                    >
+                      My List
+                    </Link>
+                    <Link
+                      href="/browse"
+                      onClick={() => setMenu(null)}
+                      className="block px-4 py-2 text-white/90 transition hover:underline"
+                    >
+                      Browse All Titles
+                    </Link>
+                    <Link
+                      href="/settings"
+                      onClick={() => setMenu(null)}
+                      className="block px-4 py-2 text-white/90 transition hover:underline"
+                    >
+                      Settings
+                    </Link>
+                    <Link
+                      href="/settings?tab=developer"
+                      onClick={() => setMenu(null)}
+                      className="block px-4 py-2 text-white/90 transition hover:underline"
+                    >
+                      Developer options
+                    </Link>
+                    <p className="px-4 pt-3 pb-1 text-xs leading-relaxed text-white/35">
+                      Demo build — data &amp; artwork belong to their owners.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </nav>
+    </header>
+  );
+}

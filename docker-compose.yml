@@ -1,0 +1,57 @@
+# NOFLIX — app Next.js + backend PHP (Xtream) + MySQL
+# Uso local:  cp .env.example .env  (e ajuste as senhas)  →  docker compose up -d --build
+# Depois importe o banco (1ª vez): veja o passo 4 do README-DEPLOY.md.
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # URL interna do backend PHP (dentro da rede do compose).
+      # O front Next.js fala com o PHP por aqui; o navegador nunca vê essa URL.
+      - PHP_BACKEND_URL=${PHP_BACKEND_URL:-http://php:80}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+    depends_on:
+      - php
+      - db
+
+  php:
+    build: ./php-backend
+    ports:
+      # Admin e API PHP expostos localmente; no Coolify, exponha este
+      # serviço num domínio próprio (ex.: php.seudominio.com) ou porta.
+      - "8080:80"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-minetv}
+      - DB_USER=${DB_USER:-noflix}
+      - DB_PASS=${DB_PASS:-}
+    volumes:
+      # Só o cache do catálogo persiste; o código é copiado no build.
+      - php-cache:/var/www/html/cache
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    # Porta 3306 só interna (sem "ports:"): só app/php alcançam o banco.
+    expose:
+      - "3306"
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-minetv}
+      - MYSQL_USER=${DB_USER:-noflix}
+      - MYSQL_PASSWORD=${DB_PASS:-}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:
+  php-cache:

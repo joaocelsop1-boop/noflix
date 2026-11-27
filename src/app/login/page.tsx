@@ -1,0 +1,223 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { Wordmark } from "@/components/wordmark";
+import { fetchPanelMe, panelLogin, panelRegister } from "@/lib/panel";
+
+type Mode = "login" | "register";
+
+/**
+ * Login / cadastro do painel — visual escuro estilo frameXTV/MineTV.
+ * Em sucesso vai para /browse. Já logado, nem vê o formulário.
+ */
+export default function LoginPage() {
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("login");
+  const [checking, setChecking] = useState(true);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [forgot, setForgot] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchPanelMe().then((me) => {
+      if (!alive) return;
+      if (me?.loggedIn) router.replace("/browse");
+      else setChecking(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [router]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setForgot(false);
+    setBusy(true);
+    try {
+      if (mode === "login") {
+        const result = await panelLogin(email.trim(), password);
+        if (!result.ok) {
+          setError(result.error ?? "E-mail ou senha inválidos.");
+          return;
+        }
+        router.replace("/browse");
+      } else {
+        const result = await panelRegister({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          whatsapp: whatsapp.trim() || undefined,
+        });
+        if (!result.ok) {
+          setError(result.error ?? "Não foi possível criar a conta.");
+          return;
+        }
+        router.replace("/browse");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (checking) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-black">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-10">
+      <Link href="/" aria-label="MineTV home">
+        <Wordmark className="text-[34px] md:text-[40px]" />
+      </Link>
+      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">
+        You&apos;re watching · MineTV
+      </p>
+
+      <div className="mt-8 w-full max-w-md rounded-xl border border-white/10 bg-[#141414] p-6 shadow-2xl md:p-8">
+        {/* abas Entrar / Criar conta */}
+        <div className="grid grid-cols-2 rounded-md bg-white/5 p-1">
+          {(
+            [
+              { id: "login", label: "Entrar" },
+              { id: "register", label: "Criar conta" },
+            ] as Array<{ id: Mode; label: string }>
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setMode(tab.id);
+                setError(null);
+                setForgot(false);
+              }}
+              aria-pressed={mode === tab.id}
+              className={
+                mode === tab.id
+                  ? "rounded-md bg-[#e50914] px-3 py-2 text-sm font-bold text-white"
+                  : "rounded-md px-3 py-2 text-sm font-semibold text-white/60 transition hover:text-white"
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={submit} className="mt-6 space-y-4">
+          {mode === "register" && (
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                Nome
+              </span>
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+              />
+            </label>
+          )}
+
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+              E-mail
+            </span>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="voce@email.com"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+              Senha
+            </span>
+            <input
+              type="password"
+              required
+              minLength={4}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+            />
+          </label>
+
+          {mode === "register" && (
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                WhatsApp <span className="normal-case text-white/35">(opcional)</span>
+              </span>
+              <input
+                type="tel"
+                autoComplete="tel"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="(00) 00000-0000"
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#e50914]"
+              />
+            </label>
+          )}
+
+          {error && (
+            <p role="alert" className="rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-3 py-2 text-sm text-[#ff6b72]">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-md bg-[#e50914] py-3 text-sm font-bold text-white transition hover:bg-[#f6121d] disabled:opacity-60"
+          >
+            {busy ? "Aguarde…" : mode === "login" ? "Entrar e assistir" : "Criar conta e assistir"}
+          </button>
+        </form>
+
+        {mode === "login" && (
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setForgot(true);
+                setError(null);
+              }}
+              className="text-sm text-white/60 underline-offset-2 transition hover:text-white hover:underline"
+            >
+              Esqueci minha senha
+            </button>
+            {forgot && (
+              <p className="mt-2 rounded-md bg-white/5 px-3 py-2 text-[13px] leading-relaxed text-white/70">
+                Para recuperar sua senha, fale com o suporte informando o e-mail da conta.
+                A recuperação por e-mail ainda não está ativa.
+              </p>
+            )}
+          </div>
+        )}
+
+        <p className="mt-6 text-center text-xs leading-relaxed text-white/35">
+          Ao entrar, você concorda com os termos de uso da MineTV.
+        </p>
+      </div>
+    </main>
+  );
+}
