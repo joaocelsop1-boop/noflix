@@ -397,6 +397,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
             <div>
               <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">URL do Servidor HTTP:</label>
               <input type="text" name="sigma_url" value="<?= htmlspecialchars($settings['sigma_url']) ?>" placeholder="http://seuservidor.com:8080" required class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">É AQUI que você troca o servidor: mudou a URL aqui e salvou, o site inteiro passa a usar o novo painel — inclusive o proxy. Não precisa editar o arquivo proxy-painel.php no cPanel.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -413,7 +414,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
             <div>
               <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Proxy do painel (opcional):</label>
               <input type="text" name="panel_proxy" value="<?= htmlspecialchars($settings['panel_proxy'] ?? '') ?>" placeholder="https://webplayer.storestreaming.shop/proxy-painel.php" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-red-500 focus:outline-none">
-              <p class="text-[11px] text-gray-500 mt-1">Só preencha se o painel bloquear o IP da Oracle (o "Testar conexão" dá 404/timeout mesmo com a URL certa). O proxy é o arquivo proxy-painel.php no cPanel — ele encaminha as chamadas para o painel. Com o proxy preenchido, TODAS as chamadas (catálogo e streams) passam por ele. Deixe vazio para falar direto com o painel.</p>
+              <p class="text-[11px] text-gray-500 mt-1">Só preencha se o painel bloquear o IP da Oracle (o "Testar conexão" dá 404/timeout mesmo com a URL certa). O proxy é o arquivo proxy-painel.php no cPanel — ele encaminha as chamadas para o painel. Com o proxy preenchido, TODAS as chamadas (catálogo e streams) passam por ele. Deixe vazio para falar direto com o painel. <strong class="text-gray-400">O proxy usa a "URL do Servidor" acima como destino — para trocar de painel, basta trocar a URL acima e salvar.</strong></p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-800">

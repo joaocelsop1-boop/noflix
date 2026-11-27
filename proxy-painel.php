@@ -37,6 +37,10 @@
  */
 
 // ---- configuração (edite aqui se precisar) ----
+// $PANEL_BASE é o padrão (reserva). O NOFLIX normalmente manda a URL do
+// painel em cada chamada (?panel=http://...), que vem do campo "URL do
+// Servidor" do admin — trocou lá, o proxy passa a usar a nova URL sozinho,
+// sem precisar editar este arquivo. Só edite aqui se quiser outro padrão.
 $PANEL_BASE = 'http://glove77.site:80';   // painel Xtream (sem barra no fim)
 $ALLOWED_IP = '129.146.127.7';            // IP público da Oracle (onde roda o NOFLIX)
 
@@ -46,6 +50,28 @@ if ($remote !== $ALLOWED_IP) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
     die('Acesso negado.');
+}
+
+// ---- URL do painel: vem do admin (?panel=...) ou do padrão acima ----
+// O NOFLIX manda ?panel=<url do campo "URL do Servidor" do admin> em cada
+// chamada. Validamos (http/https + host) e usamos; se vier inválida ou
+// ausente, cai no $PANEL_BASE. O parâmetro é REMOVIDO antes de encaminhar,
+// para o painel não receber um parâmetro estranho.
+$query = $_SERVER['QUERY_STRING'] ?? '';
+$panelBase = $PANEL_BASE;
+if ($query !== '') {
+    parse_str($query, $qs);
+    if (!empty($qs['panel']) && is_string($qs['panel'])) {
+        $cand = trim($qs['panel']);
+        $p = parse_url($cand);
+        if ($p !== false && isset($p['scheme'], $p['host'])
+            && ($p['scheme'] === 'http' || $p['scheme'] === 'https')
+            && $p['host'] !== '') {
+            $panelBase = rtrim($cand, '/');
+        }
+        unset($qs['panel']);
+        $query = http_build_query($qs);
+    }
 }
 
 // ---- caminho pedido: /proxy-painel.php/player_api.php -> /player_api.php ----
@@ -60,8 +86,8 @@ if (strpos($path, '..') !== false || !preg_match('#^/[A-Za-z0-9_\-./]+$#', $path
     die('Caminho inválido.');
 }
 
-$query = $_SERVER['QUERY_STRING'] ?? '';
-$target = $PANEL_BASE . $path . ($query !== '' ? '?' . $query : '');
+// ($query já veio lá de cima, sem o parâmetro panel.)
+$target = $panelBase . $path . ($query !== '' ? '?' . $query : '');
 
 // ---- encaminha para o painel, repassando em blocos (streaming) ----
 $ch = curl_init();

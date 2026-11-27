@@ -135,8 +135,16 @@ function sigma_url($settings, $action, $extra = '') {
     // panel_base_url: usa o proxy (se configurado) ou a URL do painel
     // normalizada. O proxy preserva o caminho, então o /player_api.php
     // chega ao painel mesmo quando a Oracle é bloqueada por IP.
+    // &panel=<url do admin>: diz ao proxy QUAL painel usar — trocou a
+    // "URL do Servidor" no admin, o proxy passa a usar a nova sem precisar
+    // editar o proxy-painel.php. O proxy remove o parâmetro antes de
+    // encaminhar ao painel.
     $base = panel_base_url($settings);
-    return $base . '/player_api.php?username=' . urlencode($settings['sigma_username']) . '&password=' . urlencode($settings['sigma_password']) . '&action=' . $action . $extra;
+    $panelParam = '';
+    if (!empty($settings['panel_proxy'])) {
+        $panelParam = '&panel=' . urlencode(normalize_panel_url($settings['sigma_url'] ?? ''));
+    }
+    return $base . '/player_api.php?username=' . urlencode($settings['sigma_username']) . '&password=' . urlencode($settings['sigma_password']) . '&action=' . $action . $extra . $panelParam;
 }
 
 // ---------- filtro de conteúdo adulto ----------

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveStreams } from "@/lib/stream-resolver";
 import { proxied } from "@/lib/stream-sign";
-import { phpMe } from "@/lib/php";
+import { phpApi, phpMe } from "@/lib/php";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -92,6 +92,39 @@ export async function GET(request: Request) {
 }
 
 /**
+ * Primeiro episódio de uma série (get_series_info do painel): o menor número
+ * de temporada e, dentro dela, o menor número de episódio. Devolve o id do
+ * episódio (é ele que toca no stream) e a extensão do arquivo.
+ */
+function firstEpisode(data: unknown): { id: number; ext: string } | null {
+  if (!data || typeof data !== "object") return null;
+  const episodes = (data as Record<string, unknown>).episodes;
+  if (!episodes || typeof episodes !== "object") return null;
+  const seasons = Object.keys(episodes as Record<string, unknown>)
+    .map((key) => Number(key))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  for (const season of seasons) {
+    const list = (episodes as Record<string, unknown>)[String(season)];
+    if (!Array.isArray(list)) continue;
+    const sorted = [...list].sort((a, b) => {
+      const ea = Number((a as Record<string, unknown>)?.episode_num ?? 0) || 0;
+      const eb = Number((b as Record<string, unknown>)?.episode_num ?? 0) || 0;
+      return ea - eb;
+    });
+    for (const ep of sorted) {
+      if (!ep || typeof ep !== "object") continue;
+      const id = Number((ep as Record<string, unknown>).id);
+      if (Number.isFinite(id) && id > 0) {
+        const ext = String((ep as Record<string, unknown>).container_extension ?? "");
+        return { id, ext };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Panel stream: verifies the PHP session (active plan required) and returns
  * the same-origin /php/stream.php proxy URL as both url and proxy.
  */
@@ -114,8 +147,26 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
     return NextResponse.json({ ok: false, reason: "plan-required", sources: [] }, { status: 403, headers: noStore });
   }
 
-  const params = new URLSearchParams({ type, id: String(id) });
-  if (ext) params.set("ext", ext);
+  /* Série sem episódio: o stream do painel é por EPISÓDIO (o id da série não
+     toca). Resolve para o primeiro episódio (menor temporada, menor número)
+     via get_series_info, para o play começar direto no S01E01. */
+  let streamId = id;
+  let streamExt = ext;
+  if (type === "series" && !season && !episode) {
+    const info = await phpApi("get_series_info", {
+      searchParams: { series_id: String(id) },
+      cookies: request.headers.get("cookie"),
+    });
+    const first = firstEpisode(info.data);
+    if (!first) {
+      return NextResponse.json({ ok: false, reason: "no-episodes", sources: [] }, { headers: noStore });
+    }
+    streamId = first.id;
+    streamExt = first.ext || streamExt;
+  }
+
+  const params = new URLSearchParams({ type, id: String(streamId) });
+  if (streamExt) params.set("ext", streamExt);
   if (type === "series") {
     if (season) params.set("season", season);
     if (episode) params.set("episode", episode);

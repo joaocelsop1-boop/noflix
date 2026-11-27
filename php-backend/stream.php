@@ -47,6 +47,16 @@ if ($panelHost === '' || $panelUser === '' || $panelPass === '') {
 $GLOBALS['panelHost'] = $panelHost;
 $GLOBALS['panelUser'] = $panelUser;
 $GLOBALS['panelPass'] = $panelPass;
+// URL real do painel (do admin) — a reescrita da playlist compara o host
+// das URLs do painel com ESTE host (e com o do proxy). Sem isso, a playlist
+// .m3u8 que vem do painel traz URLs do painel (glove77) que não batiam com
+// o host do proxy e voltavam diretas (credencial exposta + ao vivo falhando).
+$GLOBALS['panelRealHost'] = normalize_panel_url($settings['sigma_url'] ?? '');
+// Parâmetro que diz ao proxy qual painel usar (vem do admin). Só é usado
+// quando há proxy configurado; sem proxy, é vazio.
+$GLOBALS['panelParam'] = !empty($settings['panel_proxy'])
+    ? '?panel=' . urlencode(normalize_panel_url($settings['sigma_url'] ?? ''))
+    : '';
 
 $ALLOWED_TYPES = ['live', 'movie', 'series'];
 $ALLOWED_EXTS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm3u8', 'ts', 'mpg', 'mpeg', 'mp2t', 'm2ts', 'flv', 'wmv', '3gp', 'm4v', 'f4v', 'vob', 'asf', 'rm', 'rmvb', 'divx', 'ogv'];
@@ -69,7 +79,9 @@ function stream_content_type($ext) {
 
 function panel_stream_url($kind, $rest) {
     global $panelHost, $panelUser, $panelPass;
-    return $panelHost . '/' . $kind . '/' . rawurlencode($panelUser) . '/' . rawurlencode($panelPass) . '/' . $rest;
+    // ?panel=... diz ao proxy qual painel usar (URL do admin). O proxy lê,
+    // usa como destino e remove o parâmetro antes de encaminhar.
+    return $panelHost . '/' . $kind . '/' . rawurlencode($panelUser) . '/' . rawurlencode($panelPass) . '/' . $rest . ($GLOBALS['panelParam'] ?? '');
 }
 
 // Valida o caminho reescrito (tipo/resto) — nunca aceita ".." nem caracteres estranhos
@@ -123,16 +135,25 @@ function resolve_url($uri, $base) {
 function rewrite_panel_uri($uri, $playlistUrl) {
     $abs = resolve_url($uri, $playlistUrl);
     $p = parse_url($abs);
-    $panel = parse_url($GLOBALS['panelHost']);
-    $hostOk = strtolower($p['host'] ?? '') === strtolower($panel['host'] ?? '');
-    // BUG: URL da playlist sem porta (ex.: http://host/live/...) tinha port
-    // null, e null == 80 e falso — a URI voltava direta, furando o proxy
-    // (credencial exposta e ao vivo falhando nesse painel). Porta ausente =
-    // porta padrao do esquema (80 http, 443 https).
+    // A URL do segmento pode ter o host do PROXY ou o host REAL do painel
+    // (a playlist vem do painel e traz URLs do painel). Aceita os dois —
+    // senão a URL voltava direta, com a senha exposta e o ao vivo falhando.
+    $hosts = [];
+    foreach ([$GLOBALS['panelHost'] ?? '', $GLOBALS['panelRealHost'] ?? ''] as $h) {
+        $hp = parse_url($h);
+        if (!empty($hp['host'])) {
+            $hosts[] = [
+                strtolower($hp['host']),
+                (int)($hp['port'] ?? (($hp['scheme'] ?? 'http') === 'https' ? 443 : 80)),
+            ];
+        }
+    }
     $pPort = $p['port'] ?? (($p['scheme'] ?? 'http') === 'https' ? 443 : 80);
-    $panelPort = $panel['port'] ?? (($panel['scheme'] ?? 'http') === 'https' ? 443 : 80);
-    $portOk = ((int)$pPort === (int)$panelPort);
-    if (!$hostOk || !$portOk) return $abs; // URL externa (CDN etc.): deixa como está
+    $match = false;
+    foreach ($hosts as [$hh, $pp]) {
+        if (strtolower($p['host'] ?? '') === $hh && (int)$pPort === $pp) { $match = true; break; }
+    }
+    if (!$match) return $abs; // URL externa (CDN etc.): deixa como está
     $path = $p['path'] ?? '';
     // tira /tipo/usuario/senha/ do começo — a senha nunca volta p/ o navegador
     if (!preg_match('#^/(live|movie|series)/[^/]+/[^/]+/(.+)$#', $path, $m)) {
