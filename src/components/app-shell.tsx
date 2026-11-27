@@ -9,6 +9,36 @@ import { SearchOverlay } from "@/components/search-overlay";
 import { SoundNotice } from "@/components/sound-notice";
 import { CloudSync } from "@/components/cloud-sync";
 import { useStore } from "@/components/store";
+import { ChatIcon } from "@/components/icons";
+import { supportUrl } from "@/lib/support";
+import { usePanelMe } from "@/lib/use-panel-me";
+
+/* tudo26: botão flutuante de suporte — SEMPRE visível, em todas as
+   páginas (o botão ficava escondido dentro do menu do perfil, atrás de
+   um clique). Só aparece quando há contato preenchido no admin (regra
+   atual — não inventa contato): WhatsApp verde, Telegram azul. */
+function SupportFloat() {
+  const { me } = usePanelMe();
+  const url = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
+  if (!url) return null;
+  const isWhatsApp = url.includes("wa.me");
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Falar com o suporte"
+      title="Falar com o suporte"
+      className="fixed bottom-5 right-5 z-[130] grid h-14 w-14 place-items-center rounded-full shadow-2xl transition-transform hover:scale-105"
+      style={{
+        backgroundColor: isWhatsApp ? "#25d366" : "#229ED9",
+        color: isWhatsApp ? "#06281a" : "#fff",
+      }}
+    >
+      <ChatIcon width={26} height={26} />
+    </a>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { hydrated, profile, setProfile, toasts } = useStore();
@@ -30,6 +60,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
         )}
       </AnimatePresence>
+
+      <SupportFloat />
 
       <SoundNotice />
       <TitleModal />

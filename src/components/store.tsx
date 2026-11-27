@@ -71,6 +71,16 @@ export type WatchProgress = {
   /** total length in seconds */
   duration?: number;
   updated: number;
+  /** tudo26: metadados para a fileira "Continuar assistindo" (Netflix) —
+     sem eles a fileira não sabe nem o nome do título que parou. O player
+     grava junto com a posição; títulos antigos sem metadados não aparecem
+     na fileira (o progresso deles continua valendo para retomar). */
+  name?: string;
+  kind?: "movie" | "series";
+  /** título do painel: tipo + id para montar a URL de retomada */
+  panelType?: "movie" | "series" | "live";
+  panelId?: number;
+  year?: number;
 };
 
 type Toast = { id: number; message: string };
@@ -263,6 +273,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setProgress = useCallback((slug: string, value: WatchProgress) => {
     setProgressState((current) => {
+      /* tudo26: terminou (>= 97%)? Sai do "Continuar assistindo" — não há
+         mais nada para continuar. O progresso de retomada some junto. */
+      if (value.percent >= 0.97) {
+        if (!(slug in current)) return current;
+        const next = { ...current };
+        delete next[slug];
+        write("nf.progress", next);
+        return next;
+      }
       const next = { ...current, [slug]: value };
       write("nf.progress", next);
       return next;

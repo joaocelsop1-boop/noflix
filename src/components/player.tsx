@@ -42,6 +42,9 @@ import { anilistIdFor } from "@/lib/anime-ids";
 import { NativePlayer, type NativeSource } from "@/components/native-player";
 import {apiUrl, appUrl} from "@/lib/paths";
 import { PlanGate } from "@/components/plan-gate";
+import { PanelPosterCard } from "@/components/panel-home";
+import type { TmdbCastMember } from "@/lib/tmdb-types";
+import type { CatalogueEntry } from "@/lib/catalogue";
 import { fetchPanelMe, fetchPanelInfo } from "@/lib/panel";
 import type { Season, Title } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -131,6 +134,44 @@ function nextEpisodeOf(seasons: Season[], season: number, episode: number) {
   return first ? { season: nextSeason.number, episode: first.number } : null;
 }
 
+/** tudo26: minutos -> "1h17" / "45 min" (aviso de filme errado). */
+function formatMinutes(min: number): string {
+  if (min >= 60) return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
+  return `${min} min`;
+}
+
+/* tudo26: um membro do elenco — foto redonda (via /api/img) ou círculo
+   com a inicial quando não há foto; nome + personagem. */
+function CastMember({ member }: { member: TmdbCastMember }) {
+  const [photoBroken, setPhotoBroken] = useState(false);
+  const initial = member.name.trim().charAt(0).toUpperCase();
+  return (
+    <div className="w-[88px] shrink-0 text-center">
+      <div className="mx-auto grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-white/10 ring-1 ring-white/10">
+        {member.photo && !photoBroken ? (
+          <img
+            src={apiUrl(`/api/img?u=${encodeURIComponent(member.photo)}`)}
+            alt={member.name}
+            loading="lazy"
+            className="h-full w-full object-cover"
+            onError={() => setPhotoBroken(true)}
+          />
+        ) : (
+          <span className="text-xl font-bold text-white/70">{initial}</span>
+        )}
+      </div>
+      <p className="mt-2 line-clamp-2 text-[12.5px] font-semibold leading-tight text-white/90">
+        {member.name}
+      </p>
+      {member.character && (
+        <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-tight text-white/50">
+          {member.character}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Player({
   title,
   initialSeason,
@@ -138,6 +179,9 @@ export function Player({
   seasons,
   episodePicked,
   artwork,
+  similarCategory,
+  similarGenre,
+  cast,
 }: {
   title: Title;
   initialSeason: number;
@@ -146,6 +190,13 @@ export function Player({
   artwork?: { poster?: string; backdrop?: string };
   /** a URL já trouxe temporada+episódio (?s=&e=): deep link, próximo episódio — toca direto */
   episodePicked?: boolean;
+  /** tudo26: "Mais como este" — id da categoria do painel (filmes) */
+  similarCategory?: string;
+  /** tudo26: "Mais como este" — id de gênero TMDB (séries) */
+  similarGenre?: number;
+  /** tudo26: "Elenco" — créditos do TMDB (foto, ator, personagem).
+      Só vem no detalhe dos títulos do painel (details=true). */
+  cast?: TmdbCastMember[];
 }) {
   const router = useRouter();
   const { setProgress, progress, toast, settings, updateSettings } = useStore();
@@ -425,6 +476,50 @@ export function Player({
      marcava coverBroken=true e a imagem boa do TMDB, que chegava depois,
      nunca era tentada. */
   useEffect(() => setCoverBroken(false), [title.slug, detailCover]);
+  /* tudo26: pôster VERTICAL do detalhe (igual à demonstração: pôster à
+     esquerda do título). É o poster do TMDB, não o backdrop. */
+  const detailPoster =
+    artwork?.poster ?? tmdbDetail?.poster ?? panelMeta.cover ?? movieMeta.cover;
+  const [posterBroken, setPosterBroken] = useState(false);
+  useEffect(() => setPosterBroken(false), [title.slug, detailPoster]);
+  /* tudo26: duração do vídeo muito diferente da esperada = outro filme com
+     o mesmo nome tocando (o painel pode ter o arquivo errado). Avisa uma
+     vez por título, sem travar a reprodução. */
+  const [durationMismatch, setDurationMismatch] = useState<{
+    expectedMin: number;
+    actualMin: number;
+  } | null>(null);
+  const mismatchChecked = useRef(false);
+  useEffect(() => {
+    mismatchChecked.current = false;
+    setDurationMismatch(null);
+  }, [title.slug]);
+  /* tudo26: "Mais como este" — títulos do painel da mesma categoria/gênero
+     (dados reais do painel, nunca inventados). */
+  const [similar, setSimilar] = useState<CatalogueEntry[]>([]);
+  useEffect(() => {
+    if (!isPanelTitle || (!similarCategory && !similarGenre)) return;
+    let alive = true;
+    const params = new URLSearchParams({
+      tab: title.kind === "series" ? "series" : "movie",
+      limit: "12",
+    });
+    if (similarCategory) params.set("category", similarCategory);
+    else if (similarGenre) params.set("genre", String(similarGenre));
+    void fetch(apiUrl(`/api/catalogue?${params.toString()}`), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive || !data) return;
+        const list = (Array.isArray(data.results) ? data.results : []) as CatalogueEntry[];
+        setSimilar(
+          list.filter((e) => e.panel?.id !== title.panel?.id).slice(0, 12),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [isPanelTitle, similarCategory, similarGenre, title.kind, title.panel?.id]);
   /* temporada exibida no sheet (null = segue a temporada que está tocando) */
   const [sheetSeason, setSheetSeason] = useState<number | null>(null);
   const [chrome, setChrome] = useState(true);
@@ -747,6 +842,11 @@ export function Player({
    * bounce a perfectly good stream through every provider in the list.
    */
   const hardFallback = useCallback(() => {
+    /* tudo26: títulos do painel NUNCA usam embed — o timer de 12s do
+       iframe (que nunca renderiza aqui) disparava o hardFallback e os
+       avisos "O frameXTV não respondeu — tentando VidLink…" pipocavam
+       durante a reprodução do painel, sem motivo. */
+    if (isPanelTitle) return false;
     const candidate = playOrder(title).find(
       (id) => id !== player && canPlay(id, title, anilistId) && !tried.current.has(id),
     );
@@ -756,10 +856,12 @@ export function Player({
     setPlayer(candidate);
     toast(`O ${playerMeta(player).label} não respondeu — tentando ${playerMeta(candidate).label}`);
     return true;
-  }, [player, title, toast, anilistId]);
+  }, [player, title, toast, anilistId, isPanelTitle]);
 
   /** Manual "next server": ignores the tried set so it always does something. */
   const cycleServer = useCallback(() => {
+    /* tudo26: títulos do painel só têm o servidor do painel. */
+    if (isPanelTitle) return;
     const chain = playOrder(title).filter((id) => canPlay(id, title, anilistId));
     if (chain.length < 2) {
       toast("Esta é a única fonte para este título");
@@ -770,7 +872,7 @@ export function Player({
     setPlayer(next);
     setMenu(false);
     toast(`Tocando de ${playerMeta(next).label}`);
-  }, [player, title, toast, anilistId]);
+  }, [player, title, toast, anilistId, isPanelTitle]);
 
   /** the server the "try another" button will switch to */
   const nextUp = useMemo(() => {
@@ -780,7 +882,8 @@ export function Player({
   }, [title, player, anilistId]);
 
   useEffect(() => {
-    if (nativeActive) {
+    /* tudo26: títulos do painel não têm "outro servidor" para sugerir. */
+    if (nativeActive || isPanelTitle) {
       setStalled(false);
       return;
     }
@@ -791,7 +894,7 @@ export function Player({
       if (!playingRef.current) setStalled(true);
     }, 12000);
     return () => window.clearTimeout(timer);
-  }, [src, nativeActive, playing]);
+  }, [src, nativeActive, playing, isPanelTitle]);
 
   /* per-source reset: cheap, so switching feels instant */
   useEffect(() => {
@@ -808,12 +911,16 @@ export function Player({
     clearPauseTimer();
 
     /* a frame that never even loads is the only failure we can see across
-       origins — give embeds 12s before moving on by ourselves */
+       origins — give embeds 12s before moving on by ourselves.
+       tudo26: títulos do painel (e o player próprio ativo) NUNCA renderizam
+       o iframe — sem o guarda, o timer disparava o hardFallback a cada 12s
+       e os avisos de embed falhando pipocavam durante o filme do painel. */
+    if (isPanelTitle || nativeActive) return;
     const slow = window.setTimeout(() => {
       if (!loadedRef.current) hardFallback();
     }, 12000);
     return () => window.clearTimeout(slow);
-  }, [src, hardFallback]);
+  }, [src, hardFallback, isPanelTitle, nativeActive]);
 
   /* ------------------------------------------------------------- telemetry */
 
@@ -876,6 +983,13 @@ export function Player({
           seconds: current,
           duration: total,
           updated: now,
+          /* tudo26: metadados para a fileira "Continuar assistindo" — sem
+             eles, a fileira não sabe nem o nome do título que parou. */
+          name: displayName,
+          kind: title.kind,
+          panelType: title.panel?.type,
+          panelId: title.panel?.id,
+          year: title.year > 0 ? title.year : undefined,
         });
       }
     };
@@ -997,6 +1111,45 @@ export function Player({
     setNonce((n) => n + 1);
   };
 
+  /* tudo26: o vídeo é outro filme — busca o título certo no painel (o
+     título do TMDB que o detalhe mostra) e abre o primeiro com id
+     diferente do atual. Sem match, avisa em vez de trocar no escuro. */
+  const [findingCorrect, setFindingCorrect] = useState(false);
+  const findCorrectTitle = useCallback(async () => {
+    const wanted = (tmdbDetail?.title ?? displayName).trim();
+    if (!wanted || findingCorrect) return;
+    setFindingCorrect(true);
+    try {
+      const res = await fetch(
+        apiUrl(
+          `/api/catalogue?tab=${title.kind === "series" ? "series" : "movie"}&q=${encodeURIComponent(wanted)}&limit=10`,
+        ),
+        { cache: "no-store" },
+      );
+      const data = (await res.json().catch(() => null)) as {
+        results?: CatalogueEntry[];
+      } | null;
+      const list = Array.isArray(data?.results) ? data.results : [];
+      const other = list.find((e) => e.panel?.id !== title.panel?.id);
+      if (other?.panel) {
+        const cleaned = cleanTitle(other.name);
+        const y = other.year ?? cleaned.year;
+        router.push(
+          appUrl(
+            `/play/0?panel=1&type=${other.panel.type}&id=${other.panel.id}&title=${encodeURIComponent(cleaned.title)}${y ? `&year=${y}` : ""}`,
+          ),
+        );
+        setDurationMismatch(null);
+      } else {
+        toast("Não achei outro título com esse nome no painel");
+      }
+    } catch {
+      toast("Não consegui buscar no painel agora");
+    } finally {
+      setFindingCorrect(false);
+    }
+  }, [tmdbDetail?.title, displayName, title.kind, title.panel?.id, findingCorrect, router, toast]);
+
   const showChrome = chrome || menu || Boolean(upNext);
   const showRail = paused && playing && !upNext && showSuggestions && suggestions.length > 0;
   const activePlayer = playerMeta(player);
@@ -1102,49 +1255,65 @@ export function Player({
 
           {/* Conteúdo */}
           <div className="relative mx-auto -mt-20 w-full max-w-[880px] px-4 pb-12 sm:-mt-24 md:px-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#e50914]">
-              {title.kind === "series" ? "Série" : "Filme"}
-            </p>
-            <h1 className="mt-1 text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[1.1]">
-              {displayName}
-            </h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/60">
-              {detailYear ? <span>{detailYear}</span> : null}
-              {detailRating ? (
-                <span className="flex items-center gap-1 font-semibold text-white">
-                  <span className="text-[#ffc107]">★</span>
-                  {detailRating.toFixed(1)}
-                </span>
+            {/* tudo26: pôster vertical à esquerda do título, igual à demonstração */}
+            <div className="flex gap-4 md:gap-6">
+              {detailPoster && !posterBroken ? (
+                <div className="w-[104px] shrink-0 sm:w-[130px] md:w-[160px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={apiUrl(`/api/img?u=${encodeURIComponent(detailPoster)}`)}
+                    alt={displayName}
+                    onError={() => setPosterBroken(true)}
+                    className="aspect-[2/3] w-full rounded-lg object-cover ring-1 ring-white/10"
+                  />
+                </div>
               ) : null}
-              {detailGenre ? <span>{detailGenre}</span> : null}
-              {detailDuration ? <span>{detailDuration} min</span> : null}
-              {title.kind === "series" && allSeasons.length > 0 && (
-                <span>
-                  {allSeasons.length} {allSeasons.length === 1 ? "temporada" : "temporadas"}
-                </span>
-              )}
-            </p>
-            {detailSynopsis ? (
-              <div className="mt-3 max-w-[640px]">
-                <p
-                  className={cn(
-                    "text-[14px] leading-relaxed text-white/75",
-                    !synopsisExpanded && "line-clamp-2",
-                  )}
-                >
-                  {detailSynopsis}
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#e50914]">
+                  {title.kind === "series" ? "Série" : "Filme"}
                 </p>
-                {detailSynopsis.length > 180 && (
-                  <button
-                    type="button"
-                    onClick={() => setSynopsisExpanded((v) => !v)}
-                    className="mt-1 text-[13px] font-semibold text-white/90 underline-offset-2 hover:underline"
-                  >
-                    {synopsisExpanded ? "Ler menos" : "Ler mais"}
-                  </button>
-                )}
+                <h1 className="mt-1 text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[1.1]">
+                  {displayName}
+                </h1>
+                <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/60">
+                  {detailYear ? <span>{detailYear}</span> : null}
+                  {detailRating ? (
+                    <span className="flex items-center gap-1 font-semibold text-white">
+                      <span className="text-[#ffc107]">★</span>
+                      {detailRating.toFixed(1)}
+                    </span>
+                  ) : null}
+                  {detailGenre ? <span>{detailGenre}</span> : null}
+                  {detailDuration ? <span>{detailDuration} min</span> : null}
+                  {title.kind === "series" && allSeasons.length > 0 && (
+                    <span>
+                      {allSeasons.length} {allSeasons.length === 1 ? "temporada" : "temporadas"}
+                    </span>
+                  )}
+                </p>
+                {detailSynopsis ? (
+                  <div className="mt-3 max-w-[640px]">
+                    <p
+                      className={cn(
+                        "text-[14px] leading-relaxed text-white/75",
+                        !synopsisExpanded && "line-clamp-2",
+                      )}
+                    >
+                      {detailSynopsis}
+                    </p>
+                    {detailSynopsis.length > 180 && (
+                      <button
+                        type="button"
+                        onClick={() => setSynopsisExpanded((v) => !v)}
+                        className="mt-1 text-[13px] font-semibold text-white/90 underline-offset-2 hover:underline"
+                      >
+                        {synopsisExpanded ? "Ler menos" : "Ler mais"}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
 
             {title.kind === "movie" ? (
               /* filme: CTA vermelho em pílula + estágio 16:9 com a imagem
@@ -1316,6 +1485,36 @@ export function Player({
                 )}
               </>
             )}
+            {/* tudo26: "Elenco" — créditos do TMDB (foto, ator, personagem).
+                Só aparece quando o TMDB devolve elenco; sem inventar. */}
+            {cast && cast.length > 0 && (
+              <section className="mt-10">
+                <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] md:text-[19px]">
+                  Elenco
+                </h2>
+                <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {cast.map((member) => (
+                    <CastMember key={member.name} member={member} />
+                  ))}
+                </div>
+              </section>
+            )}
+            {/* tudo26: "Mais como este" — títulos reais do painel, da mesma
+                categoria/gênero. Só aparece quando há pelo menos 3. */}
+            {similar.length >= 3 && (
+              <section className="mt-10">
+                <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] md:text-[19px]">
+                  Mais como este
+                </h2>
+                <div className="mt-3 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {similar.map((entry) => (
+                    <div key={entry.key} className="shrink-0 snap-start">
+                      <PanelPosterCard entry={entry} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}
@@ -1369,6 +1568,24 @@ export function Player({
           startAt={startAt}
           onTick={({ current, total }) => {
             if (!total) return;
+            /* tudo26: o vídeo que está tocando tem duração muito diferente
+               da do filme do detalhe? É outro filme com o mesmo nome (o
+               arquivo do painel é o do filme errado). Avisa uma vez, sem
+               parar o vídeo — o usuário decide. Só para filmes do painel
+               com duração esperada conhecida. */
+            if (
+              isPanelTitle &&
+              title.kind === "movie" &&
+              detailDuration &&
+              !mismatchChecked.current
+            ) {
+              const actualMin = Math.round(total / 60);
+              const diff = Math.abs(actualMin - detailDuration);
+              if (diff > 20 && diff > detailDuration * 0.25) {
+                mismatchChecked.current = true;
+                setDurationMismatch({ expectedMin: detailDuration, actualMin });
+              }
+            }
             setProgress(title.slug, {
               season: title.kind === "series" ? season : 1,
               episode: title.kind === "series" ? episode : 1,
@@ -1376,6 +1593,12 @@ export function Player({
               seconds: current,
               duration: total,
               updated: Date.now(),
+              /* tudo26: metadados para a fileira "Continuar assistindo". */
+              name: displayName,
+              kind: title.kind,
+              panelType: title.panel?.type,
+              panelId: title.panel?.id,
+              year: title.year > 0 ? title.year : undefined,
             });
           }}
           onEnded={() => {
@@ -1396,6 +1619,40 @@ export function Player({
             toast("O player CinePlus não começou — usando um servidor de reserva");
           }}
         />
+      )}
+
+      {/* tudo26: aviso de filme errado — a duração do vídeo não bate com
+          a do filme do detalhe. Não trava nada; o usuário decide. */}
+      {picked && durationMismatch && (
+        <div className="absolute inset-x-0 top-16 z-40 flex justify-center px-4 md:top-20">
+          <div className="pointer-events-auto w-full max-w-[520px] rounded-xl border border-amber-400/40 bg-[#1a1405]/95 p-4 shadow-2xl backdrop-blur">
+            <p className="text-[13px] font-semibold text-amber-200">
+              Este vídeo parece ser outro filme
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-white/70">
+              A duração do vídeo ({formatMinutes(durationMismatch.actualMin)}) não bate
+              com a do filme ({formatMinutes(durationMismatch.expectedMin)}). O arquivo
+              do painel pode ser de outro título com o mesmo nome.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={findCorrectTitle}
+                disabled={findingCorrect}
+                className="rounded-full bg-[#e50914] px-4 py-2 text-[12.5px] font-bold text-white transition disabled:opacity-60"
+              >
+                {findingCorrect ? "Buscando…" : "Buscar o título certo"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDurationMismatch(null)}
+                className="rounded-full border border-white/20 px-4 py-2 text-[12.5px] font-semibold text-white/85 transition hover:border-white/50"
+              >
+                Continuar assistindo
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {picked && !nativeActive && !isPanelTitle && mounted && aniState !== "pending" && (
@@ -1419,7 +1676,7 @@ export function Player({
 
       {/* loaded but nothing playing: an explicit way out, never automatic */}
       <AnimatePresence>
-        {stalled && !nativeActive && nextUp && (
+        {stalled && !nativeActive && !isPanelTitle && nextUp && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

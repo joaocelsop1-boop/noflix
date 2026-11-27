@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { Player } from "@/components/player";
-import { resolveTmdbMeta } from "@/lib/tmdb";
+import { phpApi } from "@/lib/php";
+import { resolveTmdbMeta, tmdbGenreId } from "@/lib/tmdb";
 import { cleanTitle } from "@/lib/title-clean";
 import { seasonsFor } from "@/lib/catalog";
 import { animeInfo, animeSeasons, movieInfo, realSeasons, seriesInfo } from "@/lib/seasons";
@@ -37,6 +39,8 @@ export default async function PlayPage({
     /** season / episode to open on (deep links, "next episode") */
     s?: string;
     e?: string;
+    /** tudo26: "Continuar assistindo" — retoma o filme direto, sem o detalhe */
+    resume?: string;
     /** título do painel (outro agente): /play/0?panel=1&type=live&id=..&title=.. */
     panel?: string;
     type?: string;
@@ -60,11 +64,50 @@ export default async function PlayPage({
     const rawTitle = query.title?.slice(0, 120) ?? `Canal ${panelId}`;
     const cleaned = cleanTitle(rawTitle);
     const displayName = cleaned.title || rawTitle;
-    const year = cleaned.year ?? (Number(query.year) || 0);
+    /* tudo26: o painel é a verdade sobre o ARQUIVO — o get_vod_info traz
+       o ano de lançamento e a duração reais do arquivo. O ano do catálogo
+       pode estar errado ("A Noiva!" com ano 2005 no catálogo mas o arquivo
+       é o filme de 2025, 126 min): resolver o TMDB com o ano errado casa
+       o filme errado ("A Noiva Cadáver", 77 min). Com o ano e a duração
+       certos, o resolve casa o filme certo — e a duração ainda serve de
+       checagem (o resolve rejeita match com duração muito diferente).
+       Fail open: painel fora ou lento (6s) → usa o ano da URL, sem duração. */
+    let panelYear: number | undefined;
+    let panelDuration: number | undefined;
+    let similarCategory: string | undefined;
+    if (panelType === "movie") {
+      try {
+        const cookieHeader = (await cookies()).toString();
+        const info = await phpApi("get_vod_info", {
+          cookies: cookieHeader,
+          searchParams: { vod_id: String(panelId) },
+          timeoutMs: 6000,
+        });
+        const data = (info.data ?? {}) as Record<string, unknown>;
+        const metaInfo = (data.info ?? {}) as Record<string, unknown>;
+        const movieData = (data.movie_data ?? {}) as Record<string, unknown>;
+        const relYear = Number(String(metaInfo.releaseDate ?? "").slice(0, 4)) || undefined;
+        if (relYear && relYear >= 1900 && relYear <= 2100) panelYear = relYear;
+        const rawDur = metaInfo.duration_secs ?? metaInfo.duration;
+        if (typeof rawDur === "number" && rawDur > 0) {
+          panelDuration = rawDur > 600 ? Math.round(rawDur / 60) : Math.round(rawDur);
+        } else if (typeof rawDur === "string" && rawDur.includes(":")) {
+          const parts = rawDur.split(":").map(Number);
+          if (parts.length === 3 && parts.every(Number.isFinite)) {
+            panelDuration = parts[0] * 60 + parts[1];
+          }
+        }
+        const catId = String(movieData.category_id ?? "").trim();
+        if (catId) similarCategory = catId;
+      } catch {
+        /* painel fora — segue com o ano da URL */
+      }
+    }
+    const year = panelYear ?? cleaned.year ?? (Number(query.year) || 0);
     const meta =
       panelType === "live"
         ? null
-        : await resolveTmdbMeta({ key: `panel-${panelType}-${panelId}`, title: displayName, year, kind: panelType as "movie" | "series", details: true });
+        : await resolveTmdbMeta({ key: `panel-${panelType}-${panelId}`, title: displayName, year, kind: panelType as "movie" | "series", details: true, duration: panelDuration });
     const panelTitle: Title = {
       slug: `panel-${panelType}-${panelId}`,
       tmdbId: meta?.tmdbId ?? 0,
@@ -89,17 +132,22 @@ export default async function PlayPage({
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
       runtime: meta?.runtime,
     };
+    const similarGenre =
+      meta?.genres?.[0] ? tmdbGenreId(meta.genres[0]) : undefined;
     return (
       <Player
         title={panelTitle}
         initialSeason={Math.max(Number(query.s) || 1, 1)}
         initialEpisode={Math.max(Number(query.e) || 1, 1)}
         seasons={[]}
-        episodePicked={Boolean(query.s || query.e)}
+        episodePicked={Boolean(query.s || query.e || query.resume === "1")}
         artwork={{
           poster: meta?.poster,
           backdrop: meta?.backdrop,
         }}
+        similarCategory={similarCategory}
+        similarGenre={similarGenre}
+        cast={meta?.cast}
       />
     );
   }

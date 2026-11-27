@@ -104,8 +104,11 @@ export function Artwork({
             background: `radial-gradient(130% 100% at 20% 0%, ${accent}66 0%, #0c0c0c 58%, #050505 100%)`,
           }}
         >
+          {/* tudo26: era "Arte" quando o título não estava no catálogo
+              curado — o texto aparecia por cima do vídeo e do backdrop do
+              detalhe ("marca d'água ARTE"). Agora é sempre a marca. */}
           <span className="text-[8.5px] font-semibold uppercase tracking-[0.28em] text-white/45">
-            {hasRemotePoster(slug) ? "CinePlus" : "Arte"}
+            CinePlus
           </span>
           <span className="font-display text-[15px] leading-[1.05] tracking-wide text-white/90 [text-wrap:balance]">
             {name}

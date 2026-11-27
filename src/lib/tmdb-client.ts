@@ -71,12 +71,13 @@ async function flush(): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        items: batch.map(({ key, title, year, kind, details }) => ({
+        items: batch.map(({ key, title, year, kind, details, duration }) => ({
           key,
           title,
           year,
           kind,
           details,
+          duration,
         })),
       }),
     });

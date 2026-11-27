@@ -72,7 +72,8 @@ function HeroThumb({
       <img
         src={src}
         alt=""
-        loading="lazy"
+        loading="eager"
+        fetchPriority="high"
         onError={() => setBroken(true)}
         className="h-full w-full object-cover"
       />
@@ -83,7 +84,6 @@ function HeroThumb({
 export type PanelHomeData = {
   movies: CatalogueEntry[];
   series: CatalogueEntry[];
-  anime: CatalogueEntry[];
   /** Filmes da categoria "Lancamentos" do painel — prioridade do herói. */
   heroMovies: CatalogueEntry[];
   /** 10 séries em destaque (Lancamentos, Pedidos, Netflix, na ordem do painel). */
@@ -214,10 +214,11 @@ export async function fetchPanelHomeData(): Promise<{
 }> {
   const me = await fetchPanelMe();
   if (!me?.loggedIn) return { loggedIn: false, data: null };
-  const [movies, series, anime, heroMovies] = await Promise.all([
+  /* tudo26: sem buscar anime na home (a fileira saiu; a aba Anime busca
+     sozinha quando aberta). Uma chamada a menos no painel = home mais rápida. */
+  const [movies, series, heroMovies] = await Promise.all([
     fetchCatalogueTab("movie", 72),
     fetchCatalogueTab("series", 72),
-    fetchCatalogueTab("anime", 36),
     fetchLancamentosMovies(),
   ]);
   if (movies.length === 0 && series.length === 0) return { loggedIn: true, data: null };
@@ -225,7 +226,7 @@ export async function fetchPanelHomeData(): Promise<{
     fetchTop10("movie", ["lancamentos", "pedidos", "cinema"], movies),
     fetchTop10("series", ["lancamentos", "pedidos", "netflix"], series),
   ]);
-  return { loggedIn: true, data: { movies, series, anime, heroMovies, topSeries, topMovies } };
+  return { loggedIn: true, data: { movies, series, heroMovies, topSeries, topMovies } };
 }
 
 function panelPlayUrl(entry: CatalogueEntry): string {
@@ -247,12 +248,31 @@ function panelPlayUrl(entry: CatalogueEntry): string {
  * (O painel não manda áudio por título, então não há selo DUBLADO/LEGENDADO
  * — mostrar um seria inventar dado.)
  */
-function PanelPosterCard({
+/* tudo26: minutos restantes -> "Faltam 45 min" / "Faltam 1h05". */
+function formatRemaining(seconds?: number, duration?: number): string | undefined {
+  if (seconds === undefined || !duration || duration <= seconds) return undefined;
+  const left = Math.max(0, Math.round((duration - seconds) / 60));
+  if (left <= 0) return undefined;
+  if (left >= 60) return `Faltam ${Math.floor(left / 60)}h${String(left % 60).padStart(2, "0")}`;
+  return `Faltam ${left} min`;
+}
+
+export function PanelPosterCard({
   entry,
   showCaption = true,
+  /* tudo26: "Continuar assistindo" — barra de progresso vermelha na base
+     do pôster (estilo Netflix) + texto de onde parou. */
+  progress,
+  progressLabel,
+  /* tudo26: URL de play custom (retomada com ?s=&e= ou &resume=1). Sem
+     ela, usa a URL padrão do painel. */
+  playUrl,
 }: {
   entry: CatalogueEntry;
   showCaption?: boolean;
+  progress?: number;
+  progressLabel?: string;
+  playUrl?: string;
 }) {
   const router = useRouter();
   /* tudo24: dados de exibição do TMDB (capa, nota) por cima do painel —
@@ -275,11 +295,12 @@ function PanelPosterCard({
      marcava broken=true e o pôster bom do TMDB, que chegava depois,
      nunca era tentado. */
   useEffect(() => setBroken(false), [img]);
+  const pct = typeof progress === "number" ? Math.min(1, Math.max(0, progress)) : undefined;
   return (
     <div className="w-[var(--nf-card-w,186px)] shrink-0 snap-start">
       <button
         type="button"
-        onClick={() => router.push(panelPlayUrl(entry))}
+        onClick={() => router.push(playUrl ?? panelPlayUrl(entry))}
         className={cn(
           "group relative block w-full overflow-hidden rounded-lg bg-[#222] text-left ring-1 ring-white/5 transition-[transform,box-shadow,ring] duration-300 will-change-transform",
           "aspect-[2/3] hover:z-10 hover:scale-[1.05] hover:ring-white/30 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)]",
@@ -317,6 +338,12 @@ function PanelPosterCard({
             <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
           </span>
         </span>
+        {/* tudo26: barra de progresso (Netflix) — sempre visível quando há progresso */}
+        {pct !== undefined && (
+          <span className="absolute inset-x-0 bottom-0 z-10 h-[3px] bg-white/30">
+            <span className="block h-full bg-[#e50914]" style={{ width: `${Math.round(pct * 100)}%` }} />
+          </span>
+        )}
       </button>
       {showCaption && (
         <div className="mt-2 min-w-0 px-0.5">
@@ -333,8 +360,50 @@ function PanelPosterCard({
             {year ? <span>· {year}</span> : null}
             <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
           </p>
+          {progressLabel ? (
+            <p className="mt-0.5 truncate text-[11px] font-medium text-white/60">
+              {progressLabel}
+            </p>
+          ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * tudo26: legenda do Top 10 — nota e ano visíveis SOB o pôster, igual às
+ * outras fileiras. Fica fora do flex do numeral (o numeral alinha com a
+ * base do pôster, não com a legenda): o recuo é a posição da borda
+ * esquerda do pôster (numeral 64/86px − sobreposição 16/24px + padding
+ * 16/24px = 64px no celular, 86px no desktop). Usa o mesmo useTmdbMeta do
+ * cartão (mesma chave = cache compartilhado, sem chamada extra).
+ */
+function Top10Caption({ entry }: { entry: CatalogueEntry }) {
+  const meta: TmdbMeta | null | undefined = useTmdbMeta({
+    key: entry.key,
+    title: entry.name,
+    year: entry.year,
+    kind: entry.kind,
+  });
+  const displayName = cleanTitle(entry.name).title;
+  const rating = meta?.rating ?? entry.rating;
+  const year = entry.year ?? meta?.year;
+  return (
+    <div className="ml-16 mt-2 w-[var(--nf-card-w,186px)] min-w-0 px-0.5 md:ml-[86px]">
+      <p className="truncate text-[12.5px] font-medium leading-tight text-white/90">
+        {displayName}
+      </p>
+      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/50">
+        {rating ? (
+          <span className="flex items-center gap-0.5 font-semibold text-white/75">
+            <span className="text-[#ffc107]">★</span>
+            {rating.toFixed(1)}
+          </span>
+        ) : null}
+        {year ? <span>· {year}</span> : null}
+        <span>· {entry.kind === "series" ? "Série" : "Filme"}</span>
+      </p>
     </div>
   );
 }
@@ -422,14 +491,86 @@ function PanelTop10Row({
              cortado na borda; o pl-2 do tudo24 não bastou. Junto com o
              scroll-pl do ShelfStrip e as setas flutuantes, o numeral
              inteiro fica visível. */
-          <div key={entry.key} className="relative flex snap-start items-end pl-4 md:pl-6">
-            <span
-              aria-hidden
-              className="rank-numeral pointer-events-none -mr-4 w-[64px] shrink-0 select-none text-[92px] md:-mr-6 md:w-[86px] md:text-[122px]"
-            >
-              {i + 1}
-            </span>
-            <PanelPosterCard entry={entry} showCaption={false} />
+          <div key={entry.key} className="snap-start">
+            <div className="relative flex items-end pl-4 md:pl-6">
+              <span
+                aria-hidden
+                className="rank-numeral pointer-events-none -mr-4 w-[64px] shrink-0 select-none text-[92px] md:-mr-6 md:w-[86px] md:text-[122px]"
+              >
+                {i + 1}
+              </span>
+              <PanelPosterCard entry={entry} showCaption={false} />
+            </div>
+            <Top10Caption entry={entry} />
+          </div>
+        ))}
+      </ShelfStrip>
+    </section>
+  );
+}
+
+/**
+ * tudo26: "Continuar assistindo" estilo Netflix — na home, com os títulos
+ * que o cliente estava assistindo (o player salva a posição no aparelho),
+ * barra de progresso vermelha embaixo do pôster e retomada exata de onde
+ * parou (filme: o minuto; série: temporada/episódio + minuto). Só aparece
+ * quando há algo para continuar (2%–97%). Títulos sem metadados (progresso
+ * gravado antes do tudo26) não aparecem na fileira — o progresso deles
+ * continua valendo para retomar quando o título é aberto.
+ */
+function PanelContinueRow() {
+  const { progress } = useStore();
+  const items = useMemo(() => {
+    return Object.entries(progress)
+      .filter(([, pr]) => pr.panelId && pr.name && pr.panelType !== "live" && pr.percent >= 0.02 && pr.percent < 0.97)
+      .sort((a, b) => (b[1].updated ?? 0) - (a[1].updated ?? 0))
+      .slice(0, 12)
+      .map(([slug, pr]) => {
+        const kind = pr.kind === "series" ? "series" : "movie";
+        const type = pr.panelType ?? kind;
+        const entry: CatalogueEntry = {
+          key: slug,
+          tmdbId: 0,
+          kind,
+          name: pr.name ?? "",
+          year: pr.year,
+          genres: [],
+          panel: { type, id: pr.panelId ?? 0 },
+        };
+        const left = formatRemaining(pr.seconds, pr.duration);
+        const label =
+          kind === "series"
+            ? `S${pr.season} E${pr.episode}${left ? ` · ${left}` : ""}`
+            : (left ?? `${Math.round(pr.percent * 100)}% assistido`);
+        const base = panelPlayUrl(entry);
+        /* série: ?s=&e= abre o episódio certo direto; filme: &resume=1
+           pula o detalhe e retoma no minuto. O player lê o progresso pelo
+           slug e volta na posição salva. */
+        const url =
+          kind === "series" ? `${base}&s=${pr.season}&e=${pr.episode}` : `${base}&resume=1`;
+        return { entry, pr, label, url };
+      });
+  }, [progress]);
+  if (items.length === 0) return null;
+  return (
+    <section className="row-shell nf-rise group/row relative py-3 md:py-4">
+      <div className="mb-2 flex items-baseline gap-3 px-4 md:px-12">
+        <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] transition-colors hover:text-white md:text-[19px]">
+          Continuar assistindo
+        </h2>
+        <span className="hidden text-[11px] uppercase tracking-[0.16em] text-white/35 sm:block">
+          Continue de onde parou
+        </span>
+      </div>
+      <ShelfStrip label="Continuar assistindo">
+        {items.map(({ entry, pr, label, url }) => (
+          <div key={entry.key} className="snap-start">
+            <PanelPosterCard
+              entry={entry}
+              progress={pr.percent}
+              progressLabel={label}
+              playUrl={url}
+            />
           </div>
         ))}
       </ShelfStrip>
@@ -508,6 +649,10 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
     return () => window.clearTimeout(t);
   }, [index, slides.length]);
 
+  /* tudo26: sinopse do herói com "Ler mais/Ler menos" (antes era cortada
+     no meio da frase com "…" e não tinha como expandir). */
+  const [heroOverviewExpanded, setHeroOverviewExpanded] = useState(false);
+  useEffect(() => setHeroOverviewExpanded(false), [index, slides.length]);
   const active = slides[Math.min(index, slides.length - 1)] ?? slides[0];
   const activeMeta: TmdbMeta | null | undefined = active ? metas.get(active.key) : undefined;
   /* tudo24: cadeia de fallback do backdrop — TMDB primeiro, painel depois.
@@ -543,6 +688,7 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
           key={`bg-${active.key}`}
           src={bg}
           alt=""
+          fetchPriority="high"
           onError={() => {
             if (bgIdx < bgCandidates.length - 1) {
               setBgIdx((i) => i + 1);
@@ -594,9 +740,25 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
             </span>
           </div>
           {displayOverview ? (
-            <p className="mt-4 line-clamp-2 max-w-[520px] text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]">
-              {displayOverview}
-            </p>
+            <div className="mt-4 max-w-[520px]">
+              <p
+                className={cn(
+                  "text-[13.5px] leading-relaxed text-white/85 [text-shadow:0_2px_10px_rgba(0,0,0,0.8)] md:text-[15px]",
+                  !heroOverviewExpanded && "line-clamp-2",
+                )}
+              >
+                {displayOverview}
+              </p>
+              {displayOverview.length > 180 && (
+                <button
+                  type="button"
+                  onClick={() => setHeroOverviewExpanded((v) => !v)}
+                  className="mt-1 text-[13px] font-semibold text-white/90 underline-offset-2 hover:underline"
+                >
+                  {heroOverviewExpanded ? "Ler menos" : "Ler mais"}
+                </button>
+              )}
+            </div>
           ) : null}
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <button
@@ -635,9 +797,11 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
 }
 
 /**
- * Início com o conteúdo DO PAINEL: herói + Filmes + Séries (+ Anime) vindos
- * do servidor do usuário. Nenhum título do catálogo curado (TMDB) aparece
- * aqui. Minha Lista / Continuar assistindo continuam vindo da loja local.
+ * Início com o conteúdo DO PAINEL: herói + Filmes + Séries vindos do
+ * servidor do usuário (tudo26: a fileira de Anime saiu da home — os animes
+ * continuam na aba Anime e na busca). Nenhum título do catálogo curado
+ * (TMDB) aparece aqui. Minha Lista / Continuar assistindo continuam vindo
+ * da loja local.
  */
 export function PanelHome({ data }: { data: PanelHomeData }) {
   const { myList, profile } = useStore();
@@ -649,12 +813,21 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
     return {
       movies: safe(data.movies),
       series: safe(data.series),
-      anime: safe(data.anime),
       heroMovies: safe(data.heroMovies),
       topSeries: safe(data.topSeries),
       topMovies: safe(data.topMovies),
     };
   }, [data, kids]);
+
+  // tudo26: fileira de CAPAS DE FILMES lá embaixo, no lugar da Anime:
+  // "Lançamentos" = categoria Lançamentos do próprio painel (a mesma do
+  // herói, até 24 capas). Se o painel não tiver essa categoria, cai para
+  // os primeiros filmes do painel ("Mais filmes") — nunca fica vazio.
+  const lancamentosRow = useMemo(() => {
+    if (visible.heroMovies.length > 0)
+      return { title: "Lançamentos", entries: visible.heroMovies };
+    return { title: "Mais filmes", entries: visible.movies.slice(0, 20) };
+  }, [visible]);
 
   // Herói: Lançamentos do painel primeiro, depois o resto dos filmes.
   const heroEntries = useMemo(() => {
@@ -679,6 +852,10 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
             elas tampavam o topo do Top 10). As fileiras começam abaixo
             do herói; as bolinhas têm espaço próprio dentro dele. */}
         <div className="relative z-10 pb-10">
+          {/* tudo26: "Continuar assistindo" LOGO ABAIXO DO HERÓI, no topo
+              da home (igual à Netflix) — o cliente vê de cara quando entra.
+              Só aparece quando há algo para continuar. */}
+          <PanelContinueRow />
           <PanelTop10Row title="Top 10 Filmes" href={appUrl("/movies")} entries={visible.topMovies} />
           <PanelTop10Row title="Top 10 Séries" href={appUrl("/tv-shows")} entries={visible.topSeries} />
 
@@ -705,12 +882,17 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
             href={appUrl("/tv-shows")}
             entries={visible.series}
           />
+          {/* tudo26: fileira de Anime REMOVIDA da home (títulos feios,
+              "ANIME SE BEBE", "Skye Hoshi" 3x...). Os animes continuam na
+              aba Anime e na busca — só não aparecem mais na home. No lugar
+              dela, lá embaixo, uma fileira de CAPAS DE FILMES ("Lançamentos",
+              categoria do próprio painel) — o espaço não fica vazio. */}
           <PanelRow
-            id="panel-anime"
-            title="Anime"
-            hint={`${visible.anime.length.toLocaleString("pt-BR")} animes do seu servidor`}
-            href={appUrl("/anime")}
-            entries={visible.anime}
+            id="panel-lancamentos"
+            title={lancamentosRow.title}
+            hint="Filmes novos do seu servidor"
+            href={appUrl("/movies")}
+            entries={lancamentosRow.entries}
           />
         </div>
       </main>

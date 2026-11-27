@@ -33,7 +33,7 @@ const SCRIPT = `(function(){
   } catch (e) {
     /* private mode: still show it, the CSS timeout below cleans up */
   }
-  window.setTimeout(kill, 2500);
+  window.setTimeout(kill, 1500); /* tudo26: intro 2,5s -> 1,5s (menos tela preta a cada navegação) */
 })();`;
 
 export function BootIntro() {

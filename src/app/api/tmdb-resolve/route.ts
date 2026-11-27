@@ -36,6 +36,7 @@ export async function POST(request: Request) {
           year: typeof it.year === "number" ? it.year : undefined,
           kind: it.kind === "series" ? "series" : "movie",
           details: Boolean(it.details),
+          duration: typeof it.duration === "number" ? it.duration : undefined,
         });
       } catch {
         results[key] = null;

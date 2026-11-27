@@ -18,7 +18,6 @@ type Mode = "login" | "register";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
-  const [checking, setChecking] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,18 +41,18 @@ export default function LoginPage() {
     }
   }, []);
 
+  /* tudo26: o formulário renderiza IMEDIATO — antes a página mostrava
+     só uma tela preta com spinner até o fetchPanelMe resolver (vários
+     segundos de preto a cada abertura). A checagem de "já logado" roda em
+     segundo plano e só redireciona se estiver logado. */
   useEffect(() => {
     let alive = true;
     void fetchPanelMe()
       .then((me) => {
         if (!alive) return;
         if (me?.loggedIn) router.replace(afterAuth());
-        else setChecking(false);
       })
-      // tudo24: se a checagem falhar, sai do spinner em vez de travar nele.
-      .catch(() => {
-        if (alive) setChecking(false);
-      });
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -97,14 +96,6 @@ export default function LoginPage() {
       setBusy(false);
     }
   };
-
-  if (checking) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-black">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[#e50914]" />
-      </main>
-    );
-  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#07080f] px-4 py-10">

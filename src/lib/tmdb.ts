@@ -29,7 +29,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { cleanTitle } from "@/lib/title-clean";
 import { TMDB_API_KEY, isBearerToken } from "@/lib/tmdb-key";
-import type { TmdbMeta, TmdbRef } from "@/lib/tmdb-types";
+import type { TmdbCastMember, TmdbMeta, TmdbRef } from "@/lib/tmdb-types";
 
 const TMDB_API = "https://api.themoviedb.org/3";
 const CACHE_DIR = path.join(process.cwd(), ".tmdb-cache");
@@ -42,7 +42,7 @@ const MAX_CONCURRENT = 6;
  * tudo25: era 60 — baixo demais, casava o filme errado (pôster de outro
  * título no lugar certo). Com 75, só entra match com título bem próximo
  * E ano compatível. */
-const MIN_SCORE = 75;
+export const MIN_SCORE = 75;
 
 /** id de gênero TMDB → nome em português (ids estáveis do TMDB). */
 const GENRE_NAME = new Map<number, string>([
@@ -94,8 +94,9 @@ function norm(s: string): string {
     .trim();
 }
 
-/** Quão bem o candidato do TMDB casa com o título do painel (0–110). */
-function scoreMatch(
+/** Quão bem o candidato do TMDB casa com o título do painel (0–110).
+    Exportado para o teste de lógica (tudo26) — função pura. */
+export function scoreMatch(
   query: string,
   queryYear: number | undefined,
   candTitle: string,
@@ -116,6 +117,20 @@ function scoreMatch(
     if (hits === qw.length) score = 65;
     else if (hits > 0) score = 40 + Math.round((hits / qw.length) * 20);
     else return 0;
+  }
+  /* tudo26: candidato com palavras a mais que a busca é OUTRO título
+     ("A Noiva Cadáver" não é "A Noiva!") — mesmo com o ano igual, um
+     prefixo/substring com palavra extra não pode passar no MIN_SCORE.
+     Capa a pontuação de título em 60 (com o bônus de ano dá 70 < 75). */
+  const tWords = new Set(t.split(" ").filter(Boolean));
+  const qWords = q.split(" ").filter(Boolean);
+  if (
+    qWords.length > 0 &&
+    qWords.every((w) => tWords.has(w)) &&
+    tWords.size > qWords.length &&
+    score > 60
+  ) {
+    score = 60;
   }
   const cy = candDate ? Number(candDate.slice(0, 4)) : NaN;
   if (queryYear && Number.isFinite(cy)) {
@@ -218,7 +233,50 @@ async function fetchRuntime(
   return typeof ep === "number" && ep > 0 ? ep : undefined;
 }
 
-function toMeta(item: SearchItem, runtime?: number): TmdbMeta {
+/**
+ * tudo26: créditos do TMDB -> elenco principal (até 10, em ordem de
+ * destaque). Função pura, exportada para o teste de lógica: sem foto ou
+ * sem personagem, o membro continua (a tela mostra inicial/nome); sem
+ * nome, descarta. Sem elenco, devolve undefined (a seção não aparece).
+ */
+export function parseCastMembers(
+  raw: unknown,
+): TmdbCastMember[] | undefined {
+  const list = (raw as { cast?: unknown })?.cast;
+  if (!Array.isArray(list)) return undefined;
+  const out: TmdbCastMember[] = [];
+  for (const entry of list) {
+    const c = entry as { name?: unknown; character?: unknown; profile_path?: unknown };
+    if (typeof c?.name !== "string" || !c.name.trim()) continue;
+    out.push({
+      name: c.name.trim(),
+      character:
+        typeof c.character === "string" && c.character.trim()
+          ? c.character.trim()
+          : undefined,
+      photo:
+        typeof c.profile_path === "string" && c.profile_path
+          ? `https://image.tmdb.org/t/p/w185${c.profile_path}`
+          : undefined,
+    });
+    if (out.length >= 10) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** Créditos do TMDB (/movie|tv/{id}/credits) — fail open. */
+async function fetchCast(
+  id: number,
+  type: "movie" | "tv",
+  key: string,
+): Promise<TmdbCastMember[] | undefined> {
+  const data = await limited(() =>
+    tmdbFetch(`/${type}/${id}/credits`, { language: "pt-BR" }, key),
+  );
+  return parseCastMembers(data);
+}
+
+function toMeta(item: SearchItem, runtime?: number, cast?: TmdbCastMember[]): TmdbMeta {
   const title = item.title ?? item.name ?? item.original_title ?? item.original_name ?? "";
   return {
     tmdbId: item.id,
@@ -237,6 +295,7 @@ function toMeta(item: SearchItem, runtime?: number): TmdbMeta {
       .filter((g): g is string => Boolean(g))
       .slice(0, 4),
     runtime,
+    cast,
     year: Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4)) || undefined,
   };
 }
@@ -248,12 +307,36 @@ function titleVariant(title: string): string {
   return title.replace(/^\d+[\s:.-]+/, "").trim();
 }
 
+/**
+ * tudo26: a duração do TMDB diverge muito da do arquivo do painel?
+ * (mesmo nome, filme errado — ex.: painel diz 126 min, TMDB diz 77 min).
+ * Sem duração do painel ou sem runtime do TMDB, não rejeita (fail open).
+ * Função pura, exportada para o teste de lógica.
+ */
+export function runtimeMismatch(
+  panelDuration: number | undefined,
+  runtime: number | undefined,
+): boolean {
+  return Boolean(
+    panelDuration &&
+      runtime &&
+      Math.abs(runtime - panelDuration) > 20 &&
+      Math.abs(runtime - panelDuration) > panelDuration * 0.25,
+  );
+}
+
 async function resolveFresh(
   title: string,
   year: number | undefined,
   kind: "movie" | "series",
   details: boolean,
   key: string,
+  /* tudo26: duração real do arquivo no painel, em minutos (get_vod_info).
+     O painel é a verdade sobre o ARQUIVO: se o match do TMDB tem duração
+     muito diferente, é outro filme com o mesmo nome ("A Noiva!" 2025 tem
+     126 min; "A Noiva Cadáver" 2005 tem 77 min) — rejeita e tenta a
+     próxima tentativa. */
+  panelDuration?: number,
 ): Promise<TmdbMeta | null> {
   const primary: "movie" | "tv" = kind === "series" ? "tv" : "movie";
   const secondary: "movie" | "tv" = primary === "movie" ? "tv" : "movie";
@@ -287,7 +370,17 @@ async function resolveFresh(
     }
     if (best && best.score >= MIN_SCORE) {
       const runtime = details ? await fetchRuntime(best.item.id, a.type, key) : undefined;
-      return toMeta(best.item, runtime);
+      /* tudo26: duração do TMDB muito diferente da do arquivo do painel
+         = filme errado com o mesmo nome. Rejeita e tenta a próxima
+         tentativa (sem ano, outro idioma...). */
+      if (runtimeMismatch(panelDuration, runtime)) {
+        continue;
+      }
+      /* tudo26: elenco — só no detalhe (details=true), junto com o
+         runtime, e só depois que o match passou no check de duração.
+         Vai no mesmo cache do resto (chave com "|d"). */
+      const cast = details ? await fetchCast(best.item.id, a.type, key) : undefined;
+      return toMeta(best.item, runtime, cast);
     }
   }
   return null;
@@ -351,6 +444,16 @@ async function writeDisk(cacheKey: string, meta: TmdbMeta | null): Promise<void>
   }
 }
 
+/** Nome do gênero em português -> id TMDB (para as recomendações do
+ * detalhe: o catálogo do painel filtra por id de gênero TMDB). */
+export function tmdbGenreId(name: string): number | undefined {
+  const wanted = name.trim().toLowerCase();
+  for (const [id, label] of GENRE_NAME) {
+    if (label.toLowerCase() === wanted) return id;
+  }
+  return undefined;
+}
+
 /**
  * Resolve os dados de exibição do TMDB para um título do painel.
  * Sem chave, sem match ou TMDB fora → null (fail open, a tela usa o painel).
@@ -375,7 +478,14 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
     return disk;
   }
 
-  const meta = await resolveFresh(title, year, ref.kind, ref.details ?? false, key);
+  const meta = await resolveFresh(
+    title,
+    year,
+    ref.kind,
+    ref.details ?? false,
+    key,
+    typeof ref.duration === "number" && ref.duration > 0 ? ref.duration : undefined,
+  );
   memSet(cacheKey, meta);
   await writeDisk(cacheKey, meta);
   return meta;
