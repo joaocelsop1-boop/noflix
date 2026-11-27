@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { artUrl } from "@/lib/img";
+import { apiUrl } from "@/lib/paths";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "@/components/store";
@@ -81,7 +82,7 @@ export function AudienceShelves() {
             limit: "20",
           });
           try {
-            const res = await fetch(`/api/catalogue?${params.toString()}`);
+            const res = await fetch(apiUrl(`/api/catalogue?${params.toString()}`));
             if (!res.ok) return [shelf.id, [] as Entry[]] as const;
             const payload = (await res.json()) as { results?: Entry[] };
             /* never trust the response alone: a kid-safe profile filters again */

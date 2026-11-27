@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { apiUrl } from "./paths";
 
 /**
  * Signing for the HLS proxy.
@@ -49,5 +50,5 @@ export function proxied(url: string, referer: string, expiresAt = Date.now() + S
     e: String(expiresAt),
     s: signStream(url, referer, expiresAt),
   });
-  return `/api/hls?${params.toString()}`;
+  return apiUrl(`/api/hls?${params.toString()}`);
 }

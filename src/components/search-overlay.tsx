@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { artUrl } from "@/lib/img";
+import { apiUrl } from "@/lib/paths";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { CloseIcon, SearchIcon } from "@/components/icons";
@@ -38,10 +39,10 @@ async function searchPanel(
   const q = encodeURIComponent(term);
   try {
     const [movies, series] = await Promise.all([
-      fetch(`/api/catalogue?tab=movie&q=${q}&limit=${limit}`, { cache: "no-store" }).then(
+      fetch(apiUrl(`/api/catalogue?tab=movie&q=${q}&limit=${limit}`), { cache: "no-store" }).then(
         (r) => (r.ok ? r.json() : null) as Promise<CatalogueResponse | null>,
       ),
-      fetch(`/api/catalogue?tab=series&q=${q}&limit=${limit}`, { cache: "no-store" }).then(
+      fetch(apiUrl(`/api/catalogue?tab=series&q=${q}&limit=${limit}`), { cache: "no-store" }).then(
         (r) => (r.ok ? r.json() : null) as Promise<CatalogueResponse | null>,
       ),
     ]);
@@ -94,10 +95,10 @@ export function SearchOverlay() {
         void searchPanel("", 8).then((items) => setTop(items.slice(0, 8)));
         // Categorias do painel (filmes + séries) para o grid de exploração.
         void Promise.all([
-          fetch("/api/panel/categories?kind=movie", { cache: "no-store" }).then((r) =>
+          fetch(apiUrl("/api/panel/categories?kind=movie"), { cache: "no-store" }).then((r) =>
             r.ok ? r.json() : null,
           ),
-          fetch("/api/panel/categories?kind=series", { cache: "no-store" }).then((r) =>
+          fetch(apiUrl("/api/panel/categories?kind=series"), { cache: "no-store" }).then((r) =>
             r.ok ? r.json() : null,
           ),
         ]).then(([movies, series]) => {

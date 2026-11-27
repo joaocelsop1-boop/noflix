@@ -529,6 +529,7 @@ switch ($action) {
                 'success' => true, 'ok' => true, 'mode' => $gw, 'order_id' => (int)$existing['id'],
                 'amount' => (float)$existing['amount'], 'plan_name' => $plan['name'],
                 'qr_code' => $existing['pix_code'], 'qr_code_base64' => $existing['pix_qr_url'] ?: null,
+                'pix_code' => $existing['pix_code'], 'pix_qr_url' => $existing['pix_qr_url'] ?: null,
                 'pix_key' => ($settings['pix_key'] ?? '') ?: null,
                 'pix_fixed_code' => ($settings['pix_fixed_code'] ?? '') ?: null,
                 'pix_fixed_qr' => ($settings['pix_fixed_qr'] ?? '') ?: null,
@@ -545,6 +546,7 @@ switch ($action) {
                 'success' => true, 'ok' => true, 'mode' => 'manual', 'order_id' => $orderId,
                 'amount' => (float)$plan['price'], 'plan_name' => $plan['name'],
                 'qr_code' => null, 'qr_code_base64' => null,
+                'pix_code' => null, 'pix_qr_url' => null,
                 'pix_key' => ($settings['pix_key'] ?? '') ?: null,
                 'pix_fixed_code' => ($settings['pix_fixed_code'] ?? '') ?: null,
                 'pix_fixed_qr' => ($settings['pix_fixed_qr'] ?? '') ?: null,
@@ -577,6 +579,7 @@ switch ($action) {
             'success' => true, 'ok' => true, 'mode' => $gw, 'order_id' => $orderId,
             'amount' => (float)$plan['price'], 'plan_name' => $plan['name'],
             'qr_code' => $qrCode, 'qr_code_base64' => $qrB64 ?: null,
+            'pix_code' => $qrCode, 'pix_qr_url' => $qrB64 ?: null,
             'pix_key' => null,
             'pix_fixed_code' => null, 'pix_fixed_qr' => null, 'pix_beneficiary' => null,
         ]);

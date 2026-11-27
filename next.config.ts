@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // O app vive em cineplus.shop/app (o site de vendas fica na raiz):
+  // todas as rotas, assets e APIs do app passam a ser /app/*. O Next.js
+  // prefixa o basePath sozinho em Link/router/redirect/usePathname; fetch,
+  // window.location e URLs devolvidas ao cliente usam src/lib/paths.ts.
+  basePath: "/app",
   // Allow the sandbox preview host(s) to talk to the dev server without
   // Next.js rejecting the request as a cross-origin dev request.
   allowedDevOrigins: ["*.e2b.app", "*.arena.ai", "localhost:3000", "127.0.0.1:3000"],

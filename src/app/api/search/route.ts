@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiUrl } from "@/lib/paths";
 
 /**
  * GET /api/search?q=
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
   const cookie = request.headers.get("cookie") ?? "";
   const base = new URL(request.url);
   const fetchTab = async (tab: string) => {
-    const url = new URL("/api/catalogue", base);
+    const url = new URL(apiUrl("/api/catalogue"), base);
     url.searchParams.set("tab", tab);
     url.searchParams.set("q", q);
     url.searchParams.set("limit", "24");

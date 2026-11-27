@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Wordmark } from "@/components/wordmark";
 import { fetchPanelMe, panelLogin, panelRegister } from "@/lib/panel";
+import { appUrl } from "@/lib/paths";
 
 type Mode = "login" | "register";
 
@@ -29,7 +30,7 @@ export default function LoginPage() {
   /* destino após entrar: /planos com o plano do site de vendas, ou /browse */
   const afterAuth = () => {
     const plano = new URLSearchParams(window.location.search).get("plano");
-    return plano ? `/planos?plano=${encodeURIComponent(plano)}` : "/browse";
+    return plano ? appUrl(`/planos?plano=${encodeURIComponent(plano)}`) : appUrl("/browse");
   };
 
   useEffect(() => {

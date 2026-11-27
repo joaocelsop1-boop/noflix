@@ -7,6 +7,8 @@
  * backend PHP nem nas rotas de API do servidor.
  */
 
+import { apiUrl } from "./paths";
+
 export type PanelUser = {
   id: number;
   name: string;
@@ -38,6 +40,9 @@ export type PanelOrder = {
   order_id?: number | string;
   pix_code?: string;
   pix_qr_url?: string;
+  /** Nomes crus do PHP (create_order): o front mapeia para pix_code/pix_qr_url */
+  qr_code?: string | null;
+  qr_code_base64?: string | null;
   amount?: number;
   plan_name?: string;
   /** Pix fixo (manual): chave, copia e cola, QR e beneficiário do admin */
@@ -136,7 +141,7 @@ async function readJson<T>(res: Response): Promise<T | null> {
 
 export async function fetchPanelMe(): Promise<PanelMe | null> {
   try {
-    const res = await fetch("/api/panel/me", { cache: "no-store" });
+    const res = await fetch(apiUrl("/api/panel/me"), { cache: "no-store" });
     if (!res.ok) return null;
     return await readJson<PanelMe>(res);
   } catch {
@@ -148,7 +153,7 @@ export async function panelLogin(
   email: string,
   password: string,
 ): Promise<{ ok: boolean; error?: string; user?: PanelUser; canWatch?: boolean }> {
-  const res = await fetch("/api/panel/login", {
+  const res = await fetch(apiUrl("/api/panel/login"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -167,7 +172,7 @@ export async function panelRegister(input: {
   password: string;
   whatsapp?: string;
 }): Promise<{ ok: boolean; error?: string; user?: PanelUser }> {
-  const res = await fetch("/api/panel/register", {
+  const res = await fetch(apiUrl("/api/panel/register"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -180,14 +185,14 @@ export async function panelRegister(input: {
 
 export async function panelLogout(): Promise<void> {
   try {
-    await fetch("/api/panel/logout", { method: "POST" });
+    await fetch(apiUrl("/api/panel/logout"), { method: "POST" });
   } catch {
     /* sair localmente mesmo se a rota falhar */
   }
 }
 
 export async function fetchPanelPlans(): Promise<PanelPlan[]> {
-  const res = await fetch("/api/panel/plans", { cache: "no-store" });
+  const res = await fetch(apiUrl("/api/panel/plans"), { cache: "no-store" });
   const data = (await readJson<{ plans?: PanelPlan[] } | PanelPlan[]>(res)) ?? {};
   return Array.isArray(data) ? data : data.plans ?? [];
 }
@@ -200,7 +205,7 @@ export async function fetchPanelCatalog(
   if (opts?.category_id) params.set("category_id", opts.category_id);
   if (opts?.limit) params.set("limit", String(opts.limit));
   if (opts?.offset) params.set("offset", String(opts.offset));
-  const res = await fetch(`/api/panel/catalog?${params.toString()}`, { cache: "no-store" });
+  const res = await fetch(apiUrl(`/api/panel/catalog?${params.toString()}`), { cache: "no-store" });
   if (!res.ok) return [];
   return normalizePanelCatalog(await readJson(res), kind);
 }
@@ -209,14 +214,14 @@ export async function fetchPanelInfo(
   type: "movie" | "series",
   id: number,
 ): Promise<Record<string, unknown> | null> {
-  const res = await fetch(`/api/panel/info?type=${type}&id=${id}`, { cache: "no-store" });
+  const res = await fetch(apiUrl(`/api/panel/info?type=${type}&id=${id}`), { cache: "no-store" });
   if (!res.ok) return null;
   return await readJson<Record<string, unknown>>(res);
 }
 
 export async function fetchPanelEpg(streamId: number): Promise<PanelEpgProgramme[]> {
   try {
-    const res = await fetch(`/api/panel/epg?stream_id=${streamId}`, { cache: "no-store" });
+    const res = await fetch(apiUrl(`/api/panel/epg?stream_id=${streamId}`), { cache: "no-store" });
     if (!res.ok) return [];
     const data = (await readJson<unknown>(res)) as
       | { programmes?: unknown[]; epg?: unknown[] }
@@ -240,7 +245,7 @@ export async function createPanelOrder(
   planId: number,
   whatsapp?: string,
 ): Promise<PanelOrder> {
-  const res = await fetch("/api/panel/order", {
+  const res = await fetch(apiUrl("/api/panel/order"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ plan_id: planId, whatsapp: whatsapp || undefined }),
@@ -254,10 +259,22 @@ export async function createPanelOrder(
   if (!res.ok && !data.error && !data.message) {
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
   }
+  // BUG do tudo6: o PHP devolve o Pix como qr_code / qr_code_base64 e o
+  // front só lia pix_code / pix_qr_url — o gateway CRIava o Pix, o pedido
+  // ficava ok, mas QR e copia e cola NUNCA apareciam na tela. Mapeia os
+  // nomes do PHP para os do front quando os pix_* não vierem.
+  const nonEmpty = (v: unknown): string | undefined =>
+    typeof v === "string" && v.trim() !== "" ? v : undefined;
+  const errorMsg =
+    nonEmpty(data.error) ??
+    nonEmpty(data.message) ??
+    (!ok ? "Não foi possível criar o pedido. Tente novamente." : undefined);
   return {
     ...data,
     ok: Boolean(ok),
-    error: data.error ?? (typeof data.message === "string" ? data.message : undefined),
+    error: errorMsg,
+    pix_code: nonEmpty(data.pix_code) ?? nonEmpty(data.qr_code),
+    pix_qr_url: nonEmpty(data.pix_qr_url) ?? nonEmpty(data.qr_code_base64),
   };
 }
 
@@ -265,7 +282,7 @@ export async function fetchPanelOrderStatus(
   orderId: number | string,
 ): Promise<PanelOrderStatus | null> {
   try {
-    const res = await fetch(`/api/panel/order-status?order_id=${orderId}`, { cache: "no-store" });
+    const res = await fetch(apiUrl(`/api/panel/order-status?order_id=${orderId}`), { cache: "no-store" });
     if (!res.ok) return null;
     return await readJson<PanelOrderStatus>(res);
   } catch {

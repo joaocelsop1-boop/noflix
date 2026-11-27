@@ -2,6 +2,7 @@ import { titles } from "@/data/titles";
 import { generatedArt } from "@/data/generated";
 import type { Genre, Season, Title } from "@/lib/types";
 import { allowedFor } from "@/lib/avatars";
+import { appUrl } from "./paths";
 
 export const allTitles = titles;
 
@@ -37,11 +38,11 @@ export function getTitle(slug: string): Title | undefined {
 }
 
 export function posterSrc(slug: string) {
-  return generatedArt[slug]?.poster ?? `/img/posters/${slug}.webp`;
+  return generatedArt[slug]?.poster ?? appUrl(`/img/posters/${slug}.webp`);
 }
 
 export function backdropSrc(slug: string) {
-  return generatedArt[slug]?.backdrop ?? `/img/backdrops/${slug}.webp`;
+  return generatedArt[slug]?.backdrop ?? appUrl(`/img/backdrops/${slug}.webp`);
 }
 
 export function formatRuntime(minutes?: number) {

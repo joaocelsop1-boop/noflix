@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { artUrl } from "@/lib/img";
+import { apiUrl } from "@/lib/paths";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -104,7 +105,7 @@ export function LiveCatalogue({
         if (kids) params.set("kids", "1");
         if (audienceId !== "all") params.set("audience", audienceId);
 
-        const res = await fetch(`/api/catalogue?${params.toString()}`);
+        const res = await fetch(apiUrl(`/api/catalogue?${params.toString()}`));
         const data = (await res.json()) as {
           results?: Entry[];
           total?: number;
@@ -131,7 +132,7 @@ export function LiveCatalogue({
   /* categorias do painel da aba atual — o que o painel manda, na ordem dele */
   useEffect(() => {
     let alive = true;
-    void fetch(`/api/panel/categories?kind=${tab}`, { cache: "no-store" })
+    void fetch(apiUrl(`/api/panel/categories?kind=${tab}`), { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!alive) return;

@@ -1,3 +1,4 @@
+import { apiUrl } from "./paths";
 /**
  * Artwork URL helper.
  *
@@ -15,5 +16,5 @@
 export function artUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   if (!/^https?:\/\//i.test(url)) return url;
-  return `/api/img?u=${encodeURIComponent(url)}`;
+  return apiUrl(`/api/img?u=${encodeURIComponent(url)}`);
 }

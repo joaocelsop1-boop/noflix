@@ -27,7 +27,7 @@ const SCRIPT = `(function(){
   try {
     var seen = sessionStorage.getItem('nf.intro');
     var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var player = /^\\/(watch|play)(\\/|$)/.test(location.pathname);
+    var player = /^\\/(?:app\\/)?(watch|play)(\\/|$)/.test(location.pathname);
     if (seen || calm || player) { kill(); return; }
     sessionStorage.setItem('nf.intro', '1');
   } catch (e) {

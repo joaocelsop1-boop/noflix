@@ -59,7 +59,12 @@ async function isLoggedIn(request: NextRequest): Promise<boolean | null> {
 export async function middleware(request: NextRequest) {
   const loggedIn = await isLoggedIn(request);
   if (loggedIn === false) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // O redirect cru perderia o basePath (/app) e cairia na raiz (o site).
+    // O pathname do NextURL NÃO leva o basePath: ele é prefixado na hora de
+    // formatar a URL — pôr "/app/login" aqui duplicava para /app/app/login.
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
   // loggedIn === null means the panel could not be reached: let it through.
   return NextResponse.next();

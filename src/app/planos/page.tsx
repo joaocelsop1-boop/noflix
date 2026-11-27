@@ -116,7 +116,8 @@ export default function PlanosPage() {
     const result = await createPanelOrder(plan.id);
     setOrdering(null);
     if (!result.ok) {
-      setOrderError(result.error ?? "Não foi possível criar o pedido.");
+      // || em vez de ?? — "" ?? x devolve "" e a tela ficava sem erro nenhum.
+      setOrderError(result.error || "Não foi possível criar o pedido. Tente novamente.");
       setOrderPlan(null);
       return;
     }

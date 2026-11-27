@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { hasRemotePoster, localBackdrops, localPosters, remotePoster } from "@/data/artwork";
 import { backdropSrc, posterSrc } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
+import { apiUrl } from "@/lib/paths";
 
 type ArtworkProps = {
   slug: string;
@@ -43,7 +44,7 @@ export function Artwork({
 }: ArtworkProps) {
   const sources = useMemo(() => {
     const remote = remotePoster(slug);
-    const byTmdb = tmdbId ? `/api/img?tmdb=${tmdbId}&kind=${kind}` : null;
+    const byTmdb = tmdbId ? apiUrl(`/api/img?tmdb=${tmdbId}&kind=${kind}`) : null;
     const list: string[] = [];
 
     if (kind === "backdrop") {
@@ -65,7 +66,7 @@ export function Artwork({
   const [index, setIndex] = useState(0);
   const raw = sources[Math.min(index, sources.length - 1)];
   /* local /img/… paths are already ours; only remote art needs the proxy */
-  const src = /^https?:\/\//i.test(raw) ? `/api/img?u=${encodeURIComponent(raw)}` : raw;
+  const src = /^https?:\/\//i.test(raw) ? apiUrl(`/api/img?u=${encodeURIComponent(raw)}`) : raw;
 
   const failed = index >= sources.length;
 

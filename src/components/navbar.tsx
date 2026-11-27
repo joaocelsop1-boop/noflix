@@ -12,6 +12,7 @@ import { Wordmark } from "@/components/wordmark";
 import { ProfileAvatar } from "@/components/avatar";
 import { cn } from "@/lib/cn";
 import { artUrl } from "@/lib/img";
+import { apiUrl } from "@/lib/paths";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const links = [
@@ -69,7 +70,7 @@ export function Navbar() {
   useEffect(() => {
     if (menu !== "bell" || notifLoaded) return;
     let alive = true;
-    void fetch("/api/catalogue?tab=movie&limit=3", { cache: "no-store" })
+    void fetch(apiUrl("/api/catalogue?tab=movie&limit=3"), { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { results?: CatalogueEntry[] } | null) => {
         if (!alive) return;

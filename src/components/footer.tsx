@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/paths";
 
 const columns = [
   [
@@ -36,10 +37,10 @@ export function Footer() {
   useEffect(() => {
     let alive = true;
     void Promise.all([
-      fetch("/api/panel/categories?kind=movie", { cache: "no-store" }).then((r) =>
+      fetch(apiUrl("/api/panel/categories?kind=movie"), { cache: "no-store" }).then((r) =>
         r.ok ? r.json() : null,
       ),
-      fetch("/api/panel/categories?kind=series", { cache: "no-store" }).then((r) =>
+      fetch(apiUrl("/api/panel/categories?kind=series"), { cache: "no-store" }).then((r) =>
         r.ok ? r.json() : null,
       ),
     ])

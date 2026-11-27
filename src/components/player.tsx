@@ -37,6 +37,7 @@ import {
 } from "@/lib/players";
 import { anilistIdFor } from "@/lib/anime-ids";
 import { NativePlayer, type NativeSource } from "@/components/native-player";
+import { apiUrl } from "@/lib/paths";
 import { PlanGate } from "@/components/plan-gate";
 import { fetchPanelMe, fetchPanelInfo } from "@/lib/panel";
 import type { Season, Title } from "@/lib/types";
@@ -313,7 +314,7 @@ export function Player({
         params.set("season", String(season));
         params.set("episode", String(episode));
       }
-      void fetch(`/api/stream?${params.toString()}`)
+      void fetch(apiUrl(`/api/stream?${params.toString()}`))
         .then(async (res) => {
           if (res.status === 403) {
             const data = (await res.json().catch(() => null)) as {
@@ -383,7 +384,7 @@ export function Player({
       episode: String(episode),
     });
 
-    void fetch(`/api/stream?${params.toString()}`)
+    void fetch(apiUrl(`/api/stream?${params.toString()}`))
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { ok?: boolean; sources?: NativeSource[] } | null) => {
         if (!alive) return;

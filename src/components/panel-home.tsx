@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { artUrl } from "@/lib/img";
+import { apiUrl } from "@/lib/paths";
 import { fetchPanelMe } from "@/lib/panel";
 import { cn } from "@/lib/cn";
 import { Footer } from "@/components/footer";
@@ -18,6 +19,12 @@ export type PanelHomeData = {
   movies: CatalogueEntry[];
   series: CatalogueEntry[];
   anime: CatalogueEntry[];
+  /** Filmes da categoria "Lancamentos" do painel — prioridade do herói. */
+  heroMovies: CatalogueEntry[];
+  /** 10 séries em destaque (Lancamentos, Pedidos, Netflix, na ordem do painel). */
+  topSeries: CatalogueEntry[];
+  /** 10 filmes em destaque (Lancamentos, Pedidos, Cinema, na ordem do painel). */
+  topMovies: CatalogueEntry[];
 };
 
 type CatalogueResponse = {
@@ -31,7 +38,7 @@ async function fetchCatalogueTab(
   limit: number,
 ): Promise<CatalogueEntry[]> {
   try {
-    const res = await fetch(`/api/catalogue?tab=${tab}&offset=0&limit=${limit}`, {
+    const res = await fetch(apiUrl(`/api/catalogue?tab=${tab}&offset=0&limit=${limit}`), {
       cache: "no-store",
     });
     if (!res.ok) return [];
@@ -40,6 +47,85 @@ async function fetchCatalogueTab(
   } catch {
     return [];
   }
+}
+
+type PanelCategoriesResponse = { categories?: { id: string; slug: string }[] };
+
+async function fetchCategoryIds(
+  kind: "movie" | "series",
+  slugs: string[],
+): Promise<string[]> {
+  try {
+    const res = await fetch(apiUrl(`/api/panel/categories?kind=${kind}`), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as PanelCategoriesResponse;
+    const list = Array.isArray(data.categories) ? data.categories : [];
+    return slugs
+      .map((slug) => list.find((c) => c.slug === slug)?.id)
+      .filter((id): id is string => Boolean(id));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchCatalogueCategory(
+  tab: "movie" | "series",
+  categoryId: string,
+  limit: number,
+): Promise<CatalogueEntry[]> {
+  try {
+    const res = await fetch(
+      apiUrl(`/api/catalogue?tab=${tab}&category=${encodeURIComponent(categoryId)}&offset=0&limit=${limit}`),
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as CatalogueResponse;
+    return Array.isArray(data.results) ? data.results : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Filmes da categoria "Lancamentos" do painel (prioridade do herói). */
+async function fetchLancamentosMovies(): Promise<CatalogueEntry[]> {
+  const [id] = await fetchCategoryIds("movie", ["lancamentos"]);
+  if (!id) return [];
+  return fetchCatalogueCategory("movie", id, 24);
+}
+
+/**
+ * Top 10 de uma aba: itens das categorias de maior destaque do painel, na
+ * ordem dos slugs dados — sem inventar título e sem TMDB. Completa com os
+ * itens do painel em ordem quando as categorias não rendem 10. A ordem é
+ * a do painel, não "mais assistidas" (o painel não manda visualizações).
+ * Filmes: Lancamentos, Pedidos, Cinema. Séries: Lancamentos, Pedidos, Netflix.
+ */
+async function fetchTop10(
+  kind: "movie" | "series",
+  slugs: string[],
+  fallback: CatalogueEntry[],
+): Promise<CatalogueEntry[]> {
+  const ids = await fetchCategoryIds(kind, slugs);
+  const seen = new Set<string>();
+  const out: CatalogueEntry[] = [];
+  const lists = await Promise.all(
+    ids.map((id) => fetchCatalogueCategory(kind === "movie" ? "movie" : "series", id, 10)),
+  );
+  for (const list of lists) {
+    for (const entry of list) {
+      if (seen.has(entry.key)) continue;
+      seen.add(entry.key);
+      out.push(entry);
+      if (out.length >= 10) return out;
+    }
+  }
+  for (const entry of fallback) {
+    if (out.length >= 10) break;
+    if (seen.has(entry.key)) continue;
+    seen.add(entry.key);
+    out.push(entry);
+  }
+  return out.slice(0, 10);
 }
 
 /**
@@ -54,13 +140,18 @@ export async function fetchPanelHomeData(): Promise<{
 }> {
   const me = await fetchPanelMe();
   if (!me?.loggedIn) return { loggedIn: false, data: null };
-  const [movies, series, anime] = await Promise.all([
+  const [movies, series, anime, heroMovies] = await Promise.all([
     fetchCatalogueTab("movie", 72),
     fetchCatalogueTab("series", 72),
     fetchCatalogueTab("anime", 36),
+    fetchLancamentosMovies(),
   ]);
   if (movies.length === 0 && series.length === 0) return { loggedIn: true, data: null };
-  return { loggedIn: true, data: { movies, series, anime } };
+  const [topMovies, topSeries] = await Promise.all([
+    fetchTop10("movie", ["lancamentos", "pedidos", "cinema"], movies),
+    fetchTop10("series", ["lancamentos", "pedidos", "netflix"], series),
+  ]);
+  return { loggedIn: true, data: { movies, series, anime, heroMovies, topSeries, topMovies } };
 }
 
 function panelPlayUrl(entry: CatalogueEntry): string {
@@ -167,15 +258,104 @@ function PanelRow({
   );
 }
 
+/**
+ * Top 10 do painel, estilo Netflix: número grande ao lado de cada capa
+ * (mesmo visual .rank-numeral do Top 10 de filmes). A ordem é a do painel
+ * — não é "mais assistidas", o painel não manda visualizações. Clique abre
+ * o play do título (na série, com o seletor de temporada/episódio).
+ */
+function PanelTop10Row({
+  title,
+  href,
+  entries,
+}: {
+  title: string;
+  href: string;
+  entries: CatalogueEntry[];
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <section className="row-shell nf-rise group/row relative py-3 md:py-4">
+      <div className="mb-2 flex items-baseline gap-3 px-4 md:px-12">
+        <h2 className="text-[15px] font-semibold tracking-wide text-[#e5e5e5] transition-colors hover:text-white md:text-[19px]">
+          {title}
+        </h2>
+        <span className="hidden text-[11px] uppercase tracking-[0.16em] text-white/35 sm:block">
+          em destaque no seu servidor
+        </span>
+        <Link
+          href={href}
+          className="ml-auto flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#54b9c5] opacity-0 transition-all duration-300 group-hover/row:opacity-100"
+        >
+          Explorar tudo
+          <ChevronRightIcon width={14} height={14} />
+        </Link>
+      </div>
+      <ShelfStrip label={title}>
+        {entries.map((entry, i) => (
+          <div key={entry.key} className="relative flex snap-start items-end">
+            <span
+              aria-hidden
+              className="rank-numeral pointer-events-none -mr-4 w-[64px] shrink-0 select-none text-[92px] md:-mr-6 md:w-[86px] md:text-[122px]"
+            >
+              {i + 1}
+            </span>
+            <PanelPosterCard entry={entry} />
+          </div>
+        ))}
+      </ShelfStrip>
+    </section>
+  );
+}
+
 const HERO_ROTATE_MS = 8000;
 
-/** Herói rotativo com os filmes do painel (nunca TMDB). */
+/** Herói rotativo com os filmes do painel (nunca TMDB).
+ *
+ * Prioridade: filmes da categoria "Lancamentos" do painel (as entradas já
+ * vêm nessa ordem). Cartaz morto (fenix7 404, slackewn 403...) não entra
+ * no carrossel: os cartazes dos candidatos são pré-carregados no cliente e
+ * os que falham caem fora; se o slide ativo quebrar, ele sai da lista e o
+ * próximo válido assume. O fallback gradiente+título fica para o caso de
+ * todos os cartazes falharem — o herói nunca fica vazio.
+ */
 function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
   const router = useRouter();
-  const slides = useMemo(
-    () => entries.filter((e) => e.backdrop || e.poster).slice(0, 6),
+  const candidates = useMemo(
+    () => entries.filter((e) => e.backdrop || e.poster),
     [entries],
   );
+  const [dead, setDead] = useState<ReadonlySet<string>>(new Set());
+  // Pré-carrega os cartazes dos 12 primeiros candidatos e tira da lista os
+  // que não carregam — sem travar a inicial: o primeiro slide aparece na
+  // hora e os mortos somem quando o preload responde.
+  useEffect(() => {
+    let alive = true;
+    for (const entry of candidates.slice(0, 12)) {
+      const url = artUrl(entry.backdrop ?? entry.poster);
+      if (!url) continue;
+      const img = new Image();
+      img.onload = () => {};
+      img.onerror = () => {
+        if (!alive) return;
+        setDead((prev) => {
+          if (prev.has(entry.key)) return prev;
+          const next = new Set(prev);
+          next.add(entry.key);
+          return next;
+        });
+      };
+      img.src = url;
+    }
+    return () => {
+      alive = false;
+    };
+  }, [candidates]);
+  const slides = useMemo(() => {
+    const valid = candidates.filter((e) => !dead.has(e.key));
+    // Tudo morto? Mostra o primeiro candidato com o fallback gradiente.
+    return valid.length > 0 ? valid.slice(0, 6) : candidates.slice(0, 1);
+  }, [candidates, dead]);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -187,7 +367,7 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
     return () => window.clearTimeout(t);
   }, [index, slides.length]);
 
-  const active = slides[index] ?? slides[0];
+  const active = slides[Math.min(index, slides.length - 1)] ?? slides[0];
   const [bgBroken, setBgBroken] = useState(false);
   useEffect(() => setBgBroken(false), [active?.key]);
   if (!active) return null;
@@ -201,7 +381,17 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
           key={`bg-${active.key}`}
           src={bg}
           alt=""
-          onError={() => setBgBroken(true)}
+          onError={() => {
+            setBgBroken(true);
+            // Cartaz morto no slide ativo: tira ele da lista e o próximo
+            // válido assume (o índice fica, a lista encolhe).
+            setDead((prev) => {
+              if (prev.has(active.key)) return prev;
+              const next = new Set(prev);
+              next.add(active.key);
+              return next;
+            });
+          }}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}
@@ -284,10 +474,23 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
       movies: safe(data.movies),
       series: safe(data.series),
       anime: safe(data.anime),
+      heroMovies: safe(data.heroMovies),
+      topSeries: safe(data.topSeries),
+      topMovies: safe(data.topMovies),
     };
   }, [data, kids]);
 
-  const heroEntries = visible.movies.length > 0 ? visible.movies : visible.series;
+  // Herói: Lançamentos do painel primeiro, depois o resto dos filmes.
+  const heroEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const out: CatalogueEntry[] = [];
+    for (const entry of [...visible.heroMovies, ...visible.movies]) {
+      if (seen.has(entry.key)) continue;
+      seen.add(entry.key);
+      out.push(entry);
+    }
+    return out.length > 0 ? out : visible.series;
+  }, [visible]);
 
   return (
     <>
@@ -296,6 +499,9 @@ export function PanelHome({ data }: { data: PanelHomeData }) {
         <PanelHero entries={heroEntries} />
 
         <div className="relative z-10 -mt-[9vh] pb-10">
+          <PanelTop10Row title="Top 10 Filmes" href="/movies" entries={visible.topMovies} />
+          <PanelTop10Row title="Top 10 Séries" href="/tv-shows" entries={visible.topSeries} />
+
           {myList.length > 0 && (
             <ContinueRow
               slugs={myList.slice(0, 12)}

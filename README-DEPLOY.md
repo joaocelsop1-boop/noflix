@@ -30,10 +30,15 @@ noflix/
 1. Suba este repositório (branch com os arquivos acima) para o Git.
 2. No Coolify: **New Resource → Docker Compose** e aponte para o repositório.
 3. **Build Pack: Docker Compose** (o Coolify usa o `docker-compose.yml` da raiz).
-4. Domínio principal → serviço `app` (porta 3000).
-5. O serviço `php` precisa ser alcançável para o admin: no Coolify, dê a ele
-   um domínio próprio (ex.: `php.seudominio.com`) ou exponha a porta 8080.
-   O front (server-side) usa a URL interna `http://php:80` — não a pública.
+4. **Endereço do app: `cineplus.shop/app`** — o app vive no caminho `/app`
+   do domínio (o site de vendas fica na raiz `cineplus.shop/`). No Coolify,
+   adicione o domínio `cineplus.shop` no serviço `app` (porta 3000) com
+   **prefixo de caminho `/app`** (Traefik roteia `/app/*` para o app e o
+   resto para o site). O `basePath: "/app"` já está no `next.config.ts`.
+5. O serviço `php` NÃO precisa de domínio próprio nem porta exposta: o
+   admin e as APIs chegam por ele pelo rewrite `/app/php/*` do Next.js
+   (o front server-side usa a URL interna `http://php:80`). O admin fica em
+   `https://cineplus.shop/app/php/admin.php`.
 6. Variáveis de ambiente (Coolify → Environment Variables do recurso):
    | Chave | Valor |
    |---|---|
@@ -77,8 +82,8 @@ do repositório.
 
 ## 5. Configurar painel Xtream e Mercado Pago (no admin)
 
-1. Acesse o admin: **http(s)://<domínio-do-php>/admin.php**
-   (local: http://localhost:8080/admin.php).
+1. Acesse o admin: **https://cineplus.shop/app/php/admin.php**
+   (local: http://localhost:3000/app/php/admin.php).
 2. Login inicial (criado pelo `database.sql` — **troque a senha no primeiro
    acesso** em Administradores → Trocar minha senha):
    - E-mail: `admin@minetv.tv`

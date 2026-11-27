@@ -19,8 +19,8 @@ services:
   php:
     build: ./php-backend
     expose:
-      # No Coolify, dê a este serviço um domínio próprio (ex.: php.seudominio.com).
-      # Não publique porta no host — o Coolify/Traefik roteia.
+      # Sem domínio próprio e sem porta no host: o admin e as APIs chegam por
+      # ele pelo rewrite /app/php/* do Next.js (admin em /app/php/admin.php).
       - "80"
     environment:
       - DB_HOST=db

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStreams } from "@/lib/stream-resolver";
 import { proxied } from "@/lib/stream-sign";
 import { phpApi, phpMe } from "@/lib/php";
+import { apiUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -223,7 +224,7 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
 
   const params = new URLSearchParams({ type, id: String(streamId) });
   if (streamExt) params.set("ext", streamExt);
-  const url = `/php/stream.php?${params.toString()}`;
+  const url = apiUrl(`/php/stream.php?${params.toString()}`);
 
   return NextResponse.json(
     {
