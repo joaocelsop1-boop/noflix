@@ -15,17 +15,18 @@ if (is_admin()) {
 $erro = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
-    $lockMsg = login_throttle_check();
+    // tudo21: a trava é por e-mail (no banco) — lê o e-mail ANTES de checar.
+    $email = trim($_POST['email'] ?? '');
+    $pass = $_POST['password'] ?? '';
+    $lockMsg = login_throttle_check($pdo, $email);
     if ($lockMsg !== '') {
         $erro = $lockMsg;
     } else {
-    $email = trim($_POST['email'] ?? '');
-    $pass = $_POST['password'] ?? '';
     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND role = 'admin' LIMIT 1");
     $stmt->execute([$email]);
     $u = $stmt->fetch();
     if ($u && password_verify($pass, $u['password'])) {
-        login_throttle_reset();
+        login_throttle_reset($pdo, $email);
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int)$u['id'];
         $_SESSION['user_name'] = $u['name'];
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php');
         exit;
     }
-    login_throttle_fail();
+    login_throttle_fail($pdo, $email);
     $erro = 'E-mail ou senha de administrador incorretos.';
     }
 }

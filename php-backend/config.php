@@ -257,23 +257,71 @@ function csrf_check() {
 }
 
 // ---------- trava de login (forca bruta: 5 erros = 15 min) ----------
-function login_throttle_check() {
-    $until = intval($_SESSION['login_lock_until'] ?? 0);
-    if ($until > time()) {
-        $min = (int)ceil(($until - time()) / 60);
-        return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+// tudo21: ANTES era só $_SESSION — limpar o cookie zerava o contador e a
+// trava nunca pegava de verdade (bastava abrir anônimo ou limpar o cookie).
+// Agora fica NO BANCO, por e-mail: 5 senhas erradas travam aquele e-mail
+// por 15 min, em qualquer navegador, aba ou aparelho. A mensagem continua
+// genérica (não revela se o e-mail existe).
+// Por IP não dá: o PHP só vê o IP interno do Next.js (todos os clientes
+// chegam pelo mesmo IP atrás do proxy) — a chave tem que ser o e-mail.
+function ensure_login_attempts_table($pdo) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (email VARCHAR(255) NOT NULL PRIMARY KEY, attempts INT NOT NULL DEFAULT 0, lock_until INT NOT NULL DEFAULT 0, updated_at INT NOT NULL DEFAULT 0) ENGINE=InnoDB");
+    } catch (Throwable $e) {
+        error_log('ensure_login_attempts_table: ' . $e->getMessage());
+    }
+}
+function login_throttle_check($pdo, $email) {
+    $email = strtolower(trim((string)$email));
+    if ($email === '') return '';
+    try {
+        ensure_login_attempts_table($pdo);
+        $stmt = $pdo->prepare("SELECT lock_until FROM login_attempts WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $until = (int)($stmt->fetchColumn() ?: 0);
+        if ($until > time()) {
+            $min = (int)ceil(($until - time()) / 60);
+            return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+        }
+    } catch (Throwable $e) {
+        // Banco indisponível para a trava: usa a sessão como reserva.
+        $until = intval($_SESSION['login_lock_until'] ?? 0);
+        if ($until > time()) {
+            $min = (int)ceil(($until - time()) / 60);
+            return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+        }
     }
     return '';
 }
-function login_throttle_fail() {
-    $n = intval($_SESSION['login_attempts'] ?? 0) + 1;
-    $_SESSION['login_attempts'] = $n;
-    if ($n >= 5) {
-        $_SESSION['login_lock_until'] = time() + 900;
-        $_SESSION['login_attempts'] = 0;
+function login_throttle_fail($pdo, $email) {
+    $email = strtolower(trim((string)$email));
+    if ($email === '') return;
+    try {
+        ensure_login_attempts_table($pdo);
+        $now = time();
+        $pdo->prepare("INSERT INTO login_attempts (email, attempts, lock_until, updated_at) VALUES (?, 1, 0, ?) ON DUPLICATE KEY UPDATE attempts = attempts + 1, updated_at = VALUES(updated_at)")->execute([$email, $now]);
+        $pdo->prepare("UPDATE login_attempts SET lock_until = ?, attempts = 0 WHERE email = ? AND attempts >= 5")->execute([$now + 900, $email]);
+    } catch (Throwable $e) {
+        $n = intval($_SESSION['login_attempts'] ?? 0) + 1;
+        $_SESSION['login_attempts'] = $n;
+        if ($n >= 5) {
+            $_SESSION['login_lock_until'] = time() + 900;
+            $_SESSION['login_attempts'] = 0;
+        }
     }
 }
-function login_throttle_reset() {
+function login_throttle_reset($pdo, $email) {
+    $email = strtolower(trim((string)$email));
+    if ($email === '') return;
+    try {
+        ensure_login_attempts_table($pdo);
+        $pdo->prepare("DELETE FROM login_attempts WHERE email = ?")->execute([$email]);
+    } catch (Throwable $e) {
+        // nada a fazer — a linha some sozinha quando o lock expira
+    }
     unset($_SESSION['login_attempts'], $_SESSION['login_lock_until']);
 }
 

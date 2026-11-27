@@ -155,14 +155,15 @@ export function NativePlayer({
   const failedRef = useRef(false);
   const onErrorRef = useRef(onError);
   /* tudo20: o watchdog do intervalo roda numa closure antiga, então espelha
-     sourceIndex/playable em refs para ele ver a fonte atual. hlsTrial marca
-     que a fonte HLS atual veio do watchdog (trava no meio do MP4) — se ela
-     falhar, o escalonamento volta para o MP4 em vez de mostrar erro. */
+     sourceIndex/playable em refs para ele ver a fonte atual. trialRef marca
+     que a fonte atual veio do watchdog (troca por trava no meio) — se ela
+     falhar no carregamento, o escalonamento volta para a fonte de onde
+     veio em vez de mostrar erro. */
   const sourceIndexRef = useRef(0);
   /* inicializa vazio (playable é declarado abaixo) — o useEffect de
      sincronização o preenche antes de qualquer trava acontecer. */
   const playableRef = useRef<NativeSource[]>([]);
-  const hlsTrialRef = useRef(false);
+  const trialRef = useRef<{ from: number; to: number } | null>(null);
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
@@ -248,7 +249,7 @@ export function NativePlayer({
   useEffect(() => {
     setSourceIndex(0);
     setAttempt(0);
-    hlsTrialRef.current = false;
+    trialRef.current = null;
     resumeOverride.current = null;
     stallRef.current = {
       lastTime: 0,
@@ -307,7 +308,7 @@ export function NativePlayer({
     };
 
     /** timers + element listeners we have to detach ourselves */
-    const stalls: { src?: number } = {};
+    const stalls: { src?: number; manifest?: number } = {};
     let mediaErrorHandler: (() => void) | null = null;
 
     /**
@@ -317,17 +318,20 @@ export function NativePlayer({
     const escalate = () => {
       if (recovery.current.escalated) return;
       recovery.current.escalated = true;
-      /* tudo20: o HLS atual veio do watchdog (trava no meio do MP4) e não
-         carregou — volta para o MP4 na posição atual em vez de mostrar
-         erro. O MP4 é o caminho confiável; o HLS é só um bônus. */
-      if (hlsTrialRef.current) {
-        hlsTrialRef.current = false;
+      /* tudo21: a fonte atual veio do watchdog (troca por trava no meio) e
+         não carregou — volta para a fonte de onde veio, na posição atual,
+         em vez de mostrar erro. (tudo20 voltava sempre para o MP4 porque o
+         MP4 era a 1ª fonte; agora o HLS é a 1ª fonte, então a volta é
+         genérica: volta para trialRef.from.) */
+      if (trialRef.current && sourceIndex === trialRef.current.to) {
+        const back = trialRef.current.from;
+        trialRef.current = null;
         const video = videoRef.current;
         if (video && Number.isFinite(video.currentTime)) {
           resumeOverride.current = video.currentTime;
         }
         setAttempt(0);
-        setSourceIndex(0);
+        setSourceIndex(back);
         return;
       }
       if (attempt + 1 < (attempts[sourceIndex]?.length ?? 1)) {
@@ -357,7 +361,12 @@ export function NativePlayer({
         }, 25_000);
         video.addEventListener(
           "playing",
-          () => window.clearTimeout(stalls.src),
+          () => {
+            window.clearTimeout(stalls.src);
+            /* tudo21: a fonte de teste do watchdog tocou — virou a fonte
+               real; se falhar depois, escala normal (não volta mais). */
+            trialRef.current = null;
+          },
           { once: true },
         );
         video.src = url;
@@ -366,19 +375,26 @@ export function NativePlayer({
         return;
       }
 
-      /* tudo19: timeout DURO no caminho hls.js — o MP4 e o HLS nativo
-         (Safari) têm o timeout de 25s que escala se não houver dado
+      /* tudo19 + tudo21: timeouts DUROS no caminho hls.js — o MP4 e o HLS
+         nativo (Safari) têm o timeout de 25s que escala se não houver dado
          (readyState < 2), mas o caminho hls.js NÃO tinha nenhum: se o
          manifest não carregasse nem desse erro, o player ficava preso
          em "Conectando ao Painel…" para sempre (o retry interno do
          hls.js sozinho levava minutos). 25s, igual ao MP4; limpa no
-         primeiro `playing`, igual ao MP4. */
+         primeiro `playing`, igual ao MP4. No tudo21 o HLS virou 1ª fonte,
+         então o manifesto ganhou um timer PRÓPRIO de 10s (abaixo, em
+         MEDIA_ATTACHED): sem manifesto em 10s, cai para o MP4 na hora. */
       stalls.src = window.setTimeout(() => {
         if (video.readyState < 2) escalate();
       }, 25_000);
       video.addEventListener(
         "playing",
-        () => window.clearTimeout(stalls.src),
+        () => {
+          window.clearTimeout(stalls.src);
+          /* tudo21: a fonte de teste do watchdog tocou — virou a fonte
+             real; se falhar depois, escala normal (não volta mais). */
+          trialRef.current = null;
+        },
         { once: true },
       );
 
@@ -417,11 +433,15 @@ export function NativePlayer({
         capLevelToPlayerSize: false,
         testBandwidth: true,
         backBufferLength: 30,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
-        maxBufferSize: 60 * 1000 * 1000,
-        manifestLoadingTimeOut: 12_000,
-        levelLoadingTimeOut: 12_000,
+        /* tudo21: buffer AGRESSIVO, igual a um app nativo — o player baixa
+           bem mais vídeo à frente (até ~4 min ou 120 MB) para o buffer
+           nunca esvaziar no meio do filme quando a internet oscila. Antes
+           era 60s/120s/60 MB. */
+        maxBufferLength: 90,
+        maxMaxBufferLength: 240,
+        maxBufferSize: 120 * 1000 * 1000,
+        manifestLoadingTimeOut: 8_000,
+        levelLoadingTimeOut: 8_000,
         fragLoadingTimeOut: 20_000,
         /* tudo19: falhar RÁPIDO — o padrão do hls.js é retentar o
            manifest até 6x (até 64s) antes de dar erro fatal, e o
@@ -432,10 +452,10 @@ export function NativePlayer({
            abaixo garante a escalada de qualquer jeito. */
         manifestLoadingMaxRetry: 1,
         manifestLoadingRetryDelay: 1_000,
-        manifestLoadingMaxRetryTimeout: 15_000,
+        manifestLoadingMaxRetryTimeout: 10_000,
         levelLoadingMaxRetry: 1,
         levelLoadingRetryDelay: 1_000,
-        levelLoadingMaxRetryTimeout: 15_000,
+        levelLoadingMaxRetryTimeout: 10_000,
         fragLoadingMaxRetry: 2,
         fragLoadingRetryDelay: 1_000,
         fragLoadingMaxRetryTimeout: 30_000,
@@ -454,11 +474,23 @@ export function NativePlayer({
       hlsRef.current = hls;
       hls.attachMedia(video);
 
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.loadSource(url));
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        hls?.loadSource(url);
+        /* tudo21: timeout DURO de 10s no MANIFESTO — se a playlist .m3u8 não
+           chegar nesse tempo (painel sem HLS para VOD, ou painel lento),
+           cai para o MP4 na hora em vez de ficar preso em "Conectando…".
+           É o que faltava no tudo18: lá o manifesto podia retentar por
+           minutos. O timer de 25s (primeiro dado) continua valendo depois
+           do manifesto carregado. */
+        stalls.manifest = window.setTimeout(() => {
+          if (!cancelled) escalate();
+        }, 10_000);
+      });
       hls.on(Hls.Events.MANIFEST_PARSED, (
         _event: unknown,
         data: { levels: Array<{ height?: number; width?: number; bitrate?: number }> },
       ) => {
+        window.clearTimeout(stalls.manifest);
         /* a 1920x800 transfer is full HD in scope, so name it by its pixels
            instead of pretending it is "800p" */
         const label = (entry: { height?: number; width?: number; bitrate?: number }) => {
@@ -535,6 +567,7 @@ export function NativePlayer({
     return () => {
       cancelled = true;
       window.clearTimeout(stalls.src);
+      window.clearTimeout(stalls.manifest);
       if (mediaErrorHandler) video.removeEventListener("error", mediaErrorHandler);
       hlsRef.current = null;
       hls?.destroy();
@@ -662,35 +695,35 @@ export function NativePlayer({
   }, []);
 
   /**
-   * tudo20: trava no MEIO do MP4 — troca para a fonte HLS (segmentada, com
-   * retry) na posição atual. Devolve false se não houver HLS para tentar.
+   * tudo21: trava no MEIO da reprodução — troca para a PRÓXIMA fonte na
+   * posição atual (tudo20 só trocava MP4→HLS porque o MP4 era a 1ª fonte;
+   * agora o HLS é a 1ª fonte, então a troca é genérica: HLS travou → tenta
+   * o MP4; MP4 travou → não há próxima, recarrega). Devolve false se não
+   * houver próxima fonte para tentar.
    */
-  const switchStallToHls = useCallback(() => {
+  const switchStallToNext = useCallback(() => {
     const list = playableRef.current;
     const current = list[sourceIndexRef.current];
-    const hlsIndex = list.findIndex(
-      (entry, i) => i > sourceIndexRef.current && entry.type === "hls",
-    );
-    if (!current || current.type !== "mp4" || hlsIndex < 0) return false;
+    const nextIndex = list.findIndex((_entry, i) => i > sourceIndexRef.current);
+    if (!current || nextIndex < 0) return false;
     const video = videoRef.current;
     if (video && Number.isFinite(video.currentTime)) {
       resumeOverride.current = video.currentTime;
     }
-    hlsTrialRef.current = true;
+    trialRef.current = { from: sourceIndexRef.current, to: nextIndex };
     setAttempt(0);
-    setSourceIndex(hlsIndex);
+    setSourceIndex(nextIndex);
     setGeneration((value) => value + 1);
     return true;
   }, []);
 
   /**
-   * Mid-playback stall watchdog (tudo20): se currentTime congela ~8s
-   * enquanto o vídeo deveria tocar, a 1ª vez recarrega a mesma fonte na
-   * última posição; na 2ª trava (MP4 lento de novo) troca para o HLS, que é
-   * segmentado e retenta os pedaços — o MP4 progressivo congela de novo
-   * porque o painel/proxy não entrega rápido o suficiente. Até 3
-   * recuperações automáticas, com 15s de cooldown entre elas; depois disso,
-   * mostra a tela de falha.
+   * Mid-playback stall watchdog (tudo20, generalizado no tudo21): se
+   * currentTime congela ~8s enquanto o vídeo deveria tocar, a 1ª vez
+   * recarrega a mesma fonte na última posição; na 2ª trava troca para a
+   * OUTRA fonte (HLS travou → MP4; MP4 travou → não há outra, recarrega).
+   * Até 3 recuperações automáticas, com 15s de cooldown entre elas;
+   * depois disso, mostra a tela de falha.
    */
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -718,9 +751,9 @@ export function NativePlayer({
           stallRef.current.recoveries += 1;
           stallRef.current.stalledSince = null;
           stallRef.current.cooldownUntil = now + 15_000;
-          /* 2ª trava em diante no MP4: tenta o HLS (segmentado). Se não
-             houver HLS, recarrega a mesma fonte como antes. */
-          if (stallRef.current.recoveries >= 2 && switchStallToHls()) {
+          /* 2ª trava em diante: tenta a OUTRA fonte (segmentada, com
+             retry). Se não houver outra, recarrega a mesma fonte. */
+          if (stallRef.current.recoveries >= 2 && switchStallToNext()) {
             return;
           }
           recoverStall();
@@ -733,7 +766,7 @@ export function NativePlayer({
       }
     }, 2000);
     return () => window.clearInterval(id);
-  }, [recoverStall, switchStallToHls]);
+  }, [recoverStall, switchStallToNext]);
 
   /* user picks a quality / caption track → apply it to the engine */
   useEffect(() => {

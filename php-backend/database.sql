@@ -73,6 +73,15 @@ CREATE TABLE IF NOT EXISTS `users` (
   FOREIGN KEY (`plan_id`) REFERENCES `plans`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Trava de login (tudo21): 5 senhas erradas travam o e-mail por 15 min.
+-- Fica no banco (não na sessão) para não poder ser burlada limpando o cookie.
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `email` VARCHAR(255) NOT NULL PRIMARY KEY,
+  `attempts` INT NOT NULL DEFAULT 0,
+  `lock_until` INT NOT NULL DEFAULT 0,
+  `updated_at` INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB;
+
 -- Usuário Admin padrão (Senha: admin123) — PRIMEIRO ACESSO APENAS.
 -- Troque a senha no primeiro login em admin_login.php > Administradores > Trocar minha senha.
 INSERT INTO `users` (`id`, `name`, `email`, `password`, `role`, `status`, `referral_code`)

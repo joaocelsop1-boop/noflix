@@ -29,28 +29,59 @@ if (!function_exists('csrf_check')) {
         }
     }
 }
+// Fallback tudo21: mesmas assinaturas do config.php (trava no banco, por
+// e-mail). Só roda se o config.php do servidor for antigo; depois do deploy
+// as funções de lá vencem e estas nunca são definidas.
 if (!function_exists('login_throttle_check')) {
-    function login_throttle_check() {
-        $until = intval($_SESSION['login_lock_until'] ?? 0);
-        if ($until > time()) {
-            $min = (int)ceil(($until - time()) / 60);
-            return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+    function login_throttle_check($pdo = null, $email = '') {
+        $email = strtolower(trim((string)$email));
+        if ($email === '' || !$pdo) {
+            $until = intval($_SESSION['login_lock_until'] ?? 0);
+            if ($until > time()) {
+                $min = (int)ceil(($until - time()) / 60);
+                return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+            }
+            return '';
         }
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (email VARCHAR(255) NOT NULL PRIMARY KEY, attempts INT NOT NULL DEFAULT 0, lock_until INT NOT NULL DEFAULT 0, updated_at INT NOT NULL DEFAULT 0) ENGINE=InnoDB");
+            $stmt = $pdo->prepare("SELECT lock_until FROM login_attempts WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $until = (int)($stmt->fetchColumn() ?: 0);
+            if ($until > time()) {
+                $min = (int)ceil(($until - time()) / 60);
+                return 'Muitas tentativas de login. Tente novamente em ' . $min . ' minuto(s).';
+            }
+        } catch (Throwable $e) { /* sem trava: segue o login */ }
         return '';
     }
 }
 if (!function_exists('login_throttle_fail')) {
-    function login_throttle_fail() {
-        $n = intval($_SESSION['login_attempts'] ?? 0) + 1;
-        $_SESSION['login_attempts'] = $n;
-        if ($n >= 5) {
-            $_SESSION['login_lock_until'] = time() + 900;
-            $_SESSION['login_attempts'] = 0;
+    function login_throttle_fail($pdo = null, $email = '') {
+        $email = strtolower(trim((string)$email));
+        if ($email === '' || !$pdo) {
+            $n = intval($_SESSION['login_attempts'] ?? 0) + 1;
+            $_SESSION['login_attempts'] = $n;
+            if ($n >= 5) {
+                $_SESSION['login_lock_until'] = time() + 900;
+                $_SESSION['login_attempts'] = 0;
+            }
+            return;
         }
+        try {
+            $now = time();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (email VARCHAR(255) NOT NULL PRIMARY KEY, attempts INT NOT NULL DEFAULT 0, lock_until INT NOT NULL DEFAULT 0, updated_at INT NOT NULL DEFAULT 0) ENGINE=InnoDB");
+            $pdo->prepare("INSERT INTO login_attempts (email, attempts, lock_until, updated_at) VALUES (?, 1, 0, ?) ON DUPLICATE KEY UPDATE attempts = attempts + 1, updated_at = VALUES(updated_at)")->execute([$email, $now]);
+            $pdo->prepare("UPDATE login_attempts SET lock_until = ?, attempts = 0 WHERE email = ? AND attempts >= 5")->execute([$now + 900, $email]);
+        } catch (Throwable $e) { /* sem trava: segue o login */ }
     }
 }
 if (!function_exists('login_throttle_reset')) {
-    function login_throttle_reset() {
+    function login_throttle_reset($pdo = null, $email = '') {
+        $email = strtolower(trim((string)$email));
+        if ($email !== '' && $pdo) {
+            try { $pdo->prepare("DELETE FROM login_attempts WHERE email = ?")->execute([$email]); } catch (Throwable $e) { /* segue */ }
+        }
         unset($_SESSION['login_attempts'], $_SESSION['login_lock_until']);
     }
 }
@@ -73,17 +104,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
     if ($acao === 'login') {
-        $lockMsg = login_throttle_check();
+        // tudo21: a trava é por e-mail (no banco) — lê o e-mail ANTES de
+        // checar, senão não há como saber qual conta está travada.
+        $email = trim($_POST['email'] ?? '');
+        $pass = $_POST['password'] ?? '';
+        $lockMsg = login_throttle_check($pdo, $email);
         if ($lockMsg !== '') {
             $erro = $lockMsg;
         } else {
-        $email = trim($_POST['email'] ?? '');
-        $pass = $_POST['password'] ?? '';
         $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $u = $stmt->fetch();
         if ($u && password_verify($pass, $u['password'])) {
-            login_throttle_reset();
+            login_throttle_reset($pdo, $email);
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int)$u['id'];
             $_SESSION['user_name'] = $u['name'];
@@ -100,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             exit;
         }
-        login_throttle_fail();
+        login_throttle_fail($pdo, $email);
         $erro = 'E-mail ou senha incorretos.';
         }
     }

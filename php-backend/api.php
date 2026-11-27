@@ -911,14 +911,16 @@ switch ($action) {
             break;
         }
         if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-        $lockMsg = login_throttle_check();
+        // tudo21: a trava é por e-mail (no banco) — lê o e-mail ANTES de
+        // checar, senão não há como saber qual conta está travada.
+        $loginEmail = trim((string)api_post_field('email'));
+        $loginPass = (string)api_post_field('password');
+        $lockMsg = login_throttle_check($pdo, $loginEmail);
         if ($lockMsg !== '') {
             session_write_close();
             api_auth_error($lockMsg, 429);
             break;
         }
-        $loginEmail = trim((string)api_post_field('email'));
-        $loginPass = (string)api_post_field('password');
         $loginUser = null;
         if ($loginEmail !== '' && $loginPass !== '') {
             $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
@@ -926,7 +928,7 @@ switch ($action) {
             $loginUser = $stmt->fetch() ?: null;
         }
         if ($loginUser && password_verify($loginPass, $loginUser['password'])) {
-            login_throttle_reset();
+            login_throttle_reset($pdo, $loginEmail);
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int)$loginUser['id'];
             $_SESSION['user_name'] = $loginUser['name'];
@@ -941,7 +943,7 @@ switch ($action) {
             session_write_close();
             echo json_encode(['ok' => true, 'user' => $loginPayload, 'canWatch' => $loginCanWatch]);
         } else {
-            login_throttle_fail();
+            login_throttle_fail($pdo, $loginEmail);
             session_write_close();
             api_auth_error('E-mail ou senha inválidos.', 401);
         }

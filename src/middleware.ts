@@ -4,31 +4,24 @@ import type { NextRequest } from "next/server";
 /**
  * Auth guard: protected pages require a logged-in PHP session.
  *
- * Calls the PHP backend's action=me with the request cookies (60s in-memory
- * cache per cookie hash, so navigation doesn't hit the panel every time).
- * Not logged in → redirect to /login.
+ * Calls the PHP backend's action=me with the request cookies on every
+ * request. Not logged in → redirect to /login.
+ *
+ * tudo21: SEM CACHE do `me` — o cache de 60s do tudo20 deixava uma sessão
+ * encerrada (outro aparelho entrou) navegar por até 60s antes de cair no
+ * login, e o usuário via a trava como "não funcionando". A checagem de
+ * sessão não pode ser cacheada. O `me` é barato (só banco, sem chamada ao
+ * painel), então checar sempre não pesa na navegação.
  *
  * Fail-open: if the PHP backend is down or answers something unusable, the
  * request passes through and the API routes surface the error to the UI —
  * a panel outage must never lock the whole site.
  *
- * Edge runtime: plain fetch + a tiny string hash only — no node APIs and no
- * server-only imports here.
+ * Edge runtime: plain fetch only — no node APIs and no server-only imports
+ * here.
  */
 
 const PHP_BACKEND_URL = process.env.PHP_BACKEND_URL ?? "http://php:80";
-const ME_CACHE_TTL = 60_000;
-
-type MeCacheEntry = { at: number; loggedIn: boolean; sessionEnded: boolean };
-const meCache = new Map<string, MeCacheEntry>();
-
-function hashCookie(cookie: string): string {
-  let h = 5381;
-  for (let i = 0; i < cookie.length; i++) {
-    h = ((h << 5) + h + cookie.charCodeAt(i)) | 0;
-  }
-  return String(h);
-}
 
 /**
  * Sessão única (tudo20): devolve também se a sessão foi encerrada por um
@@ -38,9 +31,6 @@ function hashCookie(cookie: string): string {
 async function checkSession(request: NextRequest): Promise<{ loggedIn: boolean | null; sessionEnded: boolean }> {
   const cookie = request.headers.get("cookie") ?? "";
   if (!cookie) return { loggedIn: false, sessionEnded: false };
-  const key = hashCookie(cookie);
-  const hit = meCache.get(key);
-  if (hit && Date.now() - hit.at < ME_CACHE_TTL) return { loggedIn: hit.loggedIn, sessionEnded: hit.sessionEnded };
 
   let loggedIn: boolean | null = null;
   let sessionEnded = false;
@@ -56,10 +46,6 @@ async function checkSession(request: NextRequest): Promise<{ loggedIn: boolean |
     loggedIn = null; // PHP down → fail open
   }
 
-  if (loggedIn !== null) {
-    if (meCache.size >= 500) meCache.clear();
-    meCache.set(key, { at: Date.now(), loggedIn, sessionEnded });
-  }
   return { loggedIn, sessionEnded };
 }
 
