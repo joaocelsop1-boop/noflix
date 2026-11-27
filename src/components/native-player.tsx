@@ -137,6 +137,26 @@ export function NativePlayer({
   const hideTimer = useRef<number | null>(null);
   const lastSaved = useRef(0);
   const recovery = useRef({ network: 0, media: 0, escalated: false });
+  /**
+   * Mid-playback stall watchdog (tudo12): the 25s load timeout only guards
+   * the initial load. Once playback has started, a hung upstream leaves the
+   * spinner on forever — currentTime stops advancing and nothing retries.
+   * resumeOverride carries the position to resume at when the watchdog
+   * reloads the same source; stallRef tracks freeze / recovery budget.
+   */
+  const resumeOverride = useRef<number | null>(null);
+  const stallRef = useRef({
+    lastTime: 0,
+    stalledSince: null as number | null,
+    recoveries: 0,
+    hasPlayed: false,
+    cooldownUntil: 0,
+  });
+  const failedRef = useRef(false);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   const [sourceIndex, setSourceIndex] = useState(0);
   /** 0 = straight to the CDN, 1 = through our relay */
@@ -214,6 +234,14 @@ export function NativePlayer({
   useEffect(() => {
     setSourceIndex(0);
     setAttempt(0);
+    resumeOverride.current = null;
+    stallRef.current = {
+      lastTime: 0,
+      stalledSince: null,
+      recoveries: 0,
+      hasPlayed: false,
+      cooldownUntil: 0,
+    };
   }, [sourceKey]);
 
   /* ------------------------------------------------------------- transport */
@@ -234,7 +262,11 @@ export function NativePlayer({
     setCaptionTracks([]);
     recovery.current = { network: 0, media: 0, escalated: false };
 
-    const resumeAt = startAt && startAt > 20 ? startAt : 0;
+    /* stall recovery resumes where playback stopped (not where the title
+       started): resumeOverride is set by the watchdog before it bumps the
+       generation, and consumed once here. */
+    const resumeAt = resumeOverride.current ?? (startAt && startAt > 20 ? startAt : 0);
+    resumeOverride.current = null;
     const nudgeResume = () => {
       if (!resumeAt) return;
       if (Number.isFinite(video.duration) && Math.abs(video.currentTime - resumeAt) > 3) {
@@ -547,6 +579,64 @@ export function NativePlayer({
     return () => window.clearTimeout(timer);
   }, [waiting, sourceIndex, attempt, generation]);
 
+  /* mirror failed into a ref so the stall watchdog (interval) sees it */
+  useEffect(() => {
+    failedRef.current = failed;
+  }, [failed]);
+
+  /** reload the same source at the last known position (stall recovery) */
+  const recoverStall = useCallback(() => {
+    const video = videoRef.current;
+    if (video && Number.isFinite(video.currentTime)) {
+      resumeOverride.current = video.currentTime;
+    }
+    setGeneration((value) => value + 1);
+  }, []);
+
+  /**
+   * Mid-playback stall watchdog: if currentTime freezes for ~12s while the
+   * video should be playing, reload the same source at the last position
+   * (up to 3 automatic recoveries, with a 15s cooldown after each so the
+   * reload has time to start). After that, surface the failure UI.
+   */
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const video = videoRef.current;
+      if (!video || failedRef.current) return;
+      if (video.paused || video.ended) {
+        stallRef.current.stalledSince = null;
+        return;
+      }
+      const now = Date.now();
+      if (now < stallRef.current.cooldownUntil) return;
+      if (video.currentTime > 0) stallRef.current.hasPlayed = true;
+      if (!stallRef.current.hasPlayed) return;
+      if (Math.abs(video.currentTime - stallRef.current.lastTime) > 0.05) {
+        stallRef.current.lastTime = video.currentTime;
+        stallRef.current.stalledSince = null;
+        return;
+      }
+      if (stallRef.current.stalledSince === null) {
+        stallRef.current.stalledSince = now;
+        return;
+      }
+      if (now - stallRef.current.stalledSince >= 12_000) {
+        if (stallRef.current.recoveries < 3) {
+          stallRef.current.recoveries += 1;
+          stallRef.current.stalledSince = null;
+          stallRef.current.cooldownUntil = now + 15_000;
+          recoverStall();
+        } else {
+          stallRef.current.stalledSince = null;
+          failedRef.current = true;
+          setFailed(true);
+          onErrorRef.current?.();
+        }
+      }
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [recoverStall]);
+
   /* user picks a quality / caption track → apply it to the engine */
   useEffect(() => {
     if (!hlsRef.current) return;
@@ -704,6 +794,15 @@ export function NativePlayer({
   const retryAll = useCallback(() => {
     nextFired.current = false;
     setFailed(false);
+    failedRef.current = false;
+    resumeOverride.current = null;
+    stallRef.current = {
+      lastTime: 0,
+      stalledSince: null,
+      recoveries: 0,
+      hasPlayed: false,
+      cooldownUntil: 0,
+    };
     setSourceIndex(0);
     setAttempt(0);
     setGeneration((value) => value + 1);

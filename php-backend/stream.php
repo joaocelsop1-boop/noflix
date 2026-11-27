@@ -212,6 +212,11 @@ function serve_passthrough($url, $ext) {
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+    /* tudo12: fail fast se o upstream travar — sem isso uma conexao
+       pendurada espera para sempre (pior que fechar: fechada, o navegador
+       retoma com um novo Range; pendurada, so gira). 1 KB/s por 30 s. */
+    curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
+    curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 30);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $rangeHeaders = [];
