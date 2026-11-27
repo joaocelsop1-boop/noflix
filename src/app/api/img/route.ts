@@ -53,6 +53,29 @@ const UA =
 const resolved = new Map<string, { at: number; path: string | null }>();
 const DAY = 86_400_000;
 
+/**
+ * Cache negativo (10 min): uma capa morta (fenix7 404, slackewn 403) não
+ * precisa ser buscada de novo a cada abertura da inicial — a segunda vez
+ * falha na hora, sem esperar o timeout da rede segurar a fileira.
+ */
+const NEGATIVE_TTL = 10 * 60 * 1000;
+const dead = new Map<string, number>();
+
+function isDead(url: string): boolean {
+  const at = dead.get(url);
+  if (at === undefined) return false;
+  if (Date.now() - at > NEGATIVE_TTL) {
+    dead.delete(url);
+    return false;
+  }
+  return true;
+}
+
+function markDead(url: string): void {
+  if (dead.size >= 2000) dead.clear();
+  dead.set(url, Date.now());
+}
+
 function tmdbKey(): string {
   return (
     process.env.TMDB_API_KEY ??
@@ -149,6 +172,7 @@ export async function GET(request: Request) {
   const probe = searchParams.get("probe") === "1";
 
   for (const candidate of candidates) {
+    if (isDead(candidate)) continue;
     const hit = await grab(candidate);
     if (hit) {
       if (!probe) return hit;
@@ -159,6 +183,7 @@ export async function GET(request: Request) {
         contentType: hit.headers.get("content-type"),
       });
     }
+    markDead(candidate);
   }
 
   if (probe) {

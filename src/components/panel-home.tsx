@@ -43,20 +43,24 @@ async function fetchCatalogueTab(
 }
 
 /**
- * Busca o catálogo do painel para a Início. Devolve null quando o usuário
- * não está logado ou o painel não tem filmes/séries — nesse caso a Início
- * cai para o catálogo curado (TMDB) de sempre.
+ * Busca o catálogo do painel para a Início. Devolve se o usuário está
+ * logado e, quando sim, os dados — para a Início NUNCA cair para o
+ * catálogo curado (TMDB) silenciosamente quando o painel falha: logado
+ * sem painel mostra erro, não filme em inglês.
  */
-export async function fetchPanelHomeData(): Promise<PanelHomeData | null> {
+export async function fetchPanelHomeData(): Promise<{
+  loggedIn: boolean;
+  data: PanelHomeData | null;
+}> {
   const me = await fetchPanelMe();
-  if (!me?.loggedIn) return null;
+  if (!me?.loggedIn) return { loggedIn: false, data: null };
   const [movies, series, anime] = await Promise.all([
-    fetchCatalogueTab("movie", 120),
-    fetchCatalogueTab("series", 120),
-    fetchCatalogueTab("anime", 60),
+    fetchCatalogueTab("movie", 72),
+    fetchCatalogueTab("series", 72),
+    fetchCatalogueTab("anime", 36),
   ]);
-  if (movies.length === 0 && series.length === 0) return null;
-  return { movies, series, anime };
+  if (movies.length === 0 && series.length === 0) return { loggedIn: true, data: null };
+  return { loggedIn: true, data: { movies, series, anime } };
 }
 
 function panelPlayUrl(entry: CatalogueEntry): string {
@@ -70,6 +74,9 @@ function PanelPosterCard({ entry }: { entry: CatalogueEntry }) {
   const router = useRouter();
   const img = artUrl(entry.poster);
   const initial = (entry.name.trim()[0] ?? "?").toUpperCase();
+  /* capa morta no servidor de imagens: mostra o fallback na hora, sem
+     esperar o erro de rede segurar a fileira */
+  const [broken, setBroken] = useState(false);
   return (
     <button
       type="button"
@@ -80,13 +87,14 @@ function PanelPosterCard({ entry }: { entry: CatalogueEntry }) {
         "aspect-[2/3] hover:z-10 hover:scale-[1.05] hover:ring-white/30 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)]",
       )}
     >
-      {img ? (
+      {img && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={img}
           alt={entry.name}
           loading="lazy"
           decoding="async"
+          onError={() => setBroken(true)}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
         />
       ) : (
@@ -180,17 +188,20 @@ function PanelHero({ entries }: { entries: CatalogueEntry[] }) {
   }, [index, slides.length]);
 
   const active = slides[index] ?? slides[0];
+  const [bgBroken, setBgBroken] = useState(false);
+  useEffect(() => setBgBroken(false), [active?.key]);
   if (!active) return null;
   const bg = artUrl(active.backdrop ?? active.poster);
 
   return (
     <section className="relative h-[74svh] min-h-[440px] w-full overflow-hidden md:h-[88svh] md:min-h-[560px]">
-      {bg && (
+      {bg && !bgBroken && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`bg-${active.key}`}
           src={bg}
           alt=""
+          onError={() => setBgBroken(true)}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}

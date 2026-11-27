@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import { BrowseGrid } from "@/components/browse-grid";
-import { allTitles, topTen } from "@/lib/catalog";
+import { LiveCatalogue } from "@/components/live-catalogue";
 
-export const metadata: Metadata = { title: "Novidades — MineTV" };
+export const metadata: Metadata = { title: "Novidades — CinePlus" };
 
+/**
+ * Novidades agora mostra o catálogo DO PAINEL — antes mostrava o Top 10
+ * curado (TMDB), que não é o conteúdo do usuário.
+ */
 export default function Page() {
-  const ranked = topTen();
-  const rest = allTitles
-    .filter((t) => !ranked.some((r) => r.slug === t.slug))
-    .sort((a, b) => b.year - a.year);
-
-  return (
-    <BrowseGrid
-      titles={[...ranked, ...rest]}
-      heading="Novidades"
-      subheading="The top 10 in your region today, plus everything that just landed on the service."
-    />
-  );
+  return <LiveCatalogue heading="Novidades" />;
 }

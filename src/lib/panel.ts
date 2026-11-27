@@ -144,6 +144,9 @@ export async function panelLogin(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
+    // Sem timeout o botão ficava em "Aguarde…" para sempre quando a rede
+    // falhava — o usuário achava que nada tinha acontecido.
+    signal: AbortSignal.timeout(20_000),
   });
   const data = (await readJson<{ ok: boolean; error?: string; user?: PanelUser; canWatch?: boolean }>(res)) ?? { ok: false };
   if (!res.ok && !data.error) return { ok: false, error: "Não foi possível entrar. Tente novamente." };
@@ -160,6 +163,7 @@ export async function panelRegister(input: {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(20_000),
   });
   const data = (await readJson<{ ok: boolean; error?: string; user?: PanelUser }>(res)) ?? { ok: false };
   if (!res.ok && !data.error) return { ok: false, error: "Não foi possível criar a conta. Tente novamente." };

@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Configurações Gerais e Conexão com Banco de Dados
+ * CinePlus - Configurações Gerais e Conexão com Banco de Dados
  * CORRIGIDO: helpers de login, plano ativo e limpeza do cache do catálogo.
  */
 if (session_status() === PHP_SESSION_NONE) {
@@ -41,7 +41,7 @@ function get_settings($pdo) {
         'sigma_username' => '',
         'sigma_password' => '',
         'panel_proxy' => '',
-        'site_name' => 'MineTV',
+        'site_name' => 'CinePlus',
         'affiliate_percent' => 10,
         'trial_hours' => 3,
         'mp_access_token' => '',

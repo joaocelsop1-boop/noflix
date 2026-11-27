@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Política de privacidade — MineTV",
-  description: "Como a MineTV trata os seus dados pessoais.",
+  title: "Política de privacidade — CinePlus",
+  description: "Como a CinePlus trata os seus dados pessoais.",
 };
 
 export default function Page() {
@@ -25,7 +25,7 @@ export default function Page() {
       <h2>2. Para que usamos</h2>
       <p>
         Usamos os seus dados para prestar o serviço (acesso, cobrança e suporte), para
-        lembrar as suas preferências e para melhorar a MineTV. Não vendemos os seus dados
+        lembrar as suas preferências e para melhorar a CinePlus. Não vendemos os seus dados
         a terceiros.
       </p>
 

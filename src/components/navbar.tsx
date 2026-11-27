@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Artwork } from "@/components/artwork";
 import { BellIcon, ChevronDownIcon, SearchIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
 import { usePanelMe } from "@/lib/use-panel-me";
@@ -12,7 +11,8 @@ import { formatDateBR, panelLogout } from "@/lib/panel";
 import { Wordmark } from "@/components/wordmark";
 import { ProfileAvatar } from "@/components/avatar";
 import { cn } from "@/lib/cn";
-import { allTitles } from "@/lib/catalog";
+import { artUrl } from "@/lib/img";
+import type { CatalogueEntry } from "@/lib/catalogue";
 
 const links = [
   { href: "/", label: "Início" },
@@ -40,6 +40,9 @@ export function Navbar() {
   const panelUser = me?.loggedIn ? me.user : null;
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState<null | "profile" | "bell">(null);
+  /** novidades do painel (sino): os 3 primeiros filmes do servidor */
+  const [notifications, setNotifications] = useState<CatalogueEntry[]>([]);
+  const [notifLoaded, setNotifLoaded] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const ticking = useRef(false);
 
@@ -61,6 +64,26 @@ export function Navbar() {
     setMenu(null);
   }, [pathname]);
 
+  /* sino: busca as novidades no catálogo DO PAINEL quando aberto — antes
+     mostrava 3 títulos fixos do catálogo curado (TMDB). */
+  useEffect(() => {
+    if (menu !== "bell" || notifLoaded) return;
+    let alive = true;
+    void fetch("/api/catalogue?tab=movie&limit=3", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { results?: CatalogueEntry[] } | null) => {
+        if (!alive) return;
+        setNotifications(Array.isArray(data?.results) ? data.results : []);
+        setNotifLoaded(true);
+      })
+      .catch(() => {
+        if (alive) setNotifLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [menu, notifLoaded]);
+
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (!shellRef.current?.contains(event.target as Node)) setMenu(null);
@@ -68,8 +91,6 @@ export function Navbar() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
-
-  const notifications = allTitles.slice(0, 3);
 
   return (
     <header
@@ -162,29 +183,54 @@ export function Navbar() {
                   className="absolute right-0 top-12 w-[320px] overflow-hidden rounded-md border border-white/15 bg-[#191919]/98 py-2 shadow-2xl backdrop-blur-xl"
                 >
                   <p className="px-4 pb-2 text-xs uppercase tracking-[0.18em] text-white/40">
-                    New arrivals
+                    Novidades do servidor
                   </p>
-                  {notifications.map((t) => (
-                    <button
-                      key={t.slug}
-                      type="button"
-                      onClick={() => {
-                        setMenu(null);
-                        router.push(`/title/${t.slug}`);
-                      }}
-                      className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-white/5"
-                    >
-                      <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded">
-                        <Artwork slug={t.slug} name={t.name} accent={t.accent} sizes="60px" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-white">{t.name}</span>
-                        <span className="block text-xs text-white/50">
-                          {t.badge ?? "Transmitindo agora"} · {t.year}
+                  {notifications.length === 0 ? (
+                    <p className="px-4 py-3 text-[13px] leading-relaxed text-white/55">
+                      {notifLoaded
+                        ? "Nenhuma novidade por aqui — navegue pelo catálogo."
+                        : "Carregando novidades…"}
+                    </p>
+                  ) : (
+                    notifications.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => {
+                          setMenu(null);
+                          const type = t.panel?.type ?? t.kind;
+                          const id = t.panel?.id ?? t.tmdbId;
+                          router.push(
+                            `/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(t.name)}`,
+                          );
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-2 text-left transition hover:bg-white/5"
+                      >
+                        <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-[#222]">
+                          {t.poster ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={artUrl(t.poster)}
+                              alt={t.name}
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="grid h-full place-items-center bg-gradient-to-br from-white/15 to-transparent px-1 text-center text-[10px] text-white/70">
+                              {t.name}
+                            </span>
+                          )}
                         </span>
-                      </span>
-                    </button>
-                  ))}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm text-white">{t.name}</span>
+                          <span className="block text-xs text-white/50">
+                            {t.kind === "series" ? "Série" : "Filme"}
+                            {t.year ? ` · ${t.year}` : ""}
+                          </span>
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

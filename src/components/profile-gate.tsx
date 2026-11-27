@@ -106,7 +106,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
           {mode === "edit" ? (
             <div className="mx-auto w-full max-w-[1000px]">
               <p className="mb-1 text-[11px] uppercase tracking-[0.3em] text-[var(--nf-accent)]">
-                {active ? "Editar perfil" : profiles.length ? "Novo perfil" : "Bem-vindo à MineTV"}
+                {active ? "Editar perfil" : profiles.length ? "Novo perfil" : "Bem-vindo à CinePlus"}
               </p>
               <h1 className="mb-6 font-display text-3xl tracking-wide text-white sm:text-4xl md:text-5xl">
                 {active ? "Deixe do seu jeito" : profiles.length ? "Adicionar perfil" : "Crie sua conta"}
@@ -394,7 +394,7 @@ export function ProfileGate({ onPick }: { onPick: (profile: Profile) => void }) 
         </div>
 
         <footer className="pb-2 text-center text-[11px] text-white/25">
-          MineTV · perfis, Minha Lista e progresso ficam neste aparelho
+          CinePlus · perfis, Minha Lista e progresso ficam neste aparelho
         </footer>
       </div>
     </div>

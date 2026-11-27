@@ -1,30 +1,39 @@
 import { NextResponse } from "next/server";
-import { searchTitles } from "@/lib/catalog";
-import { serializeTitle } from "@/lib/api-serialize";
-import { externalSearch, providers } from "@/lib/providers";
 
 /**
- * GET /api/search?q=&live=1
- * Local catalogue hits come back instantly. `live=1` additionally fans out to
- * the keyless metadata providers (TVMaze, IMDb, Jikan) and TMDB when a key is
- * configured, so the search box can surface titles that are not bundled yet.
+ * GET /api/search?q=
+ * Busca SÓ no catálogo do painel do usuário (mesma fonte da busca da
+ * tela). Os provedores externos (TVMaze, IMDb, Jikan, TMDB) foram
+ * removidos: usuário logado só vê o que existe no painel dele. O
+ * parâmetro `live=1` é aceito mas ignorado (compatibilidade com
+ * chamadas antigas).
+ * Devolve os itens do painel no formato de /api/catalogue.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get("q") ?? "").trim();
-  const live = searchParams.get("live") === "1";
 
   if (!q) return NextResponse.json({ query: "", local: [], external: [], providers: [] });
 
-  const local = searchTitles(q, 24).map(serializeTitle);
-  const external = live ? await externalSearch(q) : [];
+  const cookie = request.headers.get("cookie") ?? "";
+  const base = new URL(request.url);
+  const fetchTab = async (tab: string) => {
+    const url = new URL("/api/catalogue", base);
+    url.searchParams.set("tab", tab);
+    url.searchParams.set("q", q);
+    url.searchParams.set("limit", "24");
+    const res = await fetch(url, { headers: { cookie }, cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    return Array.isArray(data?.items) ? data.items : [];
+  };
+
+  const [movies, series] = await Promise.all([fetchTab("movie"), fetchTab("series")]);
 
   return NextResponse.json({
     query: q,
-    local,
-    external,
-    providers: Object.values(providers)
-      .filter((p) => p.enabled)
-      .map((p) => ({ id: p.id, label: p.label })),
+    local: [...movies, ...series],
+    external: [],
+    providers: [],
   });
 }

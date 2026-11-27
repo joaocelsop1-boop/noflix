@@ -64,8 +64,8 @@ export default async function PlayPage({
       rating: 8,
       match: 80,
       tagline: "Transmitindo agora.",
-      overview: `${query.title ?? "Conteúdo do painel"} — playing from your panel.`,
-      creator: "MineTV",
+      overview: `${query.title ?? "Conteúdo do painel"} — transmitindo do seu painel.`,
+      creator: "CinePlus",
       cast: [],
       accent: "#e50914",
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
@@ -130,7 +130,7 @@ export default async function PlayPage({
       film?.overview ??
       anime?.overview ??
       `${name} — playing from the live catalogue.`,
-    creator: "MineTV live",
+    creator: "CinePlus live",
     cast: [],
     accent: "#141414",
     format: kind === "series" ? (show?.seasons === 1 ? "Série limitada" : "Séries") : "Filme",

@@ -137,7 +137,7 @@ export const generatedTitles: Title[] = allEntries.map((entry) => {
     match: Math.min(99, Math.round(entry.rating * 10) + 4),
     tagline: entry.kind === "series" ? "Stream the whole story." : "Now streaming.",
     overview: entry.overview,
-    creator: entry.creator ?? (isAnime ? "Animação japonesa" : "MineTV"),
+    creator: entry.creator ?? (isAnime ? "Animação japonesa" : "CinePlus"),
     cast: entry.cast ?? [],
     badge: entry.badge,
     accent: accents[hash(entry.slug) % accents.length],

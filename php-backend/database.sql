@@ -1,4 +1,4 @@
--- Banco de dados para MineTV WebPlayer + Painel ADM
+-- Banco de dados para CinePlus WebPlayer + Painel ADM
 -- IMPORTANTE (cPanel / hospedagem compartilhada): NÃO crie o banco por aqui.
 -- Crie o banco em cPanel > MySQL Databases (o nome fica com prefixo, ex.:
 -- storestreaming_minetv), adicione o usuário ao banco com TODOS os privilégios
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `sigma_username` VARCHAR(100) NOT NULL DEFAULT '',
   `sigma_password` VARCHAR(100) NOT NULL DEFAULT '',
   `panel_proxy` VARCHAR(255) NOT NULL DEFAULT '',
-  `site_name` VARCHAR(100) NOT NULL DEFAULT 'MineTV',
+  `site_name` VARCHAR(100) NOT NULL DEFAULT 'CinePlus',
   `affiliate_percent` INT NOT NULL DEFAULT 10,
   `trial_hours` INT NOT NULL DEFAULT 3,
   `mp_access_token` VARCHAR(255) NOT NULL DEFAULT '',
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
 ) ENGINE=InnoDB;
 
 INSERT INTO `settings` (`id`, `sigma_url`, `sigma_username`, `sigma_password`, `site_name`, `affiliate_percent`, `trial_hours`)
-VALUES (1, 'http://seuservidor.com:8080', 'demo_user', 'demo_pass', 'MineTV', 10, 3)
+VALUES (1, 'http://seuservidor.com:8080', 'demo_user', 'demo_pass', 'CinePlus', 10, 3)
 ON DUPLICATE KEY UPDATE `id`=1;
 
 -- 2. Tabela de Planos

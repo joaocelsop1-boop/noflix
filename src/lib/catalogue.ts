@@ -38,6 +38,8 @@ export type CatalogueEntry = {
    * /play/0?panel=1&type=..&id=.. em vez do embed TMDB. O tmdbId fica 0.
    */
   panel?: { type: "movie" | "series" | "live"; id: number };
+  /** id da categoria do painel (só para itens do painel) — alimenta o filtro por categoria da aba */
+  categoryId?: string;
 };
 
 export type Audience = "kids" | "mature" | "general";

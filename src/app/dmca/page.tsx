@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Direitos autorais e DMCA — MineTV",
-  description: "Informações sobre direitos autorais na MineTV.",
+  title: "Direitos autorais e DMCA — CinePlus",
+  description: "Informações sobre direitos autorais na CinePlus.",
 };
 
 export default function Page() {
   return (
     <LegalPage eyebrow="Legal" title="Direitos autorais e remoção" updated="Novembro de 2026">
       <p>
-        Os filmes, séries, programas e marcas exibidos na MineTV pertencem aos seus
-        respectivos detentores de direitos. A MineTV não é proprietária desse conteúdo.
+        Os filmes, séries, programas e marcas exibidos na CinePlus pertencem aos seus
+        respectivos detentores de direitos. A CinePlus não é proprietária desse conteúdo.
       </p>
 
       <h2>Uso do conteúdo</h2>
@@ -23,9 +23,9 @@ export default function Page() {
 
       <h2>Denunciar um problema</h2>
       <p>
-        Se você é titular de direitos autorais e acredita que algum conteúdo da MineTV
+        Se você é titular de direitos autorais e acredita que algum conteúdo da CinePlus
         viola os seus direitos, envie uma notificação ao suporte com: identificação da
-        obra, o título e o link dentro da MineTV, seus dados de contato e uma declaração
+        obra, o título e o link dentro da CinePlus, seus dados de contato e uma declaração
         de boa-fé. Analisaremos o pedido e removeremos o conteúdo, se for o caso.
       </p>
 

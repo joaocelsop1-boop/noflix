@@ -120,7 +120,7 @@ export default function PlanosPage() {
       <main className="min-h-screen bg-black pb-16 pt-24 md:pt-28">
         <div className="mx-auto max-w-[1100px] px-4 md:px-12">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
-            MineTV · Planos
+            CinePlus · Planos
           </p>
           <h1 className="mt-1 font-display text-[clamp(1.6rem,4vw,2.6rem)] leading-none text-white">
             Escolha seu plano

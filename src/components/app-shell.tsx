@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { ProfileGate } from "@/components/profile-gate";
 import { TitleModal } from "@/components/title-modal";
@@ -11,6 +12,11 @@ import { useStore } from "@/components/store";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { hydrated, profile, setProfile, toasts } = useStore();
+  const pathname = usePathname();
+  // O portão de perfis NUNCA pode cobrir a tela de login: sem perfil local
+  // salvo, ele aparecia por cima do formulário e o usuário não conseguia
+  // nem digitar e-mail e senha (o login parecia não funcionar).
+  const showProfileGate = hydrated && !profile && pathname !== "/login";
   return (
     <>
       {children}
@@ -18,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CloudSync />
 
       <AnimatePresence>
-        {hydrated && !profile && (
+        {showProfileGate && (
           <ProfileGate
             onPick={(picked) => setProfile(picked)}
           />

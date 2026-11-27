@@ -51,7 +51,7 @@ export function SettingsScreen() {
             Settings
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/45">
-            Deixe a MineTV do seu jeito — cores, layout, reprodução e privacidade. Tudo é salvo neste
+            Deixe a CinePlus do seu jeito — cores, layout, reprodução e privacidade. Tudo é salvo neste
             device and, if you are signed in to the cloud, mirrored to your account.
           </p>
 
@@ -86,7 +86,7 @@ export function SettingsScreen() {
 
           <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-5">
             <p className="text-[11.5px] text-white/35">
-              MineTV v1.1 · preferências guardadas localmente
+              CinePlus v1.1 · preferências guardadas localmente
             </p>
             <button
               type="button"
@@ -381,7 +381,7 @@ function AppearancePanel() {
           />
           <ToggleRow
             title="Economia de dados"
-            hint="Menos fileiras ao vivo e arte menor em conexões lentas"
+            hint="Menos fileiras e arte menor em conexões lentas"
             value={settings.dataSaver}
             onChange={(value) => updateSettings({ dataSaver: value })}
           />
@@ -428,7 +428,7 @@ function PlaybackPanel() {
     <div className="space-y-5">
       <Panel
         title="Servidor padrão"
-        hint="A MineTV troca automaticamente se um servidor parar de responder — este é só o ponto de partida."
+        hint="A CinePlus troca automaticamente se um servidor parar de responder — este é só o ponto de partida."
       >
         <div className="grid gap-2 sm:grid-cols-3">
           {PLAYERS.map((server) => (
@@ -574,7 +574,7 @@ function PrivacyPanel() {
         </p>
       </Panel>
 
-      <Panel title="Seus dados" hint="Você é dono de tudo que a MineTV guarda sobre você.">
+      <Panel title="Seus dados" hint="Você é dono de tudo que a CinePlus guarda sobre você.">
         <div className="grid gap-2 sm:grid-cols-3">
           <Stat label="Minha Lista" value={`${myList.length} titles`} />
           <Stat label="Histórico de exibição" value={`${Object.keys(progress).length} titles`} />
@@ -648,7 +648,7 @@ function PrivacyPanel() {
 
 function AboutPanel() {
   const links = [
-    { href: "/about", label: "Sobre a MineTV", hint: "O que é isto e como funciona" },
+    { href: "/about", label: "Sobre a CinePlus", hint: "O que é isto e como funciona" },
     { href: "/privacy", label: "Política de privacidade", hint: "O que é guardado e onde" },
     { href: "/terms", label: "Termos de uso", hint: "As regras de uso" },
     { href: "/dmca", label: "Direitos autorais e DMCA", hint: "Informações de remoção" },
@@ -656,9 +656,9 @@ function AboutPanel() {
 
   return (
     <div className="space-y-5">
-      <Panel title="MineTV" hint="Um front-end de streaming feito com Next.js, TMDB e players de terceiros.">
+      <Panel title="CinePlus" hint="Um front-end de streaming feito com Next.js, TMDB e players de terceiros.">
         <p className="text-[13px] leading-relaxed text-white/55">
-          A MineTV não hospeda nenhum vídeo. É um catálogo e um player: artes e metadados
+          A CinePlus não hospeda nenhum vídeo. É um catálogo e um player: artes e metadados
           vêm do TMDB, e a reprodução acontece dentro de players incorporados operados por terceiros. Se
           gostar de algo que encontrar aqui, assista no serviço que o produziu.
         </p>

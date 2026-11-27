@@ -1,11 +1,12 @@
 <?php
 /**
- * MineTV - API Bridge para o Painel Sigma (Xtream Codes API)
+ * CinePlus - API Bridge para o Painel Sigma (Xtream Codes API)
  * CORRIGIDO:
  * - sem CORS aberto
  * - catálogo exige login; test_connection exige admin
  * - a ação que devolvia a URL direta foi REMOVIDA (o player usa stream.php, que nunca expõe a senha do painel)
- * - test_connection usa SÓ o que está salvo em settings (nada de URL/usuário/senha por POST)
+ * - test_connection exige admin e usa os valores digitados no formulário
+ *   (POST) quando presentes — a URL testada é a digitada, não só a salva
  * - cache em arquivo cache/ (TTL 3600s) nas listas grandes; se o painel falhar,
  *   devolve o cache antigo, senão array vazio (nunca erro fatal)
  * - create_order: pedido pendente + Pix via Mercado Pago (se houver token)
@@ -109,7 +110,7 @@ function call_sigma($url) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -252,9 +253,17 @@ function mp_create_pix($token, $amount, $email, $description, $externalRef) {
 switch ($action) {
     case 'test_connection':
         api_require_admin();
-        // usa SÓ o que está salvo em settings — nada de URL/usuário/senha por POST.
-        // panel_base_url: passa pelo proxy quando configurado.
-        $url = panel_base_url($settings) . "/player_api.php?username=" . urlencode($settings['sigma_username']) . "&password=" . urlencode($settings['sigma_password']);
+        // Valores digitados no formulário do admin (POST) têm prioridade: o
+        // teste usa a URL NOVA, não só a salva. Sem POST, usa o salvo.
+        // Com proxy configurado, o teste passa pelo proxy com ?panel=<URL
+        // digitada> — sem isso o proxy testaria o painel antigo (o fixo dele).
+        $tUrl = normalize_panel_url(trim($_POST['sigma_url'] ?? $settings['sigma_url'] ?? ''));
+        $tUser = trim($_POST['sigma_username'] ?? $settings['sigma_username'] ?? '');
+        $tPass = trim($_POST['sigma_password'] ?? $settings['sigma_password'] ?? '');
+        $tProxy = trim($_POST['panel_proxy'] ?? $settings['panel_proxy'] ?? '');
+        $testBase = $tProxy !== '' ? rtrim($tProxy, '/') : $tUrl;
+        $panelParam = $tProxy !== '' ? '&panel=' . urlencode($tUrl) : '';
+        $url = $testBase . "/player_api.php?username=" . urlencode($tUser) . "&password=" . urlencode($tPass) . $panelParam;
         $res = call_sigma($url);
         if ($res['error']) {
             echo json_encode(['success' => false, 'message' => 'Falha ao conectar: ' . $res['message']]);
@@ -372,7 +381,7 @@ switch ($action) {
         $pdo->prepare("INSERT INTO orders (user_id, plan_id, amount, status) VALUES (?, ?, ?, 'pending')")->execute([$user['id'], $planId, $plan['price']]);
         $orderId = (int)$pdo->lastInsertId();
         if (!empty($settings['mp_access_token'])) {
-            $mp = mp_create_pix(($settings['mp_access_token'] ?? ''), (float)$plan['price'], $user['email'], 'MineTV - Plano ' . $plan['name'], 'minetv-order-' . $orderId);
+            $mp = mp_create_pix(($settings['mp_access_token'] ?? ''), (float)$plan['price'], $user['email'], 'CinePlus - Plano ' . $plan['name'], 'cineplus-order-' . $orderId);
             if ($mp['error']) {
                 echo json_encode(['success' => false, 'message' => $mp['message']]);
                 break;
@@ -449,7 +458,7 @@ switch ($action) {
         break;
 
     case 'public_catalog':
-        // Catálogo público (como o da MineTV): sem login, sem conteúdo adulto,
+        // Catálogo público (como o da CinePlus): sem login, sem conteúdo adulto,
         // só campos de exibição — nunca URLs de stream nem credenciais.
         $pubMovies = filter_adult_items(catalog_list($settings, 'get_vod_streams', '', 'vod'), 'vod', $settings, true);
         $pubSeries = filter_adult_items(catalog_list($settings, 'get_series', '', 'series'), 'series', $settings, true);

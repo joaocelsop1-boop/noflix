@@ -2,21 +2,21 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Termos de uso — MineTV",
-  description: "Termos de uso do serviço de streaming MineTV.",
+  title: "Termos de uso — CinePlus",
+  description: "Termos de uso do serviço de streaming CinePlus.",
 };
 
 export default function Page() {
   return (
     <LegalPage eyebrow="Legal" title="Termos de uso" updated="Novembro de 2026">
       <p>
-        Ao criar uma conta e usar a MineTV, você concorda com estes termos. Leia com
+        Ao criar uma conta e usar a CinePlus, você concorda com estes termos. Leia com
         atenção antes de assinar um plano.
       </p>
 
       <h2>1. O serviço</h2>
       <p>
-        A MineTV é um serviço de streaming por assinatura que oferece filmes, séries e
+        A CinePlus é um serviço de streaming por assinatura que oferece filmes, séries e
         canais ao vivo. O catálogo pode mudar sem aviso prévio: títulos entram e saem
         conforme a disponibilidade.
       </p>

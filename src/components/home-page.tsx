@@ -102,16 +102,22 @@ function TmdbHome() {
 }
 
 export function HomePage() {
-  const [mode, setMode] = useState<"checking" | "panel" | "tmdb">("checking");
+  const [mode, setMode] = useState<"checking" | "panel" | "tmdb" | "panel-error">("checking");
   const [panelData, setPanelData] = useState<PanelHomeData | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    void fetchPanelHomeData().then((data) => {
+    setMode("checking");
+    void fetchPanelHomeData().then(({ loggedIn, data }) => {
       if (!alive) return;
       if (data) {
         setPanelData(data);
         setMode("panel");
+      } else if (loggedIn) {
+        /* logado mas o painel não devolveu nada: erro em PT-BR, nunca
+           cair para o TMDB silenciosamente */
+        setMode("panel-error");
       } else {
         setMode("tmdb");
       }
@@ -119,7 +125,7 @@ export function HomePage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [attempt]);
 
   if (mode === "panel" && panelData) {
     return <PanelHome data={panelData} />;
@@ -129,8 +135,65 @@ export function HomePage() {
     return (
       <>
         <Navbar />
-        <main className="flex min-h-[70vh] items-center justify-center">
-          <p className="text-[14px] text-white/50">Carregando seu catálogo…</p>
+        <main>
+          {/* skeleton da inicial: herói + fileiras, para a tela não parecer
+              travada enquanto o catálogo do painel carrega */}
+          <div className="relative h-[74svh] min-h-[440px] w-full animate-pulse bg-[#1b1b1b] md:h-[88svh] md:min-h-[560px]">
+            <div className="absolute inset-x-0 bottom-[13%] px-4 md:px-12">
+              <div className="h-4 w-32 rounded bg-white/10" />
+              <div className="mt-4 h-12 w-3/4 max-w-[520px] rounded bg-white/10 md:h-16" />
+              <div className="mt-4 h-4 w-56 rounded bg-white/10" />
+              <div className="mt-7 h-12 w-36 rounded bg-white/10" />
+            </div>
+          </div>
+          <div className="relative z-10 -mt-[9vh] pb-10">
+            <p className="px-4 pb-2 pt-4 text-[13px] text-white/50 md:px-12">
+              Carregando seu catálogo…
+            </p>
+            {[0, 1].map((row) => (
+              <div key={row} className="py-3 md:py-4">
+                <div className="mb-2 px-4 md:px-12">
+                  <div className="h-5 w-32 rounded bg-white/10" />
+                </div>
+                <div className="flex gap-2 overflow-hidden px-4 md:px-12">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-[2/3] w-[186px] shrink-0 animate-pulse rounded-[4px] bg-white/[0.06]"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  if (mode === "panel-error") {
+    return (
+      <>
+        <Navbar />
+        <main className="grid min-h-[70vh] place-items-center px-6">
+          <div className="max-w-md text-center">
+            <p className="text-[15px] font-semibold text-white">
+              Não foi possível carregar o catálogo do seu servidor
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+              O painel não respondeu agora. Confira sua conexão e tente
+              novamente — seus filmes e séries aparecem aqui quando o painel
+              voltar.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAttempt((n) => n + 1)}
+              className="mt-5 rounded-md bg-white px-5 py-2.5 text-[13.5px] font-semibold text-black transition hover:bg-white/85"
+            >
+              Tentar novamente
+            </button>
+          </div>
         </main>
         <Footer />
       </>

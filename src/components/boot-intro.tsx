@@ -46,7 +46,7 @@ export function BootIntro() {
           <i />
           <i />
         </span>
-        <span className="nf-boot-word">MineTV</span>
+        <span className="nf-boot-word">CinePlus</span>
         <span className="nf-boot-rule" />
       </div>
       <script dangerouslySetInnerHTML={{ __html: SCRIPT }} />

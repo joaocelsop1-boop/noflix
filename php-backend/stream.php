@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Proxy de streaming (stream.php)
+ * CinePlus - Proxy de streaming (stream.php)
  * - exige login + plano ativo/não vencido (403 caso contrário)
  * - NUNCA expõe usuário/senha do painel em nenhuma URL, HTML, JS ou log:
  *   o navegador só vê stream.php; o painel é acessado só no servidor
@@ -104,7 +104,7 @@ function panel_fetch($url, $timeout = 25) {
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -210,7 +210,7 @@ function serve_passthrough($url, $ext) {
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, 0);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);

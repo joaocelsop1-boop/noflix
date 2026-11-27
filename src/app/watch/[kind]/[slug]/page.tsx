@@ -1,43 +1,10 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { Player } from "@/components/player";
-import { getTitle, seasonsFor } from "@/lib/catalog";
-import { seasonsForTmdb } from "@/lib/seasons";
+import { redirect } from "next/navigation";
 
-/* on demand + hourly: the season list is live TMDB data now */
-export const revalidate = 3600;
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const title = getTitle(slug);
-  return { title: title ? `${title.name} — MineTV` : "MineTV" };
-}
-
-export default async function WatchPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ kind: string; slug: string }>;
-  searchParams: Promise<{ s?: string; e?: string }>;
-}) {
-  const { slug } = await params;
-  const { s, e } = await searchParams;
-  const title = getTitle(slug);
-  if (!title) notFound();
-
-  /* an episode list built from TMDB beats a generated one every time */
-  const seasons =
-    title.kind === "series"
-      ? await seasonsForTmdb(title.tmdbId, seasonsFor(title))
-      : seasonsFor(title);
-  const wanted = Number(s) || 1;
-  const season = seasons.some((entry) => entry.number === wanted) ? wanted : seasons[0]?.number ?? 1;
-  const episodeCount = seasons.find((x) => x.number === season)?.episodes.length ?? 1;
-  const episode = Math.min(Math.max(Number(e) || 1, 1), episodeCount);
-
-  return <Player title={title} initialSeason={season} initialEpisode={episode} seasons={seasons} />;
+/**
+ * A página de play TMDB não existe mais no fluxo do usuário: todo o
+ * conteúdo vem do painel e o play abre direto em /play/0?panel=1. Um link
+ * antigo para /watch/... cai no Navegar (catálogo do painel).
+ */
+export default function WatchPage() {
+  redirect("/browse");
 }

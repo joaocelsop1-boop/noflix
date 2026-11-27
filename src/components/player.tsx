@@ -149,6 +149,8 @@ export function Player({
   const isPanelTitle = title.tmdbId === 0 || Boolean(title.panel);
   /** gate de plano: /api/panel/me disse canWatch=false ou o stream deu 403 */
   const [planBlocked, setPlanBlocked] = useState<string | null>(null);
+  /** motivo do stream do painel ter falhado (ex.: série sem episódios) */
+  const [panelError, setPanelError] = useState<string | null>(null);
   const [panelRetry, setPanelRetry] = useState(0);
   const [anilistId, setAnilistId] = useState<number | null>(title.anilistId ?? null);
   /* anime servers need an AniList id — hold the frame until we have one */
@@ -159,7 +161,7 @@ export function Player({
     resolvePlayer(anime ? "vidnest" : DEFAULT_PLAYER, title),
   );
   /* embeds first — they are live right now, and a stale direct link used to
-     leave the frame black. The MineTV player is opt-in from the server menu. */
+     leave the frame black. The CinePlus player is opt-in from the server menu. */
   const [nativeMode, setNativeMode] = useState(false);
   const [nativeState, setNativeState] = useState<"loading" | "ready" | "none">("loading");
   const [nativeSources, setNativeSources] = useState<NativeSource[]>([]);
@@ -251,6 +253,7 @@ export function Player({
     let alive = true;
     setNativeState("loading");
     setNativeSources([]);
+    setPanelError(null);
 
     /* painel: o stream vem de /api/stream?panel=1 — sem plano ativo o
        servidor responde 403 plan-required e o gate de plano aparece */
@@ -280,7 +283,7 @@ export function Player({
           }
           return res.ok ? res.json() : null;
         })
-        .then((data: { ok?: boolean; sources?: Array<Record<string, unknown>> } | null) => {
+        .then((data: { ok?: boolean; reason?: string; sources?: Array<Record<string, unknown>> } | null) => {
           if (!alive || !data) return;
           /* normaliza o que o painel devolve para o NativeSource: o painel
              marca live como type "m3u8" e o player espera "hls" | "mp4" */
@@ -301,6 +304,16 @@ export function Player({
             setNativeSources(sources);
             setNativeState("ready");
           } else {
+            /* mostra o motivo de verdade, não um erro genérico */
+            if (data?.reason === "no-episodes") {
+              setPanelError("Esta série ainda não tem episódios no painel.");
+            } else if (data?.reason === "panel-unavailable") {
+              setPanelError("O painel não respondeu agora — tente novamente em alguns instantes.");
+            } else if (data?.reason === "plan-required") {
+              setPanelError("Este conteúdo precisa de um plano ativo.");
+            } else {
+              setPanelError("O painel não devolveu um stream para este título agora.");
+            }
             setNativeState("none");
           }
         })
@@ -356,7 +369,7 @@ export function Player({
     setPlayer(resolvePlayer(start, title, title.anilistId ?? null));
     const q = ls.get("nf.quality");
     if (q && (QUALITIES as readonly string[]).includes(q)) setQuality(q as Quality);
-    /* only an explicit opt-in turns the MineTV player back on — except
+    /* only an explicit opt-in turns the CinePlus player back on — except
        títulos do painel, que SEMPRE usam o player próprio, nunca o embed */
     try {
       setNativeMode(isPanelTitle || window.localStorage.getItem("nf.native3") === "1");
@@ -422,7 +435,11 @@ export function Player({
     audio,
   ]);
 
-  const suggestions = useMemo(() => moreLikeThis(title, progress, 6), [title, progress]);
+  /* títulos do painel não têm "Mais como este" do TMDB: sem sugestões */
+  const suggestions = useMemo(
+    () => (isPanelTitle ? [] : moreLikeThis(title, progress, 6)),
+    [isPanelTitle, title, progress],
+  );
 
   /* servers in this title's own failover order */
   const orderedPlayers = useMemo(
@@ -465,7 +482,7 @@ export function Player({
     tried.current.add(player);
     fallbackUsed.current = true;
     setPlayer(candidate);
-    toast(`${playerMeta(player).label} didn't respond — trying ${playerMeta(candidate).label}`);
+    toast(`O ${playerMeta(player).label} não respondeu — tentando ${playerMeta(candidate).label}`);
     return true;
   }, [player, title, toast, anilistId]);
 
@@ -480,7 +497,7 @@ export function Player({
     tried.current.clear();
     setPlayer(next);
     setMenu(false);
-    toast(`Playing from ${playerMeta(next).label}`);
+    toast(`Tocando de ${playerMeta(next).label}`);
   }, [player, title, toast, anilistId]);
 
   /** the server the "try another" button will switch to */
@@ -674,7 +691,7 @@ export function Player({
 
   const changePlayer = (next: PlayerId) => {
     if (!canPlayNow(next)) {
-      toast(`${playerMeta(next).label} has no stream for this title`);
+      toast(`O ${playerMeta(next).label} não tem stream para este título`);
       return;
     }
     tried.current.clear();
@@ -682,14 +699,14 @@ export function Player({
     setNativeMode(false);
     localStorage.setItem("nf.native3", "0");
     ls.set("nf.player", next);
-    toast(`Playing from ${playerMeta(next).label}`);
+    toast(`Tocando de ${playerMeta(next).label}`);
     setMenu(false);
   };
 
   const changeQuality = (next: Quality) => {
     setQuality(next);
     ls.set("nf.quality", next);
-    toast(`Restarting in ${next.toUpperCase()}`);
+    toast(`Reiniciando em ${next.toUpperCase()}`);
     setMenu(false);
   };
 
@@ -736,12 +753,13 @@ export function Player({
           <div>
             <p className="text-[15px] font-semibold">Este conteúdo não começou no player</p>
             <p className="mt-1 text-[12.5px] text-white/55">
-              O painel não devolveu um stream para este título agora.
+              {panelError ?? "O painel não devolveu um stream para este título agora."}
             </p>
             <button
               type="button"
               onClick={() => {
                 setNativeState("loading");
+                setPanelError(null);
                 setPanelRetry((n) => n + 1);
               }}
               className="mt-4 rounded-full bg-white px-4 py-2 text-[12.5px] font-semibold text-black"
@@ -756,7 +774,7 @@ export function Player({
         <div className="absolute inset-0 grid place-items-center">
           <div className="flex flex-col items-center gap-2.5">
             <span className="h-7 w-7 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
-            <p className="text-[12px] font-medium text-white/55">Finding a stream…</p>
+            <p className="text-[12px] font-medium text-white/55">Buscando o stream…</p>
           </div>
         </div>
       )}
@@ -764,6 +782,7 @@ export function Player({
       {nativeActive && nativeState === "ready" && (
         <NativePlayer
           sources={nativeSources}
+          isPanel={isPanelTitle}
           title={`${title.name}${title.kind === "series" ? ` · S${season} E${episode}` : ""}`}
           startAt={startAt}
           onTick={({ current, total }) => {
@@ -792,7 +811,7 @@ export function Player({
             /* this title's stream is dead: drop to an embed for now, but don't
                remember it — the next visit should try our player again */
             setNativeMode(false);
-            toast("MineTV player couldn't start — using a backup server");
+            toast("O player CinePlus não começou — usando um servidor de reserva");
           }}
         />
       )}
@@ -802,7 +821,7 @@ export function Player({
           ref={iframeRef}
           key={src}
           src={src}
-          title={`${title.name} · MineTV`}
+          title={`${title.name} · CinePlus`}
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture; presentation"
           allowFullScreen
           referrerPolicy="origin"
@@ -834,7 +853,7 @@ export function Player({
               }}
               className="pointer-events-auto rounded-full border border-white/20 bg-[#141414]/95 px-4 py-2 text-[12px] font-semibold text-white shadow-2xl backdrop-blur-md transition hover:border-[var(--nf-accent)] hover:bg-[var(--nf-accent)]"
             >
-              Nothing playing yet? Try {playerMeta(nextUp).label} →
+              Nada tocando ainda? Tente {playerMeta(nextUp).label} →
             </button>
           </motion.div>
         )}
@@ -883,7 +902,7 @@ export function Player({
               <div className="max-w-[42vw] rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md">
                 {isPanelTitle && (
                   <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#e50914]">
-                    You&apos;re watching
+                    Você está assistindo
                   </p>
                 )}
                 <p className="truncate text-[12.5px] font-semibold leading-tight text-white">
@@ -891,7 +910,7 @@ export function Player({
                 </p>
                 <p className="truncate text-[10.5px] leading-tight text-white/55">
                   {title.kind === "series"
-                    ? `S${season} · E${episode}${nextEp ? " · Up next ready" : ""}`
+                    ? `S${season} · E${episode}${nextEp ? " · próximo pronto" : ""}`
                     : `${title.year} · ${title.maturity}`}
                 </p>
               </div>
@@ -917,7 +936,7 @@ export function Player({
                   aria-label="Próximo episódio"
                 >
                   <NextIcon width={16} height={16} />
-                  <span className="hidden sm:inline">Next</span>
+                  <span className="hidden sm:inline">Próximo</span>
                 </button>
               )}
 
@@ -940,7 +959,7 @@ export function Player({
                       : "bg-amber-400",
                   )}
                 />
-                {isPanelTitle ? "Painel" : nativeActive ? "MineTV Player" : activePlayer.label}
+                {isPanelTitle ? "Painel" : nativeActive ? "CinePlus Player" : activePlayer.label}
                 <ChevronDownIcon width={13} height={13} />
               </button>
             </motion.div>
@@ -964,7 +983,7 @@ export function Player({
               {isPanelTitle && (
                 <>
                   <p className="mt-1 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                    Select server
+                    Escolher servidor
                   </p>
                   <Row
                     active
@@ -991,7 +1010,7 @@ export function Player({
                 active={nativeMode && nativeState !== "none"}
                 title={
                   <span className="flex items-center gap-1.5">
-                    MineTV Player
+                    CinePlus Player
                     <span className="rounded-sm bg-[var(--nf-accent)] px-1 py-[1px] text-[8px] font-bold uppercase tracking-wide text-white">
                       Native
                     </span>
@@ -999,21 +1018,21 @@ export function Player({
                 }
                 subtitle={
                   nativeState === "none"
-                    ? "No direct stream — using a backup server"
-                    : "Our own player · resume, quality, captions"
+                    ? "Sem stream direto — usando um servidor de reserva"
+                    : "Nosso player · continuar, qualidade, legendas"
                 }
                 disabled={nativeState === "none"}
                 onClick={() => {
                   setNativeMode(true);
                   localStorage.setItem("nf.native3", "1");
                   setMenu(false);
-                  toast("Tocando no player MineTV");
+                  toast("Tocando no player CinePlus");
                 }}
               />
               {!isPanelTitle && (
                 <>
               <p className="mt-1 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                Backup servers
+                Servidores de reserva
               </p>
               {orderedPlayers.map((item) => {
                 const available = canPlayNow(item.id);
@@ -1039,7 +1058,7 @@ export function Player({
               })}
 
               <p className="mt-1 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                Troubleshooting
+                Solução de problemas
               </p>
               <Row
                 title="Próximo servidor"
@@ -1055,10 +1074,10 @@ export function Player({
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[12.5px] font-medium text-white/90">
-                    Open in new tab
+                    Abrir em nova guia
                   </span>
                   <span className="block truncate text-[10.5px] text-white/45">
-                    If the in-site player is blocked
+                    Se o player do site estiver bloqueado
                   </span>
                 </span>
               </a>
@@ -1102,14 +1121,14 @@ export function Player({
               ) : (
                 <p className="mt-1 flex items-start gap-1.5 px-2.5 pb-2 pt-2 text-[10.5px] leading-relaxed text-white/35">
                   <SubtitlesIcon width={13} height={13} className="mt-[1px] shrink-0" />
-                  Quality, subtitles and audio live in {activePlayer.label}&apos;s own bar.
+                  Qualidade, legendas e áudio ficam na barra do {activePlayer.label}.
                 </p>
               )}
 
               {title.kind === "series" && (
                 <>
                   <p className="mt-1 border-t border-white/10 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                    Up next
+                    A seguir
                   </p>
                   {nextEp ? (
                     <Row
@@ -1123,7 +1142,7 @@ export function Player({
                       onClick={() => goTo(nextEp.season, nextEp.episode)}
                     />
                   ) : (
-                    <p className="px-2.5 pb-2 text-[11px] text-white/35">You&apos;re on the last episode.</p>
+                    <p className="px-2.5 pb-2 text-[11px] text-white/35">Você está no último episódio.</p>
                   )}
 
                   {currentSeason && (
@@ -1172,13 +1191,13 @@ export function Player({
               )}
 
               <div className="mt-1 flex items-center justify-between gap-2 border-t border-white/10 px-2.5 pb-2 pt-2">
-                <span className="text-[10.5px] text-white/35">N · next episode</span>
+                <span className="text-[10.5px] text-white/35">N · próximo episódio</span>
                 <button
                   type="button"
                   onClick={restart}
                   className="text-[10.5px] font-semibold text-white/55 transition hover:text-white"
                 >
-                  Restart stream
+                  Reiniciar stream
                 </button>
               </div>
             </motion.div>
@@ -1197,10 +1216,10 @@ export function Player({
             >
               <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
                 <p className="text-[9.5px] font-semibold uppercase tracking-[0.26em] text-[var(--nf-accent)]">
-                  Up next
+                  A seguir
                 </p>
                 <span className="text-[10px] text-white/45">
-                  in {Math.max(upNext.left, 0)}s
+                  em {Math.max(upNext.left, 0)}s
                 </span>
               </div>
 
@@ -1240,7 +1259,7 @@ export function Player({
                   onClick={() => goTo(nextEp.season, nextEp.episode)}
                   className="flex-1 rounded-[4px] bg-white py-1.5 text-[11.5px] font-semibold text-black transition hover:bg-white/85"
                 >
-                  Play next
+                  Assistir
                 </button>
                 <button
                   type="button"
@@ -1270,10 +1289,10 @@ export function Player({
               <div className="flex items-start justify-between gap-3 border-b border-white/10 px-3.5 py-2.5">
                 <div>
                   <p className="text-[9.5px] font-semibold uppercase tracking-[0.26em] text-[var(--nf-accent)]">
-                    Paused
+                    Pausado
                   </p>
                   <h2 className="mt-0.5 text-[13.5px] font-semibold text-white md:text-[15px]">
-                    More Like This
+                    Mais como este
                   </h2>
                 </div>
                 <button

@@ -125,6 +125,58 @@ function firstEpisode(data: unknown): { id: number; ext: string } | null {
 }
 
 /**
+ * Episódio exato de uma série (get_series_info do painel): procura a
+ * temporada e o número do episódio pedidos. Se não existir, cai para o
+ * primeiro episódio — melhor tocar o começo do que travar a tela.
+ */
+function findEpisode(
+  data: unknown,
+  season: number,
+  episode: number,
+): { id: number; ext: string } | null {
+  if (!data || typeof data !== "object") return null;
+  const episodes = (data as Record<string, unknown>).episodes;
+  if (episodes && typeof episodes === "object") {
+    const list = (episodes as Record<string, unknown>)[String(season)];
+    if (Array.isArray(list)) {
+      for (const ep of list) {
+        if (!ep || typeof ep !== "object") continue;
+        const epNum = Number((ep as Record<string, unknown>).episode_num);
+        const id = Number((ep as Record<string, unknown>).id);
+        if (epNum === episode && Number.isFinite(id) && id > 0) {
+          const ext = String((ep as Record<string, unknown>).container_extension ?? "");
+          return { id, ext };
+        }
+      }
+    }
+  }
+  return firstEpisode(data);
+}
+
+/** get_series_info em cache (10 min): trocar de episódio não deve martelar o painel. */
+const SERIES_INFO_TTL = 10 * 60 * 1000;
+const seriesInfoCache = new Map<string, { at: number; data: unknown }>();
+
+async function cachedSeriesInfo(
+  seriesId: number,
+  cookies: string | null,
+): Promise<unknown> {
+  const key = `series:${seriesId}`;
+  const hit = seriesInfoCache.get(key);
+  if (hit && Date.now() - hit.at < SERIES_INFO_TTL) return hit.data;
+  const info = await phpApi("get_series_info", {
+    searchParams: { series_id: String(seriesId) },
+    cookies,
+  });
+  if (info.status === 200 && info.data) {
+    if (seriesInfoCache.size >= 200) seriesInfoCache.clear();
+    seriesInfoCache.set(key, { at: Date.now(), data: info.data });
+    return info.data;
+  }
+  return info.data ?? null;
+}
+
+/**
  * Panel stream: verifies the PHP session (active plan required) and returns
  * the same-origin /php/stream.php proxy URL as both url and proxy.
  */
@@ -147,30 +199,30 @@ async function panelStream(request: Request, searchParams: URLSearchParams) {
     return NextResponse.json({ ok: false, reason: "plan-required", sources: [] }, { status: 403, headers: noStore });
   }
 
-  /* Série sem episódio: o stream do painel é por EPISÓDIO (o id da série não
-     toca). Resolve para o primeiro episódio (menor temporada, menor número)
-     via get_series_info, para o play começar direto no S01E01. */
+  /* Série: o stream do painel é por EPISÓDIO (o id da série não toca).
+     Resolve o episódio via get_series_info — o player sempre manda
+     season=1&episode=1, então resolver SÓ quando não há season/episode
+     deixava o id da série ir direto para o stream.php e a série não
+     tocava. Com season/episode, busca o episódio exato; sem eles, o
+     primeiro (S01E01). */
   let streamId = id;
   let streamExt = ext;
-  if (type === "series" && !season && !episode) {
-    const info = await phpApi("get_series_info", {
-      searchParams: { series_id: String(id) },
-      cookies: request.headers.get("cookie"),
-    });
-    const first = firstEpisode(info.data);
-    if (!first) {
+  if (type === "series") {
+    const data = await cachedSeriesInfo(id, request.headers.get("cookie"));
+    const wanted = findEpisode(
+      data,
+      Math.max(Number(season) || 1, 1),
+      Math.max(Number(episode) || 1, 1),
+    );
+    if (!wanted) {
       return NextResponse.json({ ok: false, reason: "no-episodes", sources: [] }, { headers: noStore });
     }
-    streamId = first.id;
-    streamExt = first.ext || streamExt;
+    streamId = wanted.id;
+    streamExt = wanted.ext || streamExt;
   }
 
   const params = new URLSearchParams({ type, id: String(streamId) });
   if (streamExt) params.set("ext", streamExt);
-  if (type === "series") {
-    if (season) params.set("season", season);
-    if (episode) params.set("episode", episode);
-  }
   const url = `/php/stream.php?${params.toString()}`;
 
   return NextResponse.json(

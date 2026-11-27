@@ -50,7 +50,7 @@ export function SoundNotice() {
             <MuteIcon width={15} height={15} />
           </span>
           <p className="min-w-0 flex-1 text-[12px] leading-snug text-white/80">
-            Este quadro de prévia bloqueia o áudio. Abra a MineTV na própria aba para ouvir tudo.
+            Este quadro de prévia bloqueia o áudio. Abra a CinePlus na própria aba para ouvir tudo.
           </p>
           <button
             type="button"

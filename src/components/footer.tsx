@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { genres, genreSlug } from "@/lib/catalog";
+import { useEffect, useState } from "react";
 
 const columns = [
   [
@@ -16,7 +18,7 @@ const columns = [
   [
     { label: "Configurações", href: "/settings" },
     { label: "Aparência", href: "/settings?tab=appearance" },
-    { label: "Sobre a MineTV", href: "/about" },
+    { label: "Sobre a CinePlus", href: "/about" },
   ],
   [
     { label: "Política de privacidade", href: "/privacy" },
@@ -26,6 +28,48 @@ const columns = [
 ];
 
 export function Footer() {
+  /** Links de categorias DO PAINEL (filmes + séries) — nada de gênero TMDB. */
+  const [panelCategories, setPanelCategories] = useState<
+    Array<{ name: string; slug: string }>
+  >([]);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      fetch("/api/panel/categories?kind=movie", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+      fetch("/api/panel/categories?kind=series", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+    ])
+      .then(([movies, series]) => {
+        if (!alive) return;
+        const seen = new Set<string>();
+        const out: Array<{ name: string; slug: string }> = [];
+        for (const res of [movies, series]) {
+          const list = Array.isArray(res?.categories) ? res.categories : [];
+          for (const c of list) {
+            if (
+              typeof c?.slug === "string" &&
+              typeof c?.name === "string" &&
+              !seen.has(c.slug)
+            ) {
+              seen.add(c.slug);
+              out.push({ name: c.name, slug: c.slug });
+            }
+          }
+        }
+        setPanelCategories(out.slice(0, 12));
+      })
+      .catch(() => {
+        if (alive) setPanelCategories([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <footer className="mt-10 border-t border-white/5 px-4 pb-16 pt-10 text-[13px] text-[#808080] md:px-12">
       <div className="mx-auto max-w-[1100px]">
@@ -34,7 +78,7 @@ export function Footer() {
             href="/about"
             className="rounded-full border border-white/25 px-3 py-1 text-[11px] uppercase tracking-wider transition hover:border-white/60 hover:text-white"
           >
-            Sobre a MineTV
+            Sobre a CinePlus
           </a>
         </div>
 
@@ -50,23 +94,25 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          {genres.slice(0, 12).map((genre) => (
-            <Link
-              key={genre}
-              href={`/genre/${genreSlug(genre)}`}
-              className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/50 transition hover:border-white/40 hover:text-white"
-            >
-              {genre}
-            </Link>
-          ))}
-        </div>
+        {panelCategories.length > 0 && (
+          <div className="mt-8 flex flex-wrap gap-2">
+            {panelCategories.map((category) => (
+              <Link
+                key={category.slug}
+                href={`/genre/${category.slug}`}
+                className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/50 transition hover:border-white/40 hover:text-white"
+              >
+                {category.name}
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="mt-8 space-y-2 text-[11px] leading-relaxed text-white/35">
           <p>
-            MineTV — filmes, séries e canais ao vivo, tudo em um só lugar.
+            CinePlus — filmes, séries e anime, tudo em um só lugar.
           </p>
-          <p className="pt-2">MineTV</p>
+          <p className="pt-2">CinePlus</p>
         </div>
       </div>
     </footer>

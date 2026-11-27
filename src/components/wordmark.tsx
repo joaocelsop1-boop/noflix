@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 /**
- * MineTV-style wordmark. We render it as real text (Anton) instead of using
+ * CinePlus-style wordmark. We render it as real text (Anton) instead of using
  * the trademarked logo file, and give it the signature red + letterspacing.
  */
 export function Wordmark({
@@ -20,16 +20,16 @@ export function Wordmark({
         "wordmark select-none text-[#e50914] drop-shadow-[0_2px_10px_rgba(229,9,20,0.35)]",
         className,
       )}
-      aria-label="MineTV"
+      aria-label="CinePlus"
     >
-      MineTV
+      CinePlus
     </span>
   );
 
   if (!asLink) return content;
 
   return (
-    <Link href={href} className="focus-brand inline-flex shrink-0 items-center" aria-label="MineTV home">
+    <Link href={href} className="focus-brand inline-flex shrink-0 items-center" aria-label="CinePlus home">
       {content}
     </Link>
   );

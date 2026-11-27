@@ -9,7 +9,7 @@ import { fetchPanelMe, panelLogin, panelRegister } from "@/lib/panel";
 type Mode = "login" | "register";
 
 /**
- * Login / cadastro do painel — visual escuro estilo frameXTV/MineTV.
+ * Login / cadastro do painel — visual escuro estilo frameXTV/CinePlus.
  * Em sucesso vai para /browse. Já logado, nem vê o formulário.
  */
 export default function LoginPage() {
@@ -48,7 +48,11 @@ export default function LoginPage() {
           setError(result.error ?? "E-mail ou senha inválidos.");
           return;
         }
-        router.replace("/browse");
+        // Navegação por recarregamento total: o login cria a sessão no
+        // servidor, e o router.replace nem sempre refletia isso de primeira
+        // (o usuário ficava na tela de login e só entrava após refresh
+        // manual). Com o reload, o middleware e a página já veem a sessão.
+        window.location.href = "/browse";
       } else {
         const result = await panelRegister({
           name: name.trim(),
@@ -60,8 +64,12 @@ export default function LoginPage() {
           setError(result.error ?? "Não foi possível criar a conta.");
           return;
         }
-        router.replace("/browse");
+        window.location.href = "/browse";
       }
+    } catch {
+      // Antes não havia catch: se o fetch falhasse (rede, timeout), nada
+      // aparecia na tela e o botão só voltava ao normal.
+      setError("Não foi possível entrar. Confira sua conexão e tente novamente.");
     } finally {
       setBusy(false);
     }
@@ -77,11 +85,11 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-10">
-      <Link href="/" aria-label="MineTV home">
+      <Link href="/" aria-label="CinePlus home">
         <Wordmark className="text-[34px] md:text-[40px]" />
       </Link>
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">
-        You&apos;re watching · MineTV
+        You&apos;re watching · CinePlus
       </p>
 
       <div className="mt-8 w-full max-w-md rounded-xl border border-white/10 bg-[#141414] p-6 shadow-2xl md:p-8">
@@ -215,7 +223,7 @@ export default function LoginPage() {
         )}
 
         <p className="mt-6 text-center text-xs leading-relaxed text-white/35">
-          Ao entrar, você concorda com os termos de uso da MineTV.
+          Ao entrar, você concorda com os termos de uso da CinePlus.
         </p>
       </div>
     </main>

@@ -3,16 +3,16 @@ import Link from "next/link";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Sobre a MineTV",
+  title: "Sobre a CinePlus",
   description:
-    "MineTV é um serviço de streaming com filmes, séries e canais ao vivo. Assista onde quiser, com a sua conta e o seu plano.",
+    "CinePlus é um serviço de streaming com filmes, séries e canais ao vivo. Assista onde quiser, com a sua conta e o seu plano.",
 };
 
 export default function Page() {
   return (
     <LegalPage eyebrow="Sobre" title="Filmes, séries e canais ao vivo" updated="Novembro de 2026">
       <p>
-        A MineTV é um serviço de streaming: filmes, séries e canais ao vivo em um só lugar,
+        A CinePlus é um serviço de streaming: filmes, séries e canais ao vivo em um só lugar,
         para assistir no celular, no computador ou na TV. Você cria a sua conta, escolhe um
         plano e assiste na hora.
       </p>

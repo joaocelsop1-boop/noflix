@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Login do administrador
+ * CinePlus - Login do administrador
  * (o admin.php antigo criava sozinho uma sessão de Super Admin — removido.
  *  Agora só entra quem tiver e-mail/senha de admin no banco.)
  */
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MineTV — Acesso do Administrador</title>
+  <title>CinePlus — Acesso do Administrador</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>

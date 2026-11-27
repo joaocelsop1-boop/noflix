@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Seletor de perfis (máximo 4 por usuário)
+ * CinePlus - Seletor de perfis (máximo 4 por usuário)
  * Depois do login, o usuário escolhe (ou cria) um perfil antes de entrar.
  * O perfil kids esconde o conteúdo adulto. O perfil fica na sessão.
  */
@@ -88,7 +88,7 @@ $profiles = $stmt->fetchAll();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MineTV — Quem está assistindo?</title>
+  <title>CinePlus — Quem está assistindo?</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Manrope:wght@400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>

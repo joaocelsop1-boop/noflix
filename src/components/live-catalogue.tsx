@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { artUrl } from "@/lib/img";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { PlayIcon } from "@/components/icons";
@@ -42,46 +42,6 @@ const TABS: Array<{ id: Tab; label: string; noun: string }> = [
   { id: "anime", label: "Anime", noun: "animes" },
 ];
 
-const GENRES: Record<Tab, Array<{ id: number; name: string }>> = {
-  movie: [
-    { id: 28, name: "Ação" },
-    { id: 12, name: "Adventure" },
-    { id: 16, name: "Animação" },
-    { id: 35, name: "Comédia" },
-    { id: 80, name: "Crime" },
-    { id: 99, name: "Documentário" },
-    { id: 18, name: "Drama" },
-    { id: 10751, name: "Família" },
-    { id: 14, name: "Fantasia" },
-    { id: 27, name: "Terror" },
-    { id: 9648, name: "Mistério" },
-    { id: 10749, name: "Romance" },
-    { id: 878, name: "Ficção científica" },
-    { id: 53, name: "Suspense" },
-    { id: 37, name: "Faroeste" },
-  ],
-  series: [
-    { id: 10759, name: "Action & Adventure" },
-    { id: 16, name: "Animação" },
-    { id: 35, name: "Comédia" },
-    { id: 80, name: "Crime" },
-    { id: 99, name: "Documentário" },
-    { id: 18, name: "Drama" },
-    { id: 10751, name: "Família" },
-    { id: 9648, name: "Mistério" },
-    { id: 10765, name: "Ficção científica e fantasia" },
-    { id: 10764, name: "Reality" },
-  ],
-  anime: [
-    { id: 10759, name: "Ação" },
-    { id: 35, name: "Comédia" },
-    { id: 18, name: "Drama" },
-    { id: 14, name: "Fantasia" },
-    { id: 10765, name: "Ficção científica" },
-    { id: 10749, name: "Romance" },
-  ],
-};
-
 const PAGE = 96;
 
 /**
@@ -94,11 +54,14 @@ const PAGE = 96;
  */
 export function LiveCatalogue({
   initialTab,
+  initialCategory,
   heading = "O catálogo completo",
   chrome = true,
 }: {
   /** the tab this page opens on — the switcher stays available either way */
   initialTab?: Tab;
+  /** categoria do painel (id) que esta página abre filtrada — ex. de /genre/netflix */
+  initialCategory?: { id: string; tab?: Tab };
   heading?: string;
   chrome?: boolean;
 } = {}) {
@@ -106,9 +69,11 @@ export function LiveCatalogue({
   const { profile } = useStore();
   const kids = Boolean(profile?.kids);
 
-  const [tab, setTab] = useState<Tab>(initialTab ?? "movie");
+  const [tab, setTab] = useState<Tab>(initialCategory?.tab ?? initialTab ?? "movie");
   const [audience, setAudience] = useState<AudienceId>("all");
-  const [genreId, setGenreId] = useState<number | undefined>(undefined);
+  /** filtro por categoria DO PAINEL (id) — nada de gênero TMDB aqui */
+  const [categoryId, setCategoryId] = useState<string | undefined>(initialCategory?.id);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [items, setItems] = useState<Entry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -120,7 +85,7 @@ export function LiveCatalogue({
   const load = useCallback(
     async (
       target: Tab,
-      genre: number | undefined,
+      category: string | undefined,
       offset: number,
       audienceId: AudienceId,
     ) => {
@@ -135,7 +100,7 @@ export function LiveCatalogue({
           offset: String(offset),
           limit: String(PAGE),
         });
-        if (genre) params.set("genre", String(genre));
+        if (category) params.set("category", category);
         if (kids) params.set("kids", "1");
         if (audienceId !== "all") params.set("audience", audienceId);
 
@@ -163,14 +128,37 @@ export function LiveCatalogue({
     [kids],
   );
 
+  /* categorias do painel da aba atual — o que o painel manda, na ordem dele */
+  useEffect(() => {
+    let alive = true;
+    void fetch(`/api/panel/categories?kind=${tab}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive) return;
+        const list = Array.isArray(data?.categories) ? data.categories : [];
+        setCategories(
+          list.filter(
+            (c: { id?: unknown; name?: unknown }) =>
+              typeof c.id === "string" && typeof c.name === "string",
+          ),
+        );
+      })
+      .catch(() => {
+        if (alive) setCategories([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tab]);
+
   /* start over whenever the filter changes */
   useEffect(() => {
     setItems([]);
     setTotal(0);
     setDone(false);
     busy.current = false;
-    void load(tab, genreId, 0, audience);
-  }, [tab, genreId, audience, load]);
+    void load(tab, categoryId, 0, audience);
+  }, [tab, categoryId, audience, load]);
 
   /* walk the shelf as you scroll */
   useEffect(() => {
@@ -181,17 +169,17 @@ export function LiveCatalogue({
         /* only walk further once the reader has actually started scrolling —
            otherwise the first paint can chain-load the whole shelf */
         if (entries[0]?.isIntersecting && !busy.current && window.scrollY > 240) {
-          void load(tab, genreId, items.length, audience);
+          void load(tab, categoryId, items.length, audience);
         }
       },
       { rootMargin: "420px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [items.length, done, tab, genreId, audience, load]);
+  }, [items.length, done, tab, categoryId, audience, load]);
 
-  const genres = useMemo(() => GENRES[tab], [tab]);
   const activeTab = TABS.find((entry) => entry.id === tab) ?? TABS[0];
+  const activeCategory = categories.find((c) => c.id === categoryId);
   const progress = total > 0 ? Math.round((items.length / total) * 100) : 0;
 
   return (
@@ -209,7 +197,7 @@ export function LiveCatalogue({
               </h1>
               <p className="mt-2 max-w-[60ch] text-[12.5px] text-white/50">
                 {total > 0
-                  ? `${total.toLocaleString()} ${activeTab.noun} prontos para assistir — ${items.length.toLocaleString()} carregados${genreId ? " após o filtro" : ""}. Mais títulos aparecem ao rolar.`
+                  ? `${total.toLocaleString()} ${activeTab.noun} prontos para assistir — ${items.length.toLocaleString()} carregados${activeCategory ? ` em “${activeCategory.name}”` : ""}. Mais títulos aparecem ao rolar.`
                   : kids
                     ? "Carregando a prateleira segura — família, animação e comédia."
                     : "Carregando a prateleira — filmes, séries e anime, por popularidade."}
@@ -222,7 +210,7 @@ export function LiveCatalogue({
                     key={entry.id}
                     type="button"
                     onClick={() => {
-                      setGenreId(undefined);
+                      setCategoryId(undefined);
                       setTab(entry.id);
                     }}
                     className={cn(
@@ -251,24 +239,24 @@ export function LiveCatalogue({
             ))}
             {kids && (
               <span className="text-[11px] text-white/40">
-                Kid-safe profile — mature titles are hidden
+                Perfil infantil — títulos adultos estão ocultos
               </span>
             )}
           </div>
 
-          {/* genre chips */}
-          {genres.length > 0 && (
+          {/* categorias do painel — o que o servidor manda, na ordem dele */}
+          {categories.length > 0 && (
             <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
-              <Chip active={!genreId} onClick={() => setGenreId(undefined)}>
-                All
+              <Chip active={!categoryId} onClick={() => setCategoryId(undefined)}>
+                Tudo
               </Chip>
-              {genres.map((genre) => (
+              {categories.map((category) => (
                 <Chip
-                  key={genre.id}
-                  active={genreId === genre.id}
-                  onClick={() => setGenreId(genre.id === genreId ? undefined : genre.id)}
+                  key={category.id}
+                  active={categoryId === category.id}
+                  onClick={() => setCategoryId(category.id === categoryId ? undefined : category.id)}
                 >
-                  {genre.name}
+                  {category.name}
                 </Chip>
               ))}
             </div>
@@ -307,20 +295,7 @@ export function LiveCatalogue({
                 className="group relative overflow-hidden rounded-[6px] bg-[#1b1b1b] text-left ring-1 ring-white/5 transition duration-200 hover:z-10 hover:ring-white/40 focus-brand"
               >
                 <span className="relative block aspect-[2/3] w-full overflow-hidden">
-                  {item.poster ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={artUrl(item.poster)}
-                      alt={item.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
-                    />
-                  ) : (
-                    <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#232323] to-[#0f0f0f] p-2 text-center text-[11px] text-white/60">
-                      {item.name}
-                    </span>
-                  )}
+                  <CataloguePoster item={item} />
                   <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
                   <span className="absolute inset-0 grid place-items-center opacity-0 transition group-hover:opacity-100">
                     <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-black/40 text-white">
@@ -366,22 +341,22 @@ export function LiveCatalogue({
           {done && items.length === 0 && !loading && (
             <div className="pb-8 text-center">
               <p className="text-[13px] text-white/55">
-                Não foi possível carregar a prateleira agora — o catálogo curado continua
-                aqui.
+                Não foi possível carregar a prateleira agora — confira sua conexão e
+                tente novamente.
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
                 <a
-                  href="/new-popular"
+                  href="/browse"
                   className="rounded-full bg-white px-4 py-1.5 text-[12.5px] font-semibold text-black transition hover:bg-white/85"
                 >
-                  Navegar pelo catálogo curado
+                  Navegar pelo catálogo
                 </a>
                 <button
                   type="button"
                   onClick={() => {
                     setDone(false);
                     setLoading(true);
-                    void load(tab, genreId, 0, audience);
+                    void load(tab, categoryId, 0, audience);
                   }}
                   className="rounded-full bg-white/10 px-4 py-1.5 text-[12.5px] font-semibold text-white/85 transition hover:bg-white/20"
                 >
@@ -394,6 +369,33 @@ export function LiveCatalogue({
       </main>
       {chrome && <Footer />}
     </>
+  );
+}
+
+/**
+ * Capa com fallback imediato: se a URL do painel estiver morta (404/403 no
+ * servidor de imagens), o <img> quebra e o gradiente com o título aparece
+ * na hora — a fileira não fica esperando o erro de rede.
+ */
+function CataloguePoster({ item }: { item: Entry }) {
+  const [broken, setBroken] = useState(false);
+  if (!item.poster || broken) {
+    return (
+      <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-[#232323] to-[#0f0f0f] p-2 text-center text-[11px] text-white/60">
+        {item.name}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={artUrl(item.poster)}
+      alt={item.name}
+      loading="lazy"
+      decoding="async"
+      onError={() => setBroken(true)}
+      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
+    />
   );
 }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Painel Administrativo Completo
+ * CinePlus - Painel Administrativo Completo
  */
 require_once __DIR__ . '/config.php';
 
@@ -13,12 +13,15 @@ require_admin();
 // erro distingue DNS/timeout (getaddrinfo) de HTTP 404 (sem painel instalado).
 // $base já é a base pronta: o proxy (quando configurado) ou a URL do painel
 // normalizada. O proxy preserva o caminho, então /player_api.php chega ao painel.
-function test_panel_server($base, $user, $pass) {
-    $testUrl = rtrim($base, '/') . "/player_api.php?username=" . urlencode($user) . "&password=" . urlencode($pass);
+// $panelParam: "&panel=<url>" quando a base é o proxy — diz ao proxy QUAL
+// painel testar. Sem ele, o proxy testaria o painel fixo dele (o antigo),
+// e trocar a URL no campo não mudaria o resultado do teste.
+function test_panel_server($base, $user, $pass, $panelParam = '') {
+    $testUrl = rtrim($base, '/') . "/player_api.php?username=" . urlencode($user) . "&password=" . urlencode($pass) . $panelParam;
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $testUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -76,8 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Testa o servidor NOVO ANTES de salvar: se ele não responder, NADA
         // é salvo (nem a URL) e o catálogo antigo é mantido. Antes o UPDATE
         // rodava primeiro e a URL ruim sobrescrevia a boa — depois disso o
-        // catálogo não tinha mais como reconstruir.
-        $test = test_panel_server($testBase, $newUser, $newPass);
+        // catálogo não tinha mais como reconstruir. Com proxy, o teste leva
+        // ?panel=<URL nova> para o proxy testar o painel NOVO, não o antigo.
+        $panelParam = $newProxy !== '' ? '&panel=' . urlencode($newUrl) : '';
+        $test = test_panel_server($testBase, $newUser, $newPass, $panelParam);
         if ($test['ok']) {
             $stmt = $pdo->prepare("UPDATE settings SET sigma_url = ?, sigma_username = ?, sigma_password = ?, panel_proxy = ?, affiliate_percent = ?, trial_hours = ?, mp_access_token = ?, pix_key = ? WHERE id = 1");
             $stmt->execute([
@@ -106,7 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // fora do ar, o catálogo sumia e não tinha como reconstruir.
     elseif ($action === 'clear_cache') {
         $cur = get_settings($pdo);
-        $test = test_panel_server(panel_base_url($cur), $cur['sigma_username'], $cur['sigma_password']);
+        $curPanelParam = !empty($cur['panel_proxy']) ? '&panel=' . urlencode(normalize_panel_url($cur['sigma_url'] ?? '')) : '';
+        $test = test_panel_server(panel_base_url($cur), $cur['sigma_username'], $cur['sigma_password'], $curPanelParam);
         if ($test['ok']) {
             clear_catalog_cache();
             $msg = "Cache do catálogo limpo! Recarregue o player para puxar tudo de novo do painel.";
@@ -321,7 +327,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MineTV — Painel Administrativo</title>
+  <title>CinePlus — Painel Administrativo</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -337,7 +343,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
   <!-- Cabeçalho Principal -->
   <header class="bg-[#12141c] border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
     <div class="flex items-center gap-4">
-      <h1 class="font-pixel text-xl text-red-500 tracking-wider">MineTV</h1>
+      <h1 class="font-pixel text-xl text-red-500 tracking-wider">CinePlus</h1>
       <span class="text-xs px-2 py-1 bg-red-950/80 border border-red-700/50 text-red-400 rounded font-semibold uppercase">Painel ADM</span>
     </div>
     <div class="flex items-center gap-4 text-sm">
@@ -498,6 +504,7 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
             <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm hover:bg-red-700 transition">Salvar Configurações</button>
             <button type="button" onclick="testSigmaConnection()" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded text-sm transition">Testar Conexão</button>
           </div>
+          <p class="text-[11px] text-gray-500 mt-2">O teste usa a URL digitada no campo acima — não precisa salvar antes de testar. O resultado mostra qual URL foi testada.</p>
         </form>
 
         <div id="test-result-box" class="mt-6 p-4 rounded-lg bg-gray-900 border border-gray-800 hidden text-sm"></div>
@@ -955,6 +962,14 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
     async function testSigmaConnection() {
       const statusDash = document.getElementById('dash-sigma-status');
       const box = document.getElementById('test-result-box');
+      // O teste usa a URL digitada no campo — não precisa salvar antes de
+      // testar. Sem isso, trocar a URL e clicar em Testar mostrava o painel
+      // ANTIGO (o salvo), e não havia como testar a URL nova.
+      const field = (name) => {
+        const el = document.querySelector('input[name="' + name + '"]');
+        return el ? el.value : '';
+      };
+      const typedUrl = field('sigma_url').trim();
       if (statusDash) statusDash.innerText = 'Testando conexão...';
       if (box) {
         box.classList.remove('hidden');
@@ -962,15 +977,23 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
       }
 
       try {
-        const res = await fetch('api.php?action=test_connection', { method: 'POST' });
+        const form = new FormData();
+        form.append('sigma_url', field('sigma_url'));
+        form.append('sigma_username', field('sigma_username'));
+        form.append('sigma_password', field('sigma_password'));
+        form.append('panel_proxy', field('panel_proxy'));
+        const res = await fetch('api.php?action=test_connection', { method: 'POST', body: form });
         const data = await res.json();
+        const testedLine = typedUrl
+          ? '<div class="text-xs text-gray-400 mt-1">URL testada: ' + typedUrl.replace(/</g, '&lt;') + '</div>'
+          : '';
         if (data.success) {
           const successHtml = `<div class="text-emerald-400 font-bold">✓ ${data.message}</div>
-                               <div class="text-xs text-gray-400 mt-1">Status: ${data.status} | Conexões: ${data.active_cons}/${data.max_connections} | Expira em: ${data.exp_date}</div>`;
+                               <div class="text-xs text-gray-400 mt-1">Status: ${data.status} | Conexões: ${data.active_cons}/${data.max_connections} | Expira em: ${data.exp_date}</div>` + testedLine;
           if (box) box.innerHTML = successHtml;
           if (statusDash) statusDash.innerHTML = '<span class="text-emerald-400 font-bold">Online ✓</span>';
         } else {
-          const errHtml = `<div class="text-red-400 font-bold">✕ Erro: ${data.message}</div>`;
+          const errHtml = `<div class="text-red-400 font-bold">✕ Erro: ${data.message}</div>` + testedLine;
           if (box) box.innerHTML = errHtml;
           if (statusDash) statusDash.innerHTML = '<span class="text-red-400 font-bold">Falhou ✕</span>';
         }

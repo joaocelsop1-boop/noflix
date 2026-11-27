@@ -52,6 +52,36 @@ const num = (value: unknown): number | undefined => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+/** Normaliza para busca: minúsculo e sem acento ("ação" casa com "acao"). */
+function normText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+/** Cache do catálogo do painel (10 min por aba): o catálogo é o mesmo para
+ * todo mundo (um só painel no admin) e buscar 20 mil filmes + 10 mil séries
+ * no Xtream a cada abertura deixava a inicial lenta. Só guarda resultado
+ * não-vazio; vazio (deslogado/painel fora) nunca é cacheado. */
+const PANEL_CACHE_TTL = 10 * 60 * 1000;
+const panelCache = new Map<string, { at: number; entries: CatalogueEntry[] }>();
+
+/** Exportado para a rota /api/panel/categories (aba Anime deriva as categorias dos itens). */
+export async function cachedPanelCatalogue(
+  tab: CatalogueTab,
+  cookies: string | null,
+): Promise<CatalogueEntry[]> {
+  const hit = panelCache.get(tab);
+  if (hit && Date.now() - hit.at < PANEL_CACHE_TTL) return hit.entries;
+  const entries = await panelCatalogue(tab, cookies);
+  if (entries.length > 0) {
+    if (panelCache.size >= 10) panelCache.clear();
+    panelCache.set(tab, { at: Date.now(), entries });
+  }
+  return entries;
+}
+
 const str = (value: unknown): string | undefined =>
   typeof value === "string" && value.length ? value : undefined;
 
@@ -91,6 +121,8 @@ function mapPanelItem(
     anime: anime || undefined,
     audience: kids ? "kids" : "general",
     panel: { type: kind, id },
+    // id da categoria do painel — o filtro por categoria da aba usa ele.
+    categoryId: str(raw.category_id),
   };
 }
 
@@ -146,7 +178,7 @@ async function panelCatalogue(
 }
 
 /**
- * GET /api/catalogue?tab=movie|series|anime&offset=0&limit=120&genre=28&kids=1
+ * GET /api/catalogue?tab=movie|series|anime&offset=0&limit=120&genre=28&kids=1&q=termo
  *
  * A prateleira de um aba, ordenada por popularidade. `total` é o tamanho da
  * prateleira inteira, `results` é a janela pedida — a interface percorre 120
@@ -167,14 +199,18 @@ export async function GET(request: Request) {
   const offset = Math.max(Number(searchParams.get("offset") ?? 0) || 0, 0);
   const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 120) || 120, 1), 240);
   const genre = Number(searchParams.get("genre")) || 0;
+  const category = (searchParams.get("category") ?? "").trim();
   const kids = searchParams.get("kids") === "1";
   const audience = searchParams.get("audience");
+  const q = normText((searchParams.get("q") ?? "").trim());
 
   // Sem chave TMDB: usa o catálogo do painel (o usuário está logado e o
   // painel está configurado no admin). Sem painel/logado, volta vazio.
   if (!hasCatalogueKey()) {
-    const all = await panelCatalogue(tab, request.headers.get("cookie"));
+    const all = await cachedPanelCatalogue(tab, request.headers.get("cookie"));
     let filtered = all;
+    if (q) filtered = filtered.filter((entry) => normText(entry.name).includes(q));
+    if (category) filtered = filtered.filter((entry) => entry.categoryId === category);
     if (audience === "kids") filtered = filtered.filter((entry) => entry.audience === "kids" || isKidsEntry(entry));
     if (audience === "mature") filtered = filtered.filter((entry) => entry.audience === "mature");
     if (genre) filtered = filtered.filter((entry) => entry.genres.includes(genre));
@@ -197,6 +233,7 @@ export async function GET(request: Request) {
 
   const all = await buildCatalogue(tab);
   let filtered = all;
+  if (q) filtered = filtered.filter((entry) => normText(entry.name).includes(q));
   if (audience === "kids") filtered = filtered.filter((entry) => entry.audience === "kids" || isKidsEntry(entry));
   if (audience === "mature") filtered = filtered.filter((entry) => entry.audience === "mature");
   if (genre) filtered = filtered.filter((entry) => entry.genres.includes(genre));

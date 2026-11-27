@@ -1,9 +1,9 @@
 <?php
 /**
- * proxy-painel.php — Proxy do painel Xtream para o NOFLIX (MineTV)
+ * proxy-painel.php — Proxy do painel Xtream para o NOFLIX (CinePlus)
  *
  * POR QUE EXISTE:
- * O painel (glove77.site:80) só responde à API (player_api.php / get.php /
+ * O painel (brblack.site:80) só responde à API (player_api.php / get.php /
  * streams) para IPs liberados. O IP do cPanel está liberado, o da Oracle
  * (onde roda o NOFLIX) NÃO está — de lá o painel devolve 404 em tudo.
  * Este arquivo fica NO CPANEL (que o painel aceita) e encaminha as chamadas
@@ -11,7 +11,7 @@
  *
  * COMO FUNCIONA:
  *   NOFLIX (Oracle) chama:  https://<seu-cpanel>/proxy-painel.php/player_api.php?username=..&password=..&action=..
- *   Este arquivo chama:     http://glove77.site:80/player_api.php?username=..&password=..&action=..
+ *   Este arquivo chama:     http://brblack.site:80/player_api.php?username=..&password=..&action=..
  *   e devolve a resposta (JSON ou binário) para o NOFLIX.
  * O mesmo vale para os streams: /live/usuario/senha/123.m3u8, /movie/..., .ts etc.
  *
@@ -41,7 +41,7 @@
 // painel em cada chamada (?panel=http://...), que vem do campo "URL do
 // Servidor" do admin — trocou lá, o proxy passa a usar a nova URL sozinho,
 // sem precisar editar este arquivo. Só edite aqui se quiser outro padrão.
-$PANEL_BASE = 'http://glove77.site:80';   // painel Xtream (sem barra no fim)
+$PANEL_BASE = 'http://brblack.site:80';   // painel Xtream (sem barra no fim)
 $ALLOWED_IP = '129.146.127.7';            // IP público da Oracle (onde roda o NOFLIX)
 
 // ---- só o NOFLIX (Oracle) pode usar o proxy ----
@@ -99,7 +99,7 @@ curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 // Sem limite de tempo: um filme pode levar horas para tocar; o limite é
 // do servidor web, não daqui. (Antes era 60s e o filme morria no meio.)
 curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-curl_setopt($ch, CURLOPT_USERAGENT, 'MineTV-WebPlayer/1.0');
+curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 // Repassa o cabeçalho Range (pular/adiantar o vídeo) e o método/corpo.

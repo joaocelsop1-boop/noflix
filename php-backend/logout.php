@@ -1,6 +1,6 @@
 <?php
 /**
- * MineTV - Sair (logout)
+ * CinePlus - Sair (logout)
  */
 session_start();
 $_SESSION = [];

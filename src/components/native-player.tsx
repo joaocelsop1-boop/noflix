@@ -53,7 +53,7 @@ const fmt = (value: number) => {
 type Level = { index: number; label: string };
 
 /**
- * MineTV's own player.
+ * CinePlus's own player.
  *
  * hls.js owns the transport, we own every pixel: Netflix-shaped controls,
  * resume, quality, captions, PiP, fullscreen and keyboard shortcuts. No
@@ -69,6 +69,7 @@ export function NativePlayer({
   onError,
   onNext,
   nextLabel,
+  isPanel = false,
 }: {
   sources: NativeSource[];
   title: string;
@@ -80,18 +81,24 @@ export function NativePlayer({
   /** play the next episode — powers the Netflix-style end card */
   onNext?: () => void;
   nextLabel?: string;
+  /** título do painel: sem servidor de reserva (não há embed) */
+  isPanel?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
   /**
    * Reforço de volume (Web Audio): o volume do <video> só vai até 1 (100%)
-   * e o áudio do painel chega baixo. O GainNode amplifica até 2x (200%).
+   * e o áudio do painel chega baixo. O GainNode amplifica até 4x (400%).
    * Criado uma única vez por elemento (createMediaElementSource só pode
    * ser chamado uma vez) e reutilizado em todas as trocas de fonte.
+   *
+   * O boost é ligado quando a reprodução começa (não só quando o usuário
+   * toca nos controles): sem isso, quem assiste no autoplay nunca tinha
+   * o reforço e o volume ficava baixo mesmo com o padrão em 150%.
    */
   const audioBoost = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
-  /** Ganho alvo (0 a 2). O slider de volume controla este valor. */
-  const gainTarget = useRef(1.5);
+  /** Ganho alvo (0 a 4). O slider de volume controla este valor. */
+  const gainTarget = useRef(2);
   const ensureAudioBoost = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -139,9 +146,9 @@ export function NativePlayer({
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1.5);
+  const [volume, setVolume] = useState(2);
   const [muted, setMuted] = useState(false);
-  /* Sincroniza o ganho de volume (0 a 2) com o estado do slider. */
+  /* Sincroniza o ganho de volume (0 a 4) com o estado do slider. */
   useEffect(() => {
     gainTarget.current = volume;
     const boost = audioBoost.current;
@@ -237,6 +244,10 @@ export function NativePlayer({
 
     const startPlayback = () => {
       if (!autoPlay) return;
+      /* liga o reforço de volume junto com a reprodução: no autoplay
+         ninguém toca nos controles, e sem esta chamada o ganho nunca
+         era criado (o áudio ficava no volume 1.0 do elemento). */
+      ensureAudioBoost();
       void video
         .play()
         .then(() => setWaiting(false))
@@ -456,10 +467,15 @@ export function NativePlayer({
     const onPlay = () => {
       setPlaying(true);
       setWaiting(false);
+      /* retoma o AudioContext se a política de autoplay o suspendeu */
+      ensureAudioBoost();
     };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setWaiting(true);
-    const onPlaying = () => setWaiting(false);
+    const onPlaying = () => {
+      setWaiting(false);
+      ensureAudioBoost();
+    };
     const onVolume = () => {
       // O volume do elemento fica sempre em 1 (o ganho do Web Audio é quem
       // controla o volume) — aqui só sincroniza o mudo.
@@ -610,7 +626,7 @@ export function NativePlayer({
     if (!video) return;
     ensureAudioBoost();
     video.muted = !video.muted;
-    if (!video.muted && volume === 0) setVolume(1.5);
+    if (!video.muted && volume === 0) setVolume(2);
   }, [ensureAudioBoost, volume]);
 
   const toggleFullscreen = useCallback(() => {
@@ -665,7 +681,7 @@ export function NativePlayer({
           break;
         case "arrowup":
           event.preventDefault();
-          setVolume((v) => Math.min(2, Math.round((v + 0.1) * 100) / 100));
+          setVolume((v) => Math.min(4, Math.round((v + 0.1) * 100) / 100));
           poke();
           break;
         case "arrowdown":
@@ -770,7 +786,7 @@ export function NativePlayer({
             <span className="h-10 w-10 animate-spin rounded-full border-2 border-white/25 border-t-[var(--nf-accent)]" />
             {slow && (
               <p className="text-[12px] font-medium text-white/60">
-                Connecting to {playable[sourceIndex]?.label ?? "the stream"}…
+                Conectando ao {playable[sourceIndex]?.label ?? "stream"}…
               </p>
             )}
           </div>
@@ -781,9 +797,11 @@ export function NativePlayer({
       {failed && (
         <div className="absolute inset-0 grid place-items-center bg-black/85 px-6 text-center">
           <div>
-            <p className="text-[15px] font-semibold">This title didn&apos;t start in the MineTV player</p>
+            <p className="text-[15px] font-semibold">Este título não começou no player CinePlus</p>
             <p className="mt-1 text-[12.5px] text-white/55">
-              Switch to a backup server from the menu — the embeds are still there.
+              {isPanel
+                ? "Tente novamente — se persistir, confira o painel."
+                : "Troque de servidor no menu — os embeds continuam lá."}
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">
               <button
@@ -791,15 +809,17 @@ export function NativePlayer({
                 onClick={retryAll}
                 className="rounded-full bg-white px-4 py-2 text-[12.5px] font-semibold text-black"
               >
-                Try again
+                Tentar novamente
               </button>
-              <button
-                type="button"
-                onClick={() => onError?.()}
-                className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold text-white"
-              >
-                Backup server
-              </button>
+              {!isPanel && (
+                <button
+                  type="button"
+                  onClick={() => onError?.()}
+                  className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold text-white"
+                >
+                  Servidor de reserva
+                </button>
+              )}
             </div>
             <p className="mt-2 text-[11px] text-white/35">
               {playable.length} source{playable.length === 1 ? "" : "s"} tried ·{" "}
@@ -828,7 +848,7 @@ export function NativePlayer({
           }}
           className="absolute bottom-24 right-4 z-30 rounded-md bg-white/90 px-3.5 py-2 text-[12px] font-semibold text-black shadow-lg transition hover:bg-white md:right-6"
         >
-          Skip intro
+          Pular introdução
         </button>
       )}
 
@@ -836,7 +856,7 @@ export function NativePlayer({
       {nextIn !== null && onNext && !failed && (
         <div className="absolute bottom-24 right-4 z-30 w-[228px] rounded-lg border border-white/10 bg-[#141414]/95 p-3 shadow-2xl backdrop-blur-xl md:right-6">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
-            {nextIn > 0 ? `Next episode in ${nextIn}` : "Próximo episódio"}
+            {nextIn > 0 ? `Próximo episódio em ${nextIn}` : "Próximo episódio"}
           </p>
           <p className="mt-1 truncate text-[13px] font-semibold">{nextLabel ?? "A seguir"}</p>
           <div className="mt-2.5 flex items-center gap-2">
@@ -848,7 +868,7 @@ export function NativePlayer({
               }}
               className="flex-1 rounded-md bg-white px-3 py-1.5 text-[12px] font-semibold text-black"
             >
-              Play now
+              Assistir agora
             </button>
             <button
               type="button"
@@ -858,7 +878,7 @@ export function NativePlayer({
               }}
               className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white/80"
             >
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>
@@ -926,7 +946,7 @@ export function NativePlayer({
               <input
                 type="range"
                 min={0}
-                max={2}
+                max={4}
                 step={0.05}
                 value={muted ? 0 : volume}
                 onChange={(event) => {
@@ -1124,7 +1144,7 @@ export function NativePlayer({
 
       {/* title chip */}
       <div className={cn("pointer-events-none absolute left-4 top-3 z-30 transition-opacity", chrome ? "opacity-100" : "opacity-0")}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--nf-accent)]">MineTV Player</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--nf-accent)]">CinePlus Player</p>
         <p className="max-w-[60vw] truncate text-[13px] font-semibold text-white/90">{title}</p>
       </div>
     </div>

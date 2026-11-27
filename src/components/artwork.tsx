@@ -104,7 +104,7 @@ export function Artwork({
           }}
         >
           <span className="text-[8.5px] font-semibold uppercase tracking-[0.28em] text-white/45">
-            {hasRemotePoster(slug) ? "MineTV" : "Arte"}
+            {hasRemotePoster(slug) ? "CinePlus" : "Arte"}
           </span>
           <span className="font-display text-[15px] leading-[1.05] tracking-wide text-white/90 [text-wrap:balance]">
             {name}

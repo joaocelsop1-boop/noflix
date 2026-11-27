@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { SettingsScreen } from "@/components/settings-screen";
 
-export const metadata: Metadata = { title: "Configurações — MineTV" };
+export const metadata: Metadata = { title: "Configurações — CinePlus" };
 
 export default function Page() {
   return (
