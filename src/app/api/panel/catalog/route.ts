@@ -24,6 +24,7 @@ export async function GET(request: Request) {
 
   const result = await phpApi(action, {
     cookies: request.headers.get("cookie"),
+    timeoutMs: 60_000,
     searchParams: {
       category_id: searchParams.get("category_id") ?? undefined,
       limit: searchParams.get("limit") ?? undefined,

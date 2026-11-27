@@ -114,12 +114,12 @@ function catalog_cache_put($key, $data) {
 }
 
 // ---------- chamada ao painel ----------
-function call_sigma($url) {
+function call_sigma($url, $timeout = 20) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -207,7 +207,10 @@ function catalog_list($settings, $action, $extra, $cacheKey) {
     if ($cached && (time() - $cached['mtime'] < CATALOG_CACHE_TTL)) {
         return $cached['data'];
     }
-    $res = call_sigma(sigma_url($settings, $action, $extra));
+    // Listas do catalogo sao grandes (20 mil filmes) e o painel via proxy pode
+    // levar mais que os 20 s padrao para gerar+enviar — 60 s aqui, senao o
+    // catalogo frio nunca popula o cache e os filmes somem.
+    $res = call_sigma(sigma_url($settings, $action, $extra), 60);
     if ($res['error']) {
         // painel falhou: devolve o cache antigo se existir, senão vazio
         if ($cached) return $cached['data'];

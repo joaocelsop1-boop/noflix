@@ -100,11 +100,17 @@ curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 // do servidor web, não daqui. (Antes era 60s e o filme morria no meio.)
 curl_setopt($ch, CURLOPT_TIMEOUT, 0);
 curl_setopt($ch, CURLOPT_USERAGENT, 'CinePlus-WebPlayer/1.0');
-// tudo12: fail fast se o painel travar — uma conexao pendurada espera para
-// sempre (pior que fechar: fechada, o navegador retoma com um novo Range;
-// pendurada, so gira). 1 KB/s por 30 s.
-curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
-curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 30);
+// tudo12/tudo14: fail fast se o painel travar num STREAM (video) — uma
+// conexao pendurada espera para sempre (pior que fechar: fechada, o navegador
+// retoma com um novo Range; pendurada, so gira). 1 KB/s por 30 s.
+// tudo14: NAO vale para chamadas de API (player_api.php): o painel leva tempo
+// para GERAR listas grandes (get_vod_streams = 20 mil filmes) antes de mandar
+// o primeiro byte, e abortar apos 30 s de silencio matava o catalogo de filmes.
+// API ja tem timeout proprio (call_sigma/phpApi).
+if (strpos($path, 'player_api.php') === false) {
+    curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1024);
+    curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 30);
+}
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 // Repassa o cabeçalho Range (pular/adiantar o vídeo) e o método/corpo.

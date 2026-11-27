@@ -79,6 +79,8 @@ export function LiveCatalogue({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
+  /** true só quando a carga FALHOU (rede/HTTP) — diferente de prateleira vazia */
+  const [loadError, setLoadError] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
   const run = useRef(0);
@@ -94,6 +96,7 @@ export function LiveCatalogue({
       busy.current = true;
       const ticket = ++run.current;
       setLoading(true);
+      setLoadError(false);
 
       try {
         const params = new URLSearchParams({
@@ -106,6 +109,13 @@ export function LiveCatalogue({
         if (audienceId !== "all") params.set("audience", audienceId);
 
         const res = await fetch(apiUrl(`/api/catalogue?${params.toString()}`));
+        if (!res.ok) {
+          if (ticket === run.current) {
+            setLoadError(true);
+            setDone(true);
+          }
+          return;
+        }
         const data = (await res.json()) as {
           results?: Entry[];
           total?: number;
@@ -118,7 +128,10 @@ export function LiveCatalogue({
         setItems((current) => (offset === 0 ? fresh : [...current, ...fresh]));
         setDone(fresh.length === 0 || offset + fresh.length >= (data.total ?? 0));
       } catch {
-        if (ticket === run.current) setDone(true);
+        if (ticket === run.current) {
+          setLoadError(true);
+          setDone(true);
+        }
       } finally {
         if (ticket === run.current) {
           setLoading(false);
@@ -157,6 +170,7 @@ export function LiveCatalogue({
     setItems([]);
     setTotal(0);
     setDone(false);
+    setLoadError(false);
     busy.current = false;
     void load(tab, categoryId, 0, audience);
   }, [tab, categoryId, audience, load]);
@@ -339,7 +353,7 @@ export function LiveCatalogue({
               É toda a prateleira — {items.length.toLocaleString()} {activeTab.noun}.
             </p>
           )}
-          {done && items.length === 0 && !loading && (
+          {done && items.length === 0 && !loading && loadError && (
             <div className="pb-8 text-center">
               <p className="text-[13px] text-white/55">
                 Não foi possível carregar a prateleira agora — confira sua conexão e
@@ -356,6 +370,7 @@ export function LiveCatalogue({
                   type="button"
                   onClick={() => {
                     setDone(false);
+                    setLoadError(false);
                     setLoading(true);
                     void load(tab, categoryId, 0, audience);
                   }}
@@ -364,6 +379,13 @@ export function LiveCatalogue({
                   Tentar novamente
                 </button>
               </div>
+            </div>
+          )}
+          {done && items.length === 0 && !loading && !loadError && (
+            <div className="pb-8 text-center">
+              <p className="text-[13px] text-white/55">
+                Nenhum título por aqui ainda.
+              </p>
             </div>
           )}
         </div>

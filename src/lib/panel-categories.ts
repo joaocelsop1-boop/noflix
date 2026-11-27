@@ -61,7 +61,7 @@ async function fetchRawCategories(
   const key = action;
   const hit = categoriesCache.get(key);
   if (hit && Date.now() - hit.at < CATEGORIES_TTL) return hit.list;
-  const res = await phpApi(action, { cookies });
+  const res = await phpApi(action, { cookies, timeoutMs: 60_000 });
   const list: PanelCategory[] = [];
   if (res.status === 200 && Array.isArray(res.data)) {
     const seen = new Set<string>();

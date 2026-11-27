@@ -882,7 +882,7 @@ export function Player({
                       key={item.number}
                       active={false}
                       title={`E${item.number} · ${item.name}`}
-                      subtitle={`${item.runtime} min`}
+                      subtitle={item.runtime > 0 ? `${item.runtime} min` : undefined}
                       onClick={() => pickEpisode(pickerSeason?.number ?? season, item.number)}
                     />
                   ))}
@@ -1326,7 +1326,7 @@ export function Player({
                             key={item.number}
                             active={episode === item.number}
                             title={`E${item.number} · ${item.name}`}
-                            subtitle={`${item.runtime} min`}
+                            subtitle={item.runtime > 0 ? `${item.runtime} min` : undefined}
                             onClick={() => goTo(season, item.number)}
                           />
                         ))}

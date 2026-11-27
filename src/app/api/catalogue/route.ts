@@ -151,7 +151,7 @@ async function panelCatalogue(
   for (const { action, catAction, kind } of actions) {
     // Nome das categorias (id -> nome) para o filtro de gênero.
     const catName = new Map<string, string>();
-    const catRes = await phpApi(catAction, { cookies });
+    const catRes = await phpApi(catAction, { cookies, timeoutMs: 60_000 });
     if (catRes.status === 200 && Array.isArray(catRes.data)) {
       for (const c of catRes.data as Array<Record<string, unknown>>) {
         const id = String(c.category_id ?? "");
@@ -159,7 +159,7 @@ async function panelCatalogue(
         if (id && name) catName.set(id, name);
       }
     }
-    const result = await phpApi(action, { cookies });
+    const result = await phpApi(action, { cookies, timeoutMs: 60_000 });
     if (result.status !== 200) continue;
     const data = result.data;
     const list = Array.isArray(data) ? data : [];

@@ -29,6 +29,8 @@ export type PhpApiOptions = {
   searchParams?: Record<string, string | number | undefined>;
   /** Raw Cookie header value received from the browser (may be null). */
   cookies?: string | null;
+  /** Timeout em ms (padrão 15 s). Listas grandes do catálogo precisam de mais. */
+  timeoutMs?: number;
 };
 
 function collectSetCookie(res: Response): string[] {
@@ -64,7 +66,7 @@ export async function phpApi(action: string, opts: PhpApiOptions = {}): Promise<
       },
       ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
       // The panel must answer promptly; a hung backend must not hang the page.
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
     });
   } catch {
     return { status: 502, data: { ok: false, error: "panel-unavailable" }, setCookie: [] };

@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { LiveCatalogue } from "@/components/live-catalogue";
 import {
   categorySlug,
   fetchPanelCategories,
 } from "@/lib/panel-categories";
-import { appUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +50,9 @@ async function findCategory(slug: string): Promise<{
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const found = await findCategory(slug);
-  if (!found) redirect(appUrl("/browse"));
+  // Slug sem categoria no painel (ex. link antigo /genre/cinema): mostra o
+  // catálogo inteiro em vez de um beco sem saída — o link nunca dá 404.
+  if (!found) return <LiveCatalogue heading="Navegar pelo catálogo" />;
   return (
     <LiveCatalogue
       initialCategory={{ id: found.id, tab: found.tab }}
