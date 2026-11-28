@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { autoReloadOnce } from "@/lib/auto-reload";
+import { autoReloadOnce, autoResetBudget } from "@/lib/auto-reload";
 
 /**
  * tudo25: erro global (raiz) — o "Application error" do /app/login
@@ -15,6 +15,15 @@ import { autoReloadOnce } from "@/lib/auto-reload";
  * ao montar (mesmo flag do script inline do layout — um só por sessão).
  * Erro transitório some sem o usuário ver a tela; erro que persiste
  * mostra a tela com os botões.
+ *
+ * tudo28 (item 2): a tela continuou aparecendo na NAVEGAÇÃO (4 vezes no
+ * teste do tudo27) porque o flag do tudo27 era UM reload por sessão —
+ * o primeiro erro se resolvia sozinho, os seguintes mostravam a tela.
+ * Agora a fronteira tenta `reset()` ANTES (o teste mostrou que "Tentar
+ * novamente" recupera essas falhas — o reset é barato e não recarrega
+ * a página; até 2 por página/sessão) e só cai para o reload duro quando
+ * o reset não resolve — e o reload agora tem orçamento de 5 por sessão,
+ * não 1. Erro permanente (depois dos tetos) mostra a tela com os botões.
  */
 export default function GlobalError({
   error,
@@ -24,7 +33,14 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // tudo28: reset() primeiro (recupera a falha de navegação sem
+    // recarregar a página); reload duro só quando o reset não resolve.
+    if (autoResetBudget()) {
+      reset();
+      return;
+    }
     autoReloadOnce();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <html lang="pt-BR" style={{ backgroundColor: "#0d1526", colorScheme: "dark" }}>

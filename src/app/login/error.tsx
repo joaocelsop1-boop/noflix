@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { autoReloadOnce } from "@/lib/auto-reload";
+import { autoReloadOnce, autoResetBudget } from "@/lib/auto-reload";
 
 /**
  * tudo24: limite de erro do login — a página /app/login quebrou 1x na
@@ -17,6 +17,10 @@ import { autoReloadOnce } from "@/lib/auto-reload";
  * mostrar a tela de erro de cara. Erro transitório de chunk some sem o
  * usuário ver nada; erro que persiste aparece a tela com o botão (o
  * reload já foi usado, não entra em loop).
+ *
+ * tudo28 (item 2): igual ao global-error.tsx — tenta `reset()` ANTES
+ * (até 2 por página/sessão) e só cai para o reload duro quando o reset
+ * não resolve; o reload agora tem orçamento de 5 por sessão, não 1.
  */
 export default function LoginError({
   reset,
@@ -25,7 +29,13 @@ export default function LoginError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // tudo28: reset() primeiro; reload duro só quando o reset não resolve.
+    if (autoResetBudget()) {
+      reset();
+      return;
+    }
     autoReloadOnce();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <main className="grid min-h-screen place-items-center bg-[#07080f] px-4">

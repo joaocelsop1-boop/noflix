@@ -490,7 +490,16 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
      título — nem adianta buscar no TMDB. */
   if (!title || /^\d+$/.test(title)) return null;
   const year = cleaned.year ?? ref.year;
-  const cacheKey = `${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
+  /* tudo28 (item 3): versão do cache (v2). Antes do tudo27, uma falha
+     transitória do credits era cacheada SEM elenco por 7 dias (disco +
+     memória) — o tudo27 impede NOVAS entradas envenenadas (skipCache),
+     mas as ANTIGAS continuam no volume .tmdb-cache e seguiam sendo
+     servidas (foi o que deixou "Il corpo" sem elenco no teste do
+     tudo27, enquanto títulos novos do painel novo — sem entrada no
+     cache — mostravam o elenco). Subir a versão invalida tudo de uma
+     vez; os títulos voltam a resolver sob demanda (preguiçoso, só o
+     que está na tela). Para subir de novo, basta trocar o prefixo. */
+  const cacheKey = `v2|${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
 
   const mem = memCache.get(cacheKey);
   if (mem && Date.now() - mem.at < CACHE_TTL) return mem.meta;

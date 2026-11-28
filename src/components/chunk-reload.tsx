@@ -11,9 +11,10 @@ import { autoReloadOnce } from "@/lib/auto-reload";
  * Não achamos causa fixável no código do login (fetchPanelMe tem .catch,
  * nenhum uso de window em render, store só lê localStorage em efeito).
  * Mitigação: ao detectar falha de carregamento de chunk (script/link ou
- * rejeição de import dinâmico), faz UM reload duro guardado por
- * sessionStorage — nunca em loop. Se não for chunk, nada acontece e o
- * erro segue para a fronteira global (global-error.tsx).
+ * rejeição de import dinâmico), faz reload duro com orçamento
+ * (auto-reload.ts — até 5 por sessão, com 2s entre eles, nunca em loop).
+ * Se não for chunk, nada acontece e o erro segue para a fronteira
+ * global (global-error.tsx).
  *
  * tudo27: este componente só cobre erros DEPOIS da hidratação — os
  * listeners vivem num useEffect, que só roda depois que a página
@@ -37,8 +38,9 @@ function isChunkError(message: string): boolean {
 
 export function ChunkReload() {
   useEffect(() => {
-    /* tudo27: o reload é o do helper partilhado (mesmo flag do script
-       inline do layout e das fronteiras de erro — um só por sessão). */
+    /* tudo27: o reload é o do helper partilhado (mesmo contador do
+       script inline do layout e das fronteiras de erro — tudo28: até 5
+       por sessão, não um só). */
     const reloadOnce = () => {
       autoReloadOnce();
     };

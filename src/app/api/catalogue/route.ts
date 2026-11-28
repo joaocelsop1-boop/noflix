@@ -57,7 +57,7 @@ const num = (value: unknown): number | undefined => {
  * e sem pontuação (":" , "-", etc. viram espaço — "Batman: A Série
  * Animada" casa com "Batman - A Série Animada" e com "Batman A Série
  * Animada"). */
-function normText(value: string): string {
+export function normText(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -70,7 +70,7 @@ function normText(value: string): string {
  * da busca aparecem no nome (em qualquer ordem). A frase cobre o título
  * exato; as palavras cobrem título digitado sem uma palavra do meio
  * ("Batman Série Animada" acha "Batman: A Série Animada"). */
-function matchesSearch(name: string, query: string): boolean {
+export function matchesSearch(name: string, query: string): boolean {
   const n = normText(name);
   if (n.includes(query)) return true;
   const tokens = query.split(" ").filter(Boolean);

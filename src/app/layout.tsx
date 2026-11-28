@@ -57,12 +57,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             falha DURANTE a carga inicial do login disparava o erro sem
             nenhum listener no ar e a tela de erro aparecia. Este script
             roda durante o parse do HTML, antes de qualquer JS do app:
-            num erro de chunk, faz UM reload duro por sessão (mesmo flag
-            "nf-chunk-reload-done" do ChunkReload e das fronteiras de erro)
-            e nunca entra em loop. */}
+            num erro de chunk, faz reload duro (mesmo contador do
+            auto-reload.ts — até 5 por sessão, com 2s entre eles, e nunca
+            entra em loop). tudo28: o flag único do tudo27 não bastava —
+            depois de um deploy, vários chunks podem falhar na mesma
+            sessão, um por rota navegada. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var F='nf-chunk-reload-done';function bad(m){m=(m||'').toLowerCase();return m.indexOf('loading chunk')>-1||m.indexOf('chunkloaderror')>-1||m.indexOf('failed to fetch dynamically imported module')>-1||m.indexOf('importing a module script failed')>-1||m.indexOf('unable to load')>-1||m.indexOf('load failed')>-1;}function once(){try{if(sessionStorage.getItem(F))return;sessionStorage.setItem(F,'1');}catch(e){return;}window.location.reload();}window.addEventListener('error',function(e){var t=e.target;if((t&&(t.tagName==='SCRIPT'||t.tagName==='LINK'))||bad(e.message||''))once();},true);window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=typeof r==='string'?r:(r&&r.message)||'';if(bad(m))once();});}catch(e){}})();`,
+            __html: `(function(){try{var F='nf-chunk-reload-done';function bad(m){m=(m||'').toLowerCase();return m.indexOf('loading chunk')>-1||m.indexOf('chunkloaderror')>-1||m.indexOf('failed to fetch dynamically imported module')>-1||m.indexOf('importing a module script failed')>-1||m.indexOf('unable to load')>-1||m.indexOf('load failed')>-1;}function once(){try{var n=Number(sessionStorage.getItem('nf-chunk-reload-count')||'0')||0;var at=Number(sessionStorage.getItem('nf-chunk-reload-at')||'0')||0;var now=Date.now();if(n>=5||now-at<2000)return;sessionStorage.setItem('nf-chunk-reload-count',String(n+1));sessionStorage.setItem('nf-chunk-reload-at',String(now));sessionStorage.setItem(F,'1');}catch(e){return;}window.location.reload();}window.addEventListener('error',function(e){var t=e.target;if((t&&(t.tagName==='SCRIPT'||t.tagName==='LINK'))||bad(e.message||''))once();},true);window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=typeof r==='string'?r:(r&&r.message)||'';if(bad(m))once();});}catch(e){}})();`,
           }}
         />
         <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="" />
