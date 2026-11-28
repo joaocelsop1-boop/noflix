@@ -30,6 +30,11 @@ export type PanelMe = {
     whatsapp?: string | null;
     telegram?: string | null;
   };
+  /** tudo29: o dono configurou o Telegram no admin (aba Servidor Sigma,
+   * seção Notificações Telegram) — o botão "Avisar que não funcionou"
+   * aparece na tela de erro de reprodução. Só um booleano; o token do bot
+   * nunca sai do servidor. */
+  reportBroken?: boolean;
 };
 
 export type PanelPlan = {

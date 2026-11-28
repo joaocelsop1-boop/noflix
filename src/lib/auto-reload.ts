@@ -19,13 +19,30 @@
  * autoResetBudget): o teste do tudo27 mostrou que "Tentar novamente"
  * recupera essas falhas de navegação — o reset é barato (sem recarregar
  * a página) e só cai para o reload quando o reset não resolve.
+ *
+ * tudo30: o orçamento do tudo28 era por PATHNAME — todos os títulos do
+ * painel partilham "/play/0", então 2 resets serviam para TODOS os
+ * detalhes juntos; depois de 2 falhas em títulos diferentes, o erro
+ * passou a aparecer em TODOS os cliques (séries e filmes em geral). O
+ * orçamento agora é por URL (pathname + search, ou seja, por título) e
+ * o reload tem teto por URL + teto global por sessão. O reset automático
+ * também espera 1,2s (AUTO_RESET_DELAY_MS) para a condição transitória
+ * se assentar antes de tentar de novo.
  */
 export const AUTO_RELOAD_FLAG = "nf-chunk-reload-done";
 
-const RELOAD_COUNT_KEY = "nf-chunk-reload-count";
+/** tudo30: espera antes do reset automático — a condição transitória
+    (chunk frio / RSC lento) precisa de um instante para se assentar;
+    reset imediato rebatia na mesma condição e queimava o orçamento. */
+export const AUTO_RESET_DELAY_MS = 1200;
+
+const RELOAD_COUNT_PREFIX = "nf-chunk-reload-count:";
 const RELOAD_AT_KEY = "nf-chunk-reload-at";
-/** Teto de reloads automáticos por sessão (anti-loop). */
+const RELOAD_TOTAL_KEY = "nf-chunk-reload-total";
+/** Teto de reloads automáticos por URL (anti-loop local). */
 export const MAX_AUTO_RELOADS = 5;
+/** Teto GLOBAL de reloads automáticos por sessão (anti-loop geral). */
+const MAX_AUTO_RELOADS_TOTAL = 20;
 /** Intervalo mínimo entre dois reloads automáticos. */
 const MIN_RELOAD_GAP_MS = 2000;
 
@@ -38,9 +55,13 @@ export function autoReloadOnce(): boolean {
     const now = Date.now();
     const at = Number(window.sessionStorage.getItem(RELOAD_AT_KEY) ?? "0") || 0;
     if (now - at < MIN_RELOAD_GAP_MS) return false;
-    const n = Number(window.sessionStorage.getItem(RELOAD_COUNT_KEY) ?? "0") || 0;
+    const urlKey = `${RELOAD_COUNT_PREFIX}${window.location.pathname}${window.location.search}`;
+    const n = Number(window.sessionStorage.getItem(urlKey) ?? "0") || 0;
     if (n >= MAX_AUTO_RELOADS) return false;
-    window.sessionStorage.setItem(RELOAD_COUNT_KEY, String(n + 1));
+    const total = Number(window.sessionStorage.getItem(RELOAD_TOTAL_KEY) ?? "0") || 0;
+    if (total >= MAX_AUTO_RELOADS_TOTAL) return false;
+    window.sessionStorage.setItem(urlKey, String(n + 1));
+    window.sessionStorage.setItem(RELOAD_TOTAL_KEY, String(total + 1));
     window.sessionStorage.setItem(RELOAD_AT_KEY, String(now));
     window.sessionStorage.setItem(AUTO_RELOAD_FLAG, "1");
   } catch {
@@ -51,18 +72,19 @@ export function autoReloadOnce(): boolean {
 }
 
 const RESET_COUNT_PREFIX = "nf-auto-reset:";
-/** Teto de resets automáticos por página/sessão (anti-loop). */
+/** Teto de resets automáticos por URL/sessão (anti-loop). */
 const MAX_AUTO_RESETS_PER_PAGE = 2;
 
 /** Orçamento para um `reset()` automático da fronteira de erro: até 2
-    resets por página (pathname) por sessão. Devolve true quando pode
-    tentar o reset; false quando o orçamento da página acabou — aí quem
-    chamou cai para o reload duro (autoReloadOnce). Um reset que resolve
-    desmonta a fronteira; um que falha remonta e consome outra tentativa. */
+    resets por URL (pathname + search — um título = um orçamento) por
+    sessão. Devolve true quando pode tentar o reset; false quando o
+    orçamento da URL acabou — aí quem chamou cai para o reload duro
+    (autoReloadOnce). Um reset que resolve desmonta a fronteira; um que
+    falha remonta e consome outra tentativa. */
 export function autoResetBudget(): boolean {
   try {
     if (typeof window === "undefined") return false;
-    const key = `${RESET_COUNT_PREFIX}${window.location.pathname}`;
+    const key = `${RESET_COUNT_PREFIX}${window.location.pathname}${window.location.search}`;
     const n = Number(window.sessionStorage.getItem(key) ?? "0") || 0;
     if (n >= MAX_AUTO_RESETS_PER_PAGE) return false;
     window.sessionStorage.setItem(key, String(n + 1));

@@ -25,8 +25,50 @@ export type CleanedTitle = {
   year?: number;
 };
 
-/** Tags de áudio/qualidade no fim do nome — não fazem parte do título. */
-const AUDIO_TAGS = /^(leg|legendado|dub|dublado|dual|original|nacional|4k|hd|sd|fullhd|bluray|web-dl|hdtv|remaster|estendido|extended|dc)$/i;
+/** Tags de áudio/qualidade/origem no fim do nome — não fazem parte do título.
+ * tudo30: o painel novo traz sufixos que o AUDIO_TAGS antigo não cobria —
+ * "(Cinema)", "(CAM)", "(HDCAM)", "(PT-BR)", "(Completo)" — e o título ia
+ * para o TMDB com o sufixo junto ("MOANA 2 (Cinema)" não casava exato e o
+ * card ficava sem nota/ano). A checagem é por token: o parêntese do fim só
+ * sai quando TODAS as palavras dentro dele são tags, conectores ("e") ou
+ * um ano — "(Dublado e Legendado)" e "(Cinema 2024)" também saem.
+ * "(Parte 2)" e "(Vol. 2)" ficam: "parte"/"vol" não são tags, então um
+ * pedaço real do título nunca é comido. */
+const JUNK_TOKENS = new Set([
+  "leg", "legendado", "dub", "dublado", "dual", "original", "nacional",
+  "4k", "hd", "sd", "fullhd", "bluray", "web", "dl", "webdl", "hdtv",
+  "remaster", "estendido", "extended", "dc", "cinema", "cam", "hdcam",
+  "hdts", "ts", "tc", "telesync", "hdtc", "korsub", "multi", "pt", "br",
+  "ptbr", "completo", "completa", "camrip", "dvdrip", "webrip", "hevc",
+  "x264", "x265", "xvid", "3d", "imax", "hdr", "dolby", "truehd", "dts",
+  "ac3", "aac", "5.1", "7.1", "h264", "h265", "uhd", "fhd", "brrip",
+  "hdrip", "proper", "repack", "unrated", "e", "and",
+]);
+
+/** O conteúdo de um "(...)" do fim é só tag/ano? Devolve o ano quando há. */
+function parenJunk(inner: string): { strip: boolean; year?: number } {
+  const tokens = inner
+    .toLowerCase()
+    .split(/[\s&/\-]+/)
+    .map((t) => t.replace(/^[([.]+|[)\].]+$/g, ""))
+    .filter(Boolean);
+  if (tokens.length === 0) return { strip: false };
+  let year: number | undefined;
+  for (const t of tokens) {
+    if (/^\d{4}$/.test(t)) {
+      const y = Number(t);
+      if (y >= 1900 && y <= 2100) {
+        if (year === undefined) year = y;
+        continue;
+      }
+      return { strip: false };
+    }
+    if (/^\d{3,4}p$/.test(t)) continue;
+    if (JUNK_TOKENS.has(t)) continue;
+    return { strip: false };
+  }
+  return { strip: true, year };
+}
 
 export function cleanTitle(raw: string): CleanedTitle {
   let s = (raw ?? "").trim();
@@ -34,23 +76,16 @@ export function cleanTitle(raw: string): CleanedTitle {
   s = s.replace(/\[[^\]]*\]/g, " ");
   // "(AAAA)" e "(TAG)" do fim, repetidos — guarda o primeiro ano válido.
   // "THE K2 (LEG)" vira "THE K2"; "Baby Looney Tunes (2002) (2002)"
-  // vira "Baby Looney Tunes" + 2002.
+  // vira "Baby Looney Tunes" + 2002; "MOANA 2 (Cinema)" vira "MOANA 2".
   let year: number | undefined;
   for (;;) {
     const m = s.match(/\(\s*([^()]*)\s*\)\s*$/);
     if (!m) break;
     const inner = m[1].trim();
-    if (/^\d{4}$/.test(inner)) {
-      const y = Number(inner);
-      if (year === undefined && y >= 1900 && y <= 2100) year = y;
-      s = s.slice(0, m.index ?? 0).trim();
-      continue;
-    }
-    if (AUDIO_TAGS.test(inner)) {
-      s = s.slice(0, m.index ?? 0).trim();
-      continue;
-    }
-    break;
+    const junk = parenJunk(inner);
+    if (!junk.strip) break;
+    if (junk.year !== undefined && year === undefined) year = junk.year;
+    s = s.slice(0, m.index ?? 0).trim();
   }
   /* tudo27: ano no fim SEM parênteses, repetido ou com ponto.
      "Ladies First 2026 · 2025" vira "Ladies First" + 2025 (o último ano

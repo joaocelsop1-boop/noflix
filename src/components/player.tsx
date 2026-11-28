@@ -40,6 +40,7 @@ import {
 } from "@/lib/players";
 import { anilistIdFor } from "@/lib/anime-ids";
 import { NativePlayer, type NativeSource } from "@/components/native-player";
+import { ReportBrokenButton, type ReportBrokenInfo } from "@/components/report-broken-button";
 import {apiUrl, appUrl} from "@/lib/paths";
 import { PlanGate } from "@/components/plan-gate";
 import { PanelPosterCard } from "@/components/panel-home";
@@ -219,6 +220,9 @@ export function Player({
   /** motivo do stream do painel ter falhado (ex.: série sem episódios) */
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelRetry, setPanelRetry] = useState(0);
+  /** tudo29: o dono configurou o Telegram no admin (me.report_broken) — o
+   * botão "Avisar que não funcionou" aparece nas telas de erro de reprodução. */
+  const [reportEnabled, setReportEnabled] = useState(false);
   const [anilistId, setAnilistId] = useState<number | null>(title.anilistId ?? null);
   /* anime servers need an AniList id — hold the frame until we have one */
   const [aniState, setAniState] = useState<"pending" | "ok" | "none">(() =>
@@ -783,6 +787,36 @@ export function Player({
       alive = false;
     };
   }, [isPanelTitle]);
+
+  /* tudo29: o botão "Avisar que não funcionou" só aparece quando o dono
+     configurou o Telegram no admin (me.report_broken) E o cliente está
+     logado — o endpoint de envio exige login. */
+  useEffect(() => {
+    let alive = true;
+    void fetchPanelMe().then((me) => {
+      if (!alive || !me) return;
+      setReportEnabled(Boolean(me.loggedIn && me.reportBroken));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* tudo29: dados do título para o botão "Avisar que não funcionou" — o
+     mesmo objeto alimenta a tela de erro do NativePlayer e a tela de
+     "painel sem stream" abaixo. */
+  const reportInfo: ReportBrokenInfo & { enabled: boolean } = useMemo(
+    () => ({
+      title: title.name,
+      kind: title.kind,
+      year: title.year || undefined,
+      panelId: title.panel?.id,
+      season: title.kind === "series" ? season : undefined,
+      episode: title.kind === "series" ? episode : undefined,
+      enabled: reportEnabled,
+    }),
+    [title, season, episode, reportEnabled],
+  );
 
   /**
    * The embed URL depends only on [source, quality, episode] — playback
@@ -1599,6 +1633,10 @@ export function Player({
             >
               Tentar novamente
             </button>
+            {/* tudo29: avisar o dono que este título não tocou. */}
+            <div className="mt-3 flex justify-center">
+              <ReportBrokenButton info={reportInfo} enabled={reportInfo.enabled} />
+            </div>
           </div>
         </div>
       )}
@@ -1627,6 +1665,7 @@ export function Player({
           poster={playerPoster}
           title={`${title.name}${title.kind === "series" ? ` · S${season} E${episode}` : ""}`}
           startAt={startAt}
+          report={reportInfo}
           onTick={({ current, total }) => {
             if (!total) return;
             /* tudo26: o vídeo que está tocando tem duração muito diferente

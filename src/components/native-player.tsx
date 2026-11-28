@@ -13,6 +13,7 @@ import {
   VolumeIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { ReportBrokenButton, type ReportBrokenInfo } from "@/components/report-broken-button";
 
 export type NativeSource = {
   /** the CDN itself — played straight from the viewer's IP */
@@ -71,6 +72,10 @@ export function NativePlayer({
   nextLabel,
   isPanel = false,
   poster,
+  /** tudo29: dados do título para o botão "Avisar que não funcionou" —
+   * só aparece na tela de erro de reprodução, e só quando o dono
+   * configurou o Telegram no admin (enabled=true). */
+  report,
 }: {
   sources: NativeSource[];
   title: string;
@@ -86,6 +91,7 @@ export function NativePlayer({
   nextLabel?: string;
   /** título do painel: sem servidor de reserva (não há embed) */
   isPanel?: boolean;
+  report?: (ReportBrokenInfo & { enabled: boolean }) | null;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
@@ -148,6 +154,13 @@ export function NativePlayer({
    * reloads the same source; stallRef tracks freeze / recovery budget.
    */
   const resumeOverride = useRef<number | null>(null);
+  /* tudo30: última posição conhecida da reprodução (atualizada a cada
+     timeupdate) — é o que impede o filme de recomeçar do 0 quando o
+     transporte recarrega: o watchdog e a escalada setam resumeOverride,
+     mas um erro de rede ou uma troca de fonte que passe por outro caminho
+     caía no startAt (ponto do resume inicial) ou no 0. Com a última
+     posição conhecida, qualquer recarga retoma exatamente onde parou. */
+  const lastKnownTime = useRef(0);
   const stallRef = useRef({
     lastTime: 0,
     stalledSince: null as number | null,
@@ -284,12 +297,29 @@ export function NativePlayer({
     /* stall recovery resumes where playback stopped (not where the title
        started): resumeOverride is set by the watchdog before it bumps the
        generation, and consumed once here. */
-    const resumeAt = resumeOverride.current ?? (startAt && startAt > 20 ? startAt : 0);
+    /* tudo30: a posição de retomada NUNCA é 0 no meio do filme — a ordem
+       é: override do watchdog/escalada → última posição conhecida
+       (timeupdate) → ponto do "Continuar assistindo" (startAt) → 0 (só
+       no início, quando nada tocou ainda). */
+    const lastKnown = lastKnownTime.current > 0 ? lastKnownTime.current : null;
+    const resumeAt =
+      resumeOverride.current ?? lastKnown ?? (startAt && startAt > 20 ? startAt : 0);
     resumeOverride.current = null;
+    let resumeRetryArmed = false;
     const nudgeResume = () => {
       if (!resumeAt) return;
-      if (Number.isFinite(video.duration) && Math.abs(video.currentTime - resumeAt) > 3) {
-        video.currentTime = resumeAt;
+      if (Number.isFinite(video.duration)) {
+        if (Math.abs(video.currentTime - resumeAt) > 3) {
+          video.currentTime = resumeAt;
+        }
+        return;
+      }
+      /* tudo30: a duração ainda não é conhecida (HLS: o manifesto chegou
+         mas o elemento ainda não tem duration) — tenta de novo quando ela
+         chegar, em vez de pular o seek em silêncio e começar do 0. */
+      if (!resumeRetryArmed) {
+        resumeRetryArmed = true;
+        video.addEventListener("durationchange", nudgeResume, { once: true });
       }
     };
 
@@ -321,6 +351,16 @@ export function NativePlayer({
     const escalate = () => {
       if (recovery.current.escalated) return;
       recovery.current.escalated = true;
+      /* tudo30: a troca de fonte NÃO pode perder a posição — antes, um
+         erro de rede no meio do filme escalava para a próxima fonte e o
+         transporte recomeçava do 0 (ou do ponto do resume inicial),
+         porque só o watchdog setava resumeOverride. Guarda a posição
+         atual para o transporte retomar exatamente onde parou. No
+         carregamento inicial currentTime é 0 e nada é guardado. */
+      const currentVideo = videoRef.current;
+      if (currentVideo && Number.isFinite(currentVideo.currentTime) && currentVideo.currentTime > 0) {
+        resumeOverride.current = currentVideo.currentTime;
+      }
       /* tudo21: a fonte atual veio do watchdog (troca por trava no meio) e
          não carregou — volta para a fonte de onde veio, na posição atual,
          em vez de mostrar erro. (tudo20 voltava sempre para o MP4 porque o
@@ -479,6 +519,9 @@ export function NativePlayer({
 
       hlsRef.current = hls;
       hls.attachMedia(video);
+      /* tudo30: o seek de retomada também no loadedmetadata — no
+         MANIFEST_PARSED a duração do elemento pode ainda não existir. */
+      video.addEventListener("loadedmetadata", nudgeResume, { once: true });
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
         hls?.loadSource(url);
@@ -618,6 +661,11 @@ export function NativePlayer({
       onEnded?.();
     };
     const onTime = () => {
+      /* tudo30: marca a última posição conhecida — é ela que o transporte
+         usa para retomar se recarregar no meio do filme. */
+      if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
+        lastKnownTime.current = video.currentTime;
+      }
       sync();
       const now = Date.now();
       if (onTick && now - lastSaved.current > 5000) {
@@ -694,9 +742,14 @@ export function NativePlayer({
   /** reload the same source at the last known position (stall recovery) */
   const recoverStall = useCallback(() => {
     const video = videoRef.current;
-    if (video && Number.isFinite(video.currentTime)) {
-      resumeOverride.current = video.currentTime;
-    }
+    /* tudo30: se o elemento já perdeu a posição (currentTime 0/NaN no
+       momento da trava), usa a última posição conhecida — nunca 0 no
+       meio do filme. */
+    const at =
+      video && Number.isFinite(video.currentTime) && video.currentTime > 0
+        ? video.currentTime
+        : lastKnownTime.current;
+    if (at > 0) resumeOverride.current = at;
     setGeneration((value) => value + 1);
   }, []);
 
@@ -714,9 +767,13 @@ export function NativePlayer({
     const nextIndex = list.findIndex((_entry, i) => i > sourceIndexRef.current);
     if (!current || nextIndex < 0) return false;
     const video = videoRef.current;
-    if (video && Number.isFinite(video.currentTime)) {
-      resumeOverride.current = video.currentTime;
-    }
+    /* tudo30: idem recoverStall — última posição conhecida quando o
+       elemento já perdeu a atual. */
+    const at =
+      video && Number.isFinite(video.currentTime) && video.currentTime > 0
+        ? video.currentTime
+        : lastKnownTime.current;
+    if (at > 0) resumeOverride.current = at;
     trialRef.current = { from: sourceIndexRef.current, to: nextIndex };
     setAttempt(0);
     setSourceIndex(nextIndex);
@@ -742,7 +799,10 @@ export function NativePlayer({
       }
       const now = Date.now();
       if (now < stallRef.current.cooldownUntil) return;
-      if (video.currentTime > 0) stallRef.current.hasPlayed = true;
+      if (video.currentTime > 0) {
+        stallRef.current.hasPlayed = true;
+        lastKnownTime.current = video.currentTime;
+      }
       if (!stallRef.current.hasPlayed) return;
       if (Math.abs(video.currentTime - stallRef.current.lastTime) > 0.05) {
         stallRef.current.lastTime = video.currentTime;
@@ -1059,6 +1119,14 @@ export function NativePlayer({
                 </button>
               )}
             </div>
+            {/* tudo29: avisar o dono que este título não tocou — só aparece
+                quando o Telegram está configurado no admin; depois do clique
+                vira "Aviso enviado ✓" (1 por título por sessão). */}
+            {report && (
+              <div className="mt-3 flex justify-center">
+                <ReportBrokenButton info={report} enabled={report.enabled} />
+              </div>
+            )}
             <p className="mt-2 text-[11px] text-white/35">
               {playable.length} source{playable.length === 1 ? "" : "s"} tried ·{" "}
               {playable.map((entry) => entry.label).join(", ") || "none available"}

@@ -148,6 +148,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Suporte salvo! " . ($wa !== '' || $tg !== '' ? "O botão \"Suporte\" aparece no app (menu da conta e rodapé)." : "Sem contato preenchido, o botão \"Suporte\" não aparece no app.");
     }
 
+    // Salvar notificação Telegram (seção Notificações Telegram na aba
+    // Servidor Sigma) — SEMPRE salva, sem testar o painel: o token e o
+    // chat ID não dependem do painel. Vazios = recurso desligado (o botão
+    // "Avisar que não funcionou" não aparece no app). O token é segredo:
+    // ele nunca é exibido em log nem devolvido em nenhuma resposta da API.
+    elseif ($action === 'save_telegram_notify') {
+        $ntToken = trim($_POST['telegram_notify_token'] ?? '');
+        $ntChat = trim($_POST['telegram_notify_chat_id'] ?? '');
+        $stmt = $pdo->prepare("UPDATE settings SET telegram_notify_token = ?, telegram_notify_chat_id = ? WHERE id = 1");
+        $stmt->execute([$ntToken, $ntChat]);
+        $msg = "Notificação Telegram salva! " . ($ntToken !== '' && $ntChat !== '' ? "Quando um título não tocar, o cliente vê o botão \"Avisar que não funcionou\" e você recebe a notificação no Telegram." : "Com token ou chat ID vazio, o botão não aparece no app.");
+    }
+
     // Limpar cache do catálogo (força puxar tudo de novo do painel) — SÓ
     // apaga se o painel responder. Antes apagava sem checar: com o painel
     // fora do ar, o catálogo sumia e não tinha como reconstruir.
@@ -571,6 +584,31 @@ $pendingCommissions = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM commissi
           </div>
           <div class="mt-4">
             <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Suporte</button>
+          </div>
+        </form>
+
+        <!-- NOTIFICAÇÕES TELEGRAM: quando um título não toca, o cliente avisa
+             e o dono recebe no Telegram. Formulário próprio: salva sempre,
+             sem testar o painel. -->
+        <form method="POST" class="mt-8 border-t border-gray-800 pt-6">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+          <input type="hidden" name="form_action" value="save_telegram_notify">
+          <h4 class="text-base font-semibold text-white mb-1">Notificações Telegram</h4>
+          <p class="text-sm text-gray-400 mb-4">Quando um filme ou série não tocar, o cliente vê o botão "Avisar que não funcionou" na tela de erro — e você recebe a notificação no Telegram com o nome do título e quem reportou. Deixe os dois campos vazios para desligar o recurso.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">Token do bot:</label>
+              <input type="password" name="telegram_notify_token" value="<?= htmlspecialchars($settings['telegram_notify_token'] ?? '') ?>" placeholder="123456789:AAH..." autocomplete="off" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">No Telegram, fale com o @BotFather e use /newbot para criar um bot — ele devolve o token. Nunca compartilhe o token com ninguém.</p>
+            </div>
+            <div>
+              <label class="block text-xs uppercase font-semibold text-gray-400 mb-1">ID do chat:</label>
+              <input type="text" name="telegram_notify_chat_id" value="<?= htmlspecialchars($settings['telegram_notify_chat_id'] ?? '') ?>" placeholder="123456789" inputmode="numeric" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none">
+              <p class="text-[11px] text-gray-500 mt-1">Seu ID no Telegram (fale com o @userinfobot e ele mostra o seu ID) ou o ID de um grupo/canal. Abra o bot e mande qualquer mensagem para ele antes — senão ele não consegue te escrever.</p>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="px-5 py-2.5 bg-red-brand text-white font-semibold rounded text-sm transition">Salvar Telegram</button>
           </div>
         </form>
 

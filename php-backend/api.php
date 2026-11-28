@@ -898,7 +898,94 @@ switch ($action) {
                 'whatsapp' => trim((string)($settings['support_whatsapp'] ?? '')),
                 'telegram' => trim((string)($settings['support_telegram'] ?? '')),
             ],
+            // Notificação de título quebrado (tudo29): SÓ um booleano — o
+            // token do bot NUNCA sai do servidor. O app mostra o botão
+            // "Avisar que não funcionou" na tela de erro de reprodução só
+            // quando o dono configurou token + chat ID no admin.
+            'report_broken' => trim((string)($settings['telegram_notify_token'] ?? '')) !== '' && trim((string)($settings['telegram_notify_chat_id'] ?? '')) !== '',
         ]);
+        break;
+
+    case 'report_broken':
+        // POST — cliente logado avisa que um título não tocou; o dono
+        // recebe no Telegram (token + chat ID do admin, aba Servidor
+        // Sigma, seção Notificações Telegram).
+        // Segurança: o token NUNCA aparece na resposta nem no log; só
+        // usuário logado passa; 1 aviso por título por sessão (a chave
+        // fica na $_SESSION — a sessão foi fechada no topo do arquivo,
+        // por isso ela é reaberta aqui, como o adult_unlock faz).
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            api_auth_error('Método inválido.', 405);
+            break;
+        }
+        api_require_login();
+        $repUser = current_user($pdo);
+        if (!$repUser) api_error('Login necessário.', 401);
+        $repToken = trim((string)($settings['telegram_notify_token'] ?? ''));
+        $repChat = trim((string)($settings['telegram_notify_chat_id'] ?? ''));
+        if ($repToken === '' || $repChat === '') {
+            echo json_encode(['ok' => false, 'error' => 'not_configured']);
+            break;
+        }
+        $repTitle = trim((string)api_post_field('title', ''));
+        $repKind = api_post_field('kind', 'movie') === 'series' ? 'series' : 'movie';
+        $repYear = intval(api_post_field('year', 0));
+        $repPanelId = intval(api_post_field('panel_id', 0));
+        $repSeason = intval(api_post_field('season', 0));
+        $repEpisode = intval(api_post_field('episode', 0));
+        if ($repTitle === '') {
+            api_auth_error('Título não informado.', 400);
+            break;
+        }
+        $repKey = $repKind . ':' . ($repPanelId > 0 ? (string)$repPanelId : md5($repTitle . '|' . $repYear)) . ($repKind === 'series' && $repSeason > 0 ? ':S' . $repSeason . 'E' . $repEpisode : '');
+        if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+        if (!isset($_SESSION['reported_broken']) || !is_array($_SESSION['reported_broken'])) $_SESSION['reported_broken'] = [];
+        if (!empty($_SESSION['reported_broken'][$repKey])) {
+            session_write_close();
+            echo json_encode(['ok' => true, 'already' => true]);
+            break;
+        }
+        // Mensagem para o dono: nome do título, tipo, ano, quem reportou
+        // (perfil + e-mail da conta logada) e a data/hora do aviso.
+        $repLabel = $repKind === 'series' ? 'série' : 'filme';
+        $repWhat = $repTitle . ($repYear > 0 ? ' (' . $repYear . ', ' . $repLabel . ')' : ' (' . $repLabel . ')');
+        if ($repKind === 'series' && $repSeason > 0 && $repEpisode > 0) {
+            $repWhat = $repTitle . ' — S' . $repSeason . ' E' . $repEpisode . ($repYear > 0 ? ' (' . $repYear . ', série)' : ' (série)');
+        }
+        $repName = trim((string)($repUser['name'] ?? ''));
+        $repEmail = trim((string)($repUser['email'] ?? ''));
+        $repText = "🎬 Título não funcionou: " . $repWhat . "\n👤 Reportado por: " . ($repName !== '' ? $repName : 'cliente') . " (" . $repEmail . ")\n🕐 " . date('d/m/Y H:i');
+        // Envio pela API do Telegram (10s de timeout). O token vai só na
+        // URL da chamada servidor→Telegram — nunca em resposta, log ou front.
+        $repCh = curl_init();
+        curl_setopt($repCh, CURLOPT_URL, 'https://api.telegram.org/bot' . $repToken . '/sendMessage');
+        curl_setopt($repCh, CURLOPT_POST, true);
+        curl_setopt($repCh, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $repChat, 'text' => $repText]));
+        curl_setopt($repCh, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($repCh, CURLOPT_TIMEOUT, 10);
+        curl_setopt($repCh, CURLOPT_CONNECTTIMEOUT, 5);
+        $repResp = curl_exec($repCh);
+        $repHttp = (int)curl_getinfo($repCh, CURLINFO_RESPONSE_CODE);
+        $repErr = curl_error($repCh);
+        curl_close($repCh);
+        $repSent = $repResp !== false && $repHttp === 200;
+        if ($repSent) {
+            $repDecoded = json_decode((string)$repResp, true);
+            $repSent = !empty($repDecoded['ok']);
+        }
+        if ($repSent) {
+            // Só marca como enviado quando o Telegram confirmou — se a
+            // entrega falhar, o cliente pode tentar de novo (a notificação
+            // nunca chegou ao dono).
+            $_SESSION['reported_broken'][$repKey] = time();
+            session_write_close();
+            echo json_encode(['ok' => true]);
+        } else {
+            session_write_close();
+            // Sem o token e sem o chat ID no log: só o código HTTP/erro cURL.
+            error_log('report_broken: falha ao enviar para o Telegram (HTTP ' . $repHttp . ($repErr !== '' ? ', cURL: ' . $repErr : '') . ')');
+            echo json_encode(['ok' => false, 'error' => 'send_failed']);
+        }
         break;
 
     case 'login':

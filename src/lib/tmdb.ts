@@ -314,6 +314,19 @@ function toMeta(item: SearchItem, runtime?: number, cast?: TmdbCastMember[]): Tm
 /** Variante de busca sem números no início ("007 Contra GoldenEye" →
  *  "Contra GoldenEye"): o TMDB acha o filme certo, e a pontuação continua
  *  sendo julgada contra o título original limpo. */
+/** Título sem nenhum parêntese do fim ("Filme (Parte 2) (2024)" -> "Filme").
+ * Só para a busca no TMDB — o título exibido continua o limpo. */
+function bareTitle(title: string): string {
+  let s = title;
+  for (;;) {
+    const m = s.match(/\(\s*[^()]*\s*\)\s*$/);
+    if (!m) break;
+    s = s.slice(0, m.index ?? 0).trim();
+  }
+  return s;
+}
+
+
 function titleVariant(title: string): string {
   return title.replace(/^\d+[\s:.-]+/, "").trim();
 }
@@ -366,6 +379,16 @@ async function resolveFresh(
     attempts.push({ type: primary, lang: "pt-BR", y: year, q: variant });
     attempts.push({ type: primary, lang: "en-US", y: year, q: variant });
   }
+  /* tudo30: última tentativa — o título sem NENHUM parêntese do fim
+     ("Filme (Parte 2)" -> "Filme"). O cleanTitle mantém "(Parte 2)" de
+     propósito (é parte do título), mas o TMDB busca melhor sem ele; a
+     pontuação continua sendo julgada contra o título original limpo, então
+     um match aqui ainda precisa ser o filme certo (score >= MIN_SCORE). */
+  const bare = bareTitle(title);
+  if (bare && bare !== title && bare !== variant) {
+    attempts.push({ type: primary, lang: "pt-BR", y: year, q: bare });
+    attempts.push({ type: primary, lang: "en-US", y: year, q: bare });
+  }
   for (const a of attempts) {
     const results = await limited(() => searchOnce(a.type, a.q, a.y, a.lang, key));
     let best: { item: SearchItem; score: number } | null = null;
@@ -392,7 +415,13 @@ async function resolveFresh(
       /* tudo26: duração do TMDB muito diferente da do arquivo do painel
          = filme errado com o mesmo nome. Rejeita e tenta a próxima
          tentativa (sem ano, outro idioma...). */
-      if (runtimeMismatch(panelDuration, runtime)) {
+      /* tudo30: a duração do painel já provou ser falha (MOANA 2 não
+         devolve nada; outros títulos devolvem a duração errada) — um
+         match EXATO de título + ano (score >= 100) vale mais que a
+         duração do painel. A proteção do tudo26 continua: o filme
+         errado com o mesmo nome nunca chega a 100 ("A Noiva!" 2025 vs
+         2005 = 60; "A Noiva Cadáver", com palavras extras = 70). */
+      if (runtimeMismatch(panelDuration, runtime) && best.score < 100) {
         continue;
       }
       /* tudo26: elenco — só no detalhe (details=true), junto com o
@@ -481,6 +510,30 @@ export function tmdbGenreId(name: string): number | undefined {
  * Resolve os dados de exibição do TMDB para um título do painel.
  * Sem chave, sem match ou TMDB fora → null (fail open, a tela usa o painel).
  */
+/** tudo30: resolve com teto — o detalhe não pode esperar o pior caso do
+ * resolve (tentativas sequenciais de até 8s cada, ~50s no pior caso): com
+ * 9s sem resposta, devolve null e a página nasce com os dados do painel;
+ * o cliente completa capa/sinopse/nota/elenco via useTmdbMeta depois.
+ * O resolve original continua em segundo plano e pode deixar o resultado
+ * no cache — a próxima abertura do título já acha pronto. */
+export async function resolveTmdbMetaRaced(
+  ref: TmdbRef,
+  timeoutMs = 9000,
+): Promise<TmdbMeta | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      resolveTmdbMeta(ref),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+
 export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
   const key = credential();
   if (!key) return null;

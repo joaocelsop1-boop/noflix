@@ -65,6 +65,13 @@ function get_settings($pdo) {
         // na aba Servidor Sigma, seção Suporte.
         'support_whatsapp' => '',
         'support_telegram' => '',
+        // Notificações Telegram (tudo29): quando um título não toca, o
+        // cliente avisa e o dono recebe no Telegram. Vazios = recurso
+        // desligado (o botão "Avisar que não funcionou" não aparece no
+        // app). O admin preenche na aba Servidor Sigma, seção
+        // Notificações Telegram. O token é segredo: nunca sai do servidor.
+        'telegram_notify_token' => '',
+        'telegram_notify_chat_id' => '',
     ];
     ensure_payment_columns($pdo);
     ensure_user_columns($pdo);
@@ -98,6 +105,10 @@ function ensure_payment_columns($pdo) {
         'asaas_sandbox' => "TINYINT(1) NOT NULL DEFAULT 0",
         'support_whatsapp' => "VARCHAR(30) NOT NULL DEFAULT ''",
         'support_telegram' => "VARCHAR(100) NOT NULL DEFAULT ''",
+        // tudo29: bot do Telegram que avisa o dono quando um título não
+        // toca + o chat que recebe a notificação (ID do usuário/grupo).
+        'telegram_notify_token' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'telegram_notify_chat_id' => "VARCHAR(100) NOT NULL DEFAULT ''",
     ];
     try {
         foreach ($settingsCols as $col => $def) {

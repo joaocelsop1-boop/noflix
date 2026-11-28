@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { autoReloadOnce, autoResetBudget } from "@/lib/auto-reload";
+import { AUTO_RESET_DELAY_MS, autoReloadOnce, autoResetBudget } from "@/lib/auto-reload";
 
 /**
  * tudo25: erro global (raiz) — o "Application error" do /app/login
@@ -33,13 +33,19 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // tudo28: reset() primeiro (recupera a falha de navegação sem
+    // tudo30: espera 1,2s antes do reset automático — a condição
+    // transitória (chunk frio / RSC lento) precisa se assentar; o reset
+    // imediato do tudo28 rebatia na mesma condição e queimava o
+    // orçamento. reset() primeiro (recupera a falha de navegação sem
     // recarregar a página); reload duro só quando o reset não resolve.
-    if (autoResetBudget()) {
-      reset();
-      return;
-    }
-    autoReloadOnce();
+    const timer = window.setTimeout(() => {
+      if (autoResetBudget()) {
+        reset();
+        return;
+      }
+      autoReloadOnce();
+    }, AUTO_RESET_DELAY_MS);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (

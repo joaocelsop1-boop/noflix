@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { Player } from "@/components/player";
 import { phpApi } from "@/lib/php";
-import { resolveTmdbMeta, tmdbGenreId } from "@/lib/tmdb";
+import { resolveTmdbMetaRaced, tmdbGenreId } from "@/lib/tmdb";
 import { cleanTitle } from "@/lib/title-clean";
 import { seasonsFor } from "@/lib/catalog";
 import { animeInfo, animeSeasons, movieInfo, realSeasons, seriesInfo } from "@/lib/seasons";
@@ -74,10 +74,12 @@ export default async function PlayPage({
        Fail open: painel fora ou lento (6s) → usa o ano da URL, sem duração. */
     let panelYear: number | undefined;
     let panelDuration: number | undefined;
+    let panelPlot: string | undefined;
+    let panelGenres: Genre[] = [];
     let similarCategory: string | undefined;
+    const cookieHeader = (await cookies()).toString();
     if (panelType === "movie") {
       try {
-        const cookieHeader = (await cookies()).toString();
         const info = await phpApi("get_vod_info", {
           cookies: cookieHeader,
           searchParams: { vod_id: String(panelId) },
@@ -99,15 +101,62 @@ export default async function PlayPage({
         }
         const catId = String(movieData.category_id ?? "").trim();
         if (catId) similarCategory = catId;
+        /* tudo30: sinopse e gêneros DO PAINEL como fallback — sem eles o
+           detalhe nascia vazio quando o TMDB não resolvia (foi o MOANA 2:
+           só título, selo e botões, sem ano/nota/gêneros/duração/sinopse). */
+        if (typeof metaInfo.plot === "string" && metaInfo.plot.trim()) {
+          panelPlot = metaInfo.plot.trim();
+        }
+        if (typeof metaInfo.genre === "string" && metaInfo.genre.trim()) {
+          panelGenres = metaInfo.genre
+            .split(",")
+            .map((g) => g.trim())
+            .filter(Boolean)
+            .slice(0, 4) as Genre[];
+        }
+      } catch {
+        /* painel fora — segue com o ano da URL */
+      }
+    } else if (panelType === "series") {
+      /* tudo30: a série também tem dados no painel (get_series_info: plot,
+         genre, releaseDate) — antes o servidor nem buscava, e sem TMDB o
+         detalhe da série nascia vazio; o cliente já buscava isso, mas só
+         depois do 1º paint. */
+      try {
+        const info = await phpApi("get_series_info", {
+          cookies: cookieHeader,
+          searchParams: { series_id: String(panelId) },
+          timeoutMs: 6000,
+        });
+        const data = (info.data ?? {}) as Record<string, unknown>;
+        const metaInfo = (data.info ?? {}) as Record<string, unknown>;
+        const relYear = Number(String(metaInfo.releaseDate ?? "").slice(0, 4)) || undefined;
+        if (relYear && relYear >= 1900 && relYear <= 2100) panelYear = relYear;
+        if (typeof metaInfo.plot === "string" && metaInfo.plot.trim()) {
+          panelPlot = metaInfo.plot.trim();
+        }
+        if (typeof metaInfo.genre === "string" && metaInfo.genre.trim()) {
+          panelGenres = metaInfo.genre
+            .split(",")
+            .map((g) => g.trim())
+            .filter(Boolean)
+            .slice(0, 4) as Genre[];
+        }
       } catch {
         /* painel fora — segue com o ano da URL */
       }
     }
     const year = panelYear ?? cleaned.year ?? (Number(query.year) || 0);
+    /* tudo30: o TMDB não pode segurar o detalhe — o resolve tem tentativas
+       sequenciais de até 8s cada (~50s no pior caso) e a navegação
+       cliente→servidor (RSC) falha quando o render demora: é o que faz a
+       tela de erro aparecer ao clicar em séries e filmes. Com 9s o detalhe
+       nasce com os dados do painel; o hook useTmdbMeta do cliente completa
+       capa/sinopse/nota/elenco depois, sem erro. */
     const meta =
       panelType === "live"
         ? null
-        : await resolveTmdbMeta({ key: `panel-${panelType}-${panelId}`, title: displayName, year, kind: panelType as "movie" | "series", details: true, duration: panelDuration });
+        : await resolveTmdbMetaRaced({ key: `panel-${panelType}-${panelId}`, title: displayName, year, kind: panelType as "movie" | "series", details: true, duration: panelDuration });
     const panelTitle: Title = {
       slug: `panel-${panelType}-${panelId}`,
       tmdbId: meta?.tmdbId ?? 0,
@@ -118,19 +167,19 @@ export default async function PlayPage({
       // tudo22: ano desconhecido é 0 (não mostra ano) — antes caía para o
       // ano atual (2026) e a série piscava 2026 antes de corrigir para 1992.
       year: year || meta?.year || 0,
-      genres: (meta?.genres ?? []) as Genre[],
+      genres: (meta?.genres?.length ? meta.genres : panelGenres) as Genre[],
       maturity: "16+",
       /* tudo25: nota do TMDB quando há; 0 = sem nota (o Player só mostra
          ★ quando a nota é > 0) — nunca mais o 8 inventado. */
       rating: meta?.rating ?? 0,
       match: meta?.rating ? Math.round(meta.rating * 10) : 0,
       tagline: "Transmitindo agora.",
-      overview: meta?.overview ?? "",
+      overview: meta?.overview ?? panelPlot ?? "",
       creator: "CinePlus",
       cast: [],
       accent: "#e50914",
       format: panelType === "live" ? "Ao vivo" : panelType === "series" ? "Séries" : "Filme",
-      runtime: meta?.runtime,
+      runtime: meta?.runtime ?? panelDuration,
     };
     const similarGenre =
       meta?.genres?.[0] ? tmdbGenreId(meta.genres[0]) : undefined;
