@@ -93,3 +93,92 @@ export function autoResetBudget(): boolean {
     return false;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* tudo31 — classificar e capturar o erro real, em vez de adivinhar.   */
+/*                                                                     */
+/* O teste do tudo30 provou que o erro aparece na 1ª tentativa de      */
+/* quase TODA navegação (detalhe, Novidades, Séries, voltar, login) e  */
+/* o retry SEMPRE funciona — mas a tela ficava parada até o clique     */
+/* manual. A causa é o mecanismo de auto-recuperação, não os dados:    */
+/* o useEffect das fronteiras rodava UMA vez por montagem; se o        */
+/* reset() falhasse, nada mais acontecia (o efeito não re-rodava,      */
+/* porque a fronteira não desmonta — ela só recebe outro erro). Além   */
+/* disso, reset() é a recuperação ERRADA para erro de chunk/RSC: ele   */
+/* retenta o mesmo chunk/RSC que acabou de falhar. Para esses, o        */
+/* reload duro (documento novo, chunks novos) é o que resolve.         */
+/*                                                                     */
+/* Os listeners de chunk (script inline do layout + ChunkReload) NÃO   */
+/* veem esses erros: o roteador do Next.js captura a rejeição do       */
+/* import dinâmico / do fetch RSC internamente e joga para a           */
+/* fronteira de erro — nunca vira `unhandledrejection`. Por isso a     */
+/* fronteira é o ÚNICO ponto de recuperação, e ela precisa de um loop  */
+/* de verdade (re-roda a cada novo erro, com orçamentos), não de um    */
+/* tiro único.                                                         */
+/* ------------------------------------------------------------------ */
+
+/** Chave onde o último erro capturado fica guardado (sobrevive ao reload). */
+export const LAST_ERROR_KEY = "nf-last-error";
+
+/** Erro de chunk ou de fetch do RSC — a recuperação certa é o reload
+    duro, não o reset() (que retenta o mesmo chunk/RSC que falhou). */
+export function isChunkOrFetchError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  const text = `${message} ${typeof digest === "string" ? digest : ""}`.toLowerCase();
+  return (
+    text.includes("loading chunk") ||
+    text.includes("chunkloaderror") ||
+    text.includes("failed to fetch dynamically imported module") ||
+    text.includes("importing a module script failed") ||
+    text.includes("failed to fetch") ||
+    text.includes("load failed") ||
+    text.includes("unable to load") ||
+    text.includes("networkerror") ||
+    text.includes("network error")
+  );
+}
+
+/** Erro que NÃO adianta retentar (ex.: rota inexistente) — mostra a
+    tela direto, sem gastar o orçamento de recuperação. */
+export function isNonRetryableError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_NOT_FOUND");
+}
+
+/** Grava o erro real (mensagem, digest, URL, hora) no sessionStorage e
+    no console — é o que o teste ao vivo lê para dizer O QUE falhou, em
+    vez de adivinhar. Sobrevive ao reload duro, então dá para conferir
+    depois que a página voltar. */
+export function recordLastError(error: unknown): void {
+  try {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : String(error ?? "");
+    const digest = (error as { digest?: unknown } | null)?.digest;
+    const rec = {
+      message: message.slice(0, 300),
+      digest: typeof digest === "string" ? digest : "",
+      url:
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "",
+      at: new Date().toISOString(),
+    };
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(LAST_ERROR_KEY, JSON.stringify(rec));
+    }
+    // eslint-disable-next-line no-console
+    console.error("[cineplus] erro capturado na fronteira:", rec);
+  } catch {
+    /* nunca quebrar a página por causa do registro do erro */
+  }
+}

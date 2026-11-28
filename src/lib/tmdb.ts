@@ -518,7 +518,7 @@ export function tmdbGenreId(name: string): number | undefined {
  * no cache — a próxima abertura do título já acha pronto. */
 export async function resolveTmdbMetaRaced(
   ref: TmdbRef,
-  timeoutMs = 9000,
+  timeoutMs = 6000,
 ): Promise<TmdbMeta | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { AUTO_RESET_DELAY_MS, autoReloadOnce, autoResetBudget } from "@/lib/auto-reload";
+import { useEffect, useRef, useState } from "react";
+import {
+  AUTO_RESET_DELAY_MS,
+  autoReloadOnce,
+  autoResetBudget,
+  isChunkOrFetchError,
+  isNonRetryableError,
+  recordLastError,
+} from "@/lib/auto-reload";
 
 /**
  * tudo24: limite de erro do login — a página /app/login quebrou 1x na
@@ -21,29 +28,81 @@ import { AUTO_RESET_DELAY_MS, autoReloadOnce, autoResetBudget } from "@/lib/auto
  * tudo28 (item 2): igual ao global-error.tsx — tenta `reset()` ANTES
  * (até 2 por página/sessão) e só cai para o reload duro quando o reset
  * não resolve; o reload agora tem orçamento de 5 por sessão, não 1.
+ *
+ * tudo31: mesmo loop de recuperação do global-error.tsx — o efeito
+ * re-roda a cada NOVO erro (antes rodava uma só vez por montagem e, se
+ * o reset falhasse, a tela ficava parada até o clique manual); erro de
+ * chunk/fetch vai direto para o reload duro; enquanto recupera, mostra
+ * "Carregando…" em vez da tela de erro; a tela de erro só aparece
+ * quando a recuperação esgota, com a mensagem e o digest do erro real
+ * visíveis para diagnosticar.
  */
 export default function LoginError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [phase, setPhase] = useState<"recovering" | "stuck">("recovering");
+  const attemptsRef = useRef(0);
+
   useEffect(() => {
-    // tudo30: espera 1,2s antes do reset automático — a condição
-    // transitória (chunk frio / RSC lento) precisa se assentar; o reset
-    // imediato do tudo28 rebatia na mesma condição e queimava o
-    // orçamento. reset() primeiro (recupera a falha de navegação sem
-    // recarregar a página); reload duro só quando o reset não resolve.
+    recordLastError(error);
+    if (isNonRetryableError(error)) {
+      setPhase("stuck");
+      return;
+    }
+    attemptsRef.current += 1;
+    if (attemptsRef.current > 6) {
+      setPhase("stuck");
+      return;
+    }
     const timer = window.setTimeout(() => {
+      if (isChunkOrFetchError(error)) {
+        if (!autoReloadOnce()) setPhase("stuck");
+        return;
+      }
       if (autoResetBudget()) {
         reset();
         return;
       }
-      autoReloadOnce();
+      if (!autoReloadOnce()) setPhase("stuck");
     }, AUTO_RESET_DELAY_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPhase("stuck"), 10000);
+    return () => window.clearTimeout(t);
   }, []);
+
+  const detail = `${error?.message ?? ""}${error?.digest ? ` [${error.digest}]` : ""}`.trim();
+
+  if (phase === "recovering") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#07080f] px-4">
+        <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1220] p-6 text-center shadow-2xl md:p-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e50914]">
+            CinePlus
+          </p>
+          <div
+            className="mx-auto mt-6 h-10 w-10 animate-spin rounded-full border-[3px] border-white/15 border-t-[#e50914]"
+            aria-hidden="true"
+          />
+          <h1 className="mt-5 text-xl font-bold text-white">Carregando…</h1>
+          <p className="mt-2 text-sm leading-relaxed text-white/60">
+            Recuperando automaticamente — só um instante.
+          </p>
+          {detail ? (
+            <p className="mt-5 break-words text-[11px] text-white/35">{detail.slice(0, 160)}</p>
+          ) : null}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="grid min-h-screen place-items-center bg-[#07080f] px-4">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1220] p-6 text-center shadow-2xl md:p-8">
@@ -63,6 +122,9 @@ export default function LoginError({
         >
           Tentar novamente
         </button>
+        {detail ? (
+          <p className="mt-5 break-words text-[11px] text-white/35">{detail.slice(0, 200)}</p>
+        ) : null}
       </div>
     </main>
   );

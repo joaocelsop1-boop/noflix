@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { PlayIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
+import { useTmdbMeta } from "@/lib/tmdb-client";
 import { cn } from "@/lib/cn";
 
 type Tab = "movie" | "series" | "anime";
@@ -328,12 +329,7 @@ export function LiveCatalogue({
                   <span className="block truncate text-[11px] font-medium leading-tight text-white/90">
                     {item.name}
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1 text-[9.5px] text-white/45">
-                    {item.rating ? (
-                      <span className="font-semibold text-[#46d369]">{item.rating}</span>
-                    ) : null}
-                    {item.year ? <span>· {item.year}</span> : null}
-                  </span>
+                  <CatalogueCardMeta item={item} />
                 </span>
               </button>
             ))}
@@ -393,6 +389,39 @@ export function LiveCatalogue({
       </main>
       {chrome && <Footer />}
     </>
+  );
+}
+
+/**
+ * tudo31: nota e ano no card do catálogo — os cards mostravam SÓ o título
+ * porque usavam `item.rating`/`item.year` DO PAINEL, e o painel quase
+ * nunca devolve nota (e muitas vezes nem ano) na lista (get_vod_streams /
+ * get_series). O detalhe já tinha os dados porque resolve o TMDB; o card
+ * agora resolve também, com o mesmo useTmdbMeta do PanelPosterCard /
+ * Top10Caption (mesma chave = cache compartilhado, fila em lote de 25,
+ * sem chamada extra por card repetido). Nota SÓ do TMDB (o rating do
+ * painel é o "8 falso"/vazio — tudo27 item 6); ano é o do painel quando
+ * há, senão o do TMDB. Enquanto resolve, mostra o ano do painel se
+ * houver e nenhum ★; sem match, fica só o ano do painel (nunca quebra).
+ */
+function CatalogueCardMeta({ item }: { item: Entry }) {
+  const meta = useTmdbMeta({
+    key: item.key,
+    title: item.name,
+    year: item.year,
+    kind: item.kind,
+  });
+  const rating = meta?.rating;
+  const year = item.year ?? meta?.year;
+  return (
+    <span className="mt-0.5 flex items-center gap-1 text-[9.5px] text-white/45">
+      {rating ? (
+        <span className="flex items-center gap-0.5 font-semibold text-[#ffc107]">
+          ★ {rating.toFixed(1)}
+        </span>
+      ) : null}
+      {year ? <span>· {year}</span> : null}
+    </span>
   );
 }
 

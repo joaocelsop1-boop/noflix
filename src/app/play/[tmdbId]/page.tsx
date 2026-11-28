@@ -83,7 +83,7 @@ export default async function PlayPage({
         const info = await phpApi("get_vod_info", {
           cookies: cookieHeader,
           searchParams: { vod_id: String(panelId) },
-          timeoutMs: 6000,
+          timeoutMs: 4000,
         });
         const data = (info.data ?? {}) as Record<string, unknown>;
         const metaInfo = (data.info ?? {}) as Record<string, unknown>;
@@ -126,7 +126,7 @@ export default async function PlayPage({
         const info = await phpApi("get_series_info", {
           cookies: cookieHeader,
           searchParams: { series_id: String(panelId) },
-          timeoutMs: 6000,
+          timeoutMs: 4000,
         });
         const data = (info.data ?? {}) as Record<string, unknown>;
         const metaInfo = (data.info ?? {}) as Record<string, unknown>;
@@ -152,7 +152,11 @@ export default async function PlayPage({
        cliente→servidor (RSC) falha quando o render demora: é o que faz a
        tela de erro aparecer ao clicar em séries e filmes. Com 9s o detalhe
        nasce com os dados do painel; o hook useTmdbMeta do cliente completa
-       capa/sinopse/nota/elenco depois, sem erro. */
+       capa/sinopse/nota/elenco depois, sem erro.
+       tudo31: teto do race 9s → 6s e get_vod_info/get_series_info 6s → 4s
+       (o pior caso do RSC cai de ~15s para ~10s; TMDB e painel respondem
+       em <1s no normal, então os tetos continuam folgados — e o cliente
+       completa o que faltar). */
     const meta =
       panelType === "live"
         ? null
