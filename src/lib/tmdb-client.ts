@@ -116,9 +116,28 @@ export async function flush(): Promise<void> {
           }),
         });
         if (!res.ok) throw new Error("resolve failed");
-        const data = (await res.json()) as { results?: Record<string, TmdbMeta | null> };
+        const data = (await res.json()) as {
+          results?: Record<string, TmdbMeta | null>;
+          failed?: string[];
+        };
         const results = data?.results ?? {};
+        /* tudo35: chaves que o servidor marcou como falha do TMDB —
+           NÃO cacheia null (senão a falha transitória vira "sem match"
+           permanente); re-enfileira para retentar como falha de rede. */
+        const failedKeys = new Set(data?.failed ?? []);
         for (const item of batch) {
+          if (failedKeys.has(item.key)) {
+            batchFailed = true;
+            const n = (retryCount.get(item.key) ?? 0) + 1;
+            retryCount.set(item.key, n);
+            if (n <= MAX_RETRIES) {
+              pending.set(item.key, item);
+            } else {
+              retryCount.delete(item.key);
+              cache.set(item.key, null);
+            }
+            continue;
+          }
           cache.set(item.key, results[item.key] ?? null);
           retryCount.delete(item.key);
         }

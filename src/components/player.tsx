@@ -135,6 +135,26 @@ function nextEpisodeOf(seasons: Season[], season: number, episode: number) {
   return first ? { season: nextSeason.number, episode: first.number } : null;
 }
 
+/**
+ * tudo35: rótulo da temporada — NUNCA vazio. O nome pode vir ausente
+ * (painel), "Season N" (TMDB, vira "Temporada N") ou em branco/espaços
+ * (era o que deixava os botões do sheet de episódios VAZIOS: o nome
+ * vinha truthy mas em branco e o ternário o renderizava, sem cair no
+ * fallback "Temporada N"). Nome próprio ("Book One") é mantido.
+ */
+function seasonLabel(entry: { name?: string; number: number }): string {
+  const n = (entry.name ?? "").trim();
+  if (n && !/^Season \d+$/i.test(n)) return n;
+  return `Temporada ${entry.number}`;
+}
+
+/** tudo35: versão curta ("S1") p/ o painel "A seguir" — mesmo trim + fallback. */
+function seasonShortLabel(entry: { name?: string; number: number }): string {
+  const n = (entry.name ?? "").trim();
+  if (n && !/^Season \d+$/i.test(n)) return n;
+  return `S${entry.number}`;
+}
+
 /** tudo26: minutos -> "1h17" / "45 min" (aviso de filme errado). */
 function formatMinutes(min: number): string {
   if (min >= 60) return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
@@ -299,6 +319,10 @@ export function Player({
                 overview: String(ep.plot ?? ""),
               }))
               .filter((ep) => ep.number > 0)
+              // tudo35: o painel devolve o mesmo episódio 2x com títulos
+              // diferentes ("Tulsa King - S01E01" e "Tulsa King (2022)
+              // S01 E01") — uma entrada por número de episódio.
+              .filter((ep, i, arr) => arr.findIndex((x) => x.number === ep.number) === i)
               .sort((a, b) => a.number - b.number),
           };
         })
@@ -1485,17 +1509,13 @@ export function Player({
                                 : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                             }
                           >
-                            {entry.name && !/^Season \d+$/.test(entry.name)
-                              ? entry.name
-                              : `Temporada ${entry.number}`}
+                            {seasonLabel(entry)}
                           </button>
                         ))}
                       </div>
                     )}
                     <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40">
-                      {pickerSeason?.name && !/^Season \d+$/.test(pickerSeason.name)
-                        ? pickerSeason.name
-                        : `Temporada ${pickerSeason?.number ?? season}`}
+                      {seasonLabel(pickerSeason ?? { number: season })}
                       {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                     </p>
                     <div className="mt-1">
@@ -2110,9 +2130,7 @@ export function Player({
                   {currentSeason && (
                     <>
                       <p className="mt-1 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                        {currentSeason.name && !/^Season \d+$/.test(currentSeason.name)
-                          ? currentSeason.name
-                          : `Temporada ${season}`}
+                        {seasonLabel(currentSeason)}
                         {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                       </p>
                       {allSeasons.length > 1 && (
@@ -2129,9 +2147,7 @@ export function Player({
                                   : "shrink-0 rounded border border-white/10 px-2 py-0.5 text-[11px] text-white/60 transition hover:border-white/40 hover:text-white"
                               }
                             >
-                              {entry.name && !/^Season \d+$/.test(entry.name)
-                                ? entry.name
-                                : `S${entry.number}`}
+                              {seasonShortLabel(entry)}
                             </button>
                           ))}
                         </div>
@@ -2408,17 +2424,13 @@ export function Player({
                             : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                         }
                       >
-                        {entry.name && !/^Season \d+$/.test(entry.name)
-                          ? entry.name
-                          : `Temporada ${entry.number}`}
+                        {seasonLabel(entry)}
                       </button>
                     ))}
                   </div>
                 )}
                 <p className="px-4 pt-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/40 md:px-6">
-                  {sheetSeasonData?.name && !/^Season \d+$/.test(sheetSeasonData.name)
-                    ? sheetSeasonData.name
-                    : `Temporada ${sheetSeasonData?.number ?? season}`}
+                  {seasonLabel(sheetSeasonData ?? { number: season })}
                   {allSeasons.length > 1 ? ` · ${allSeasons.length} temporadas` : ""}
                 </p>
                 <div className="mt-1 flex-1 overflow-y-auto px-2 pb-4 md:px-4">

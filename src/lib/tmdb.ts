@@ -202,7 +202,7 @@ async function searchOnce(
   year: number | undefined,
   lang: string,
   key: string,
-): Promise<SearchItem[]> {
+): Promise<SearchItem[] | null> {
   const params: Record<string, string> = {
     query,
     language: lang,
@@ -216,7 +216,11 @@ async function searchOnce(
   const data = (await tmdbFetch(`/search/${type}`, params, key)) as {
     results?: SearchItem[];
   } | null;
-  return Array.isArray(data?.results) ? data.results : [];
+  /* tudo35: null = a API do TMDB falhou (429, timeout, rede) — NÃO é
+     "sem resultados". Quem chama precisa distinguir, senão a falha
+     transitória vira null cacheado (7 dias sem ★/ano/capa). */
+  if (data === null) return null;
+  return Array.isArray(data.results) ? data.results : [];
 }
 
 async function fetchRuntime(
@@ -361,7 +365,7 @@ async function resolveFresh(
      126 min; "A Noiva Cadáver" 2005 tem 77 min) — rejeita e tenta a
      próxima tentativa. */
   panelDuration?: number,
-): Promise<{ meta: TmdbMeta | null; skipCache?: boolean }> {
+): Promise<{ meta: TmdbMeta | null; skipCache?: boolean; failed?: boolean }> {
   const primary: "movie" | "tv" = kind === "series" ? "tv" : "movie";
   const secondary: "movie" | "tv" = primary === "movie" ? "tv" : "movie";
   // Tentativas em ordem: tipo certo + pt-BR + ano → sem ano → en-US + ano →
@@ -389,8 +393,13 @@ async function resolveFresh(
     attempts.push({ type: primary, lang: "pt-BR", y: year, q: bare });
     attempts.push({ type: primary, lang: "en-US", y: year, q: bare });
   }
+  /* tudo35: distingue "o TMDB não achou nada" de "o TMDB falhou". */
+  let anySearchOk = false;
   for (const a of attempts) {
     const results = await limited(() => searchOnce(a.type, a.q, a.y, a.lang, key));
+    /* API falhou nesta tentativa — não é "sem match", tenta a próxima. */
+    if (results === null) continue;
+    anySearchOk = true;
     let best: { item: SearchItem; score: number } | null = null;
     for (const item of results.slice(0, 10)) {
       // tudo25: o título original do TMDB também vale — filme estrangeiro
@@ -435,6 +444,9 @@ async function resolveFresh(
       return { meta };
     }
   }
+  /* Nenhuma tentativa chegou a responder: falha transitória do TMDB —
+     NÃO cacheia (skipCache) e avisa quem chamou (failed) para retentar. */
+  if (!anySearchOk) return { meta: null, skipCache: true, failed: true };
   return { meta: null };
 }
 
@@ -534,14 +546,23 @@ export async function resolveTmdbMetaRaced(
 }
 
 
-export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
+/**
+ * tudo35: resolve com o status da falha — a rota /api/tmdb-resolve
+ * precisa saber se o null é "sem match" (o cliente cacheia) ou "o TMDB
+ * falhou" (o cliente retenta, sem cachear null). Sem isso, uma falha
+ * transitória (429/timeout) virava null permanente no cliente e no
+ * disco (7 dias) — era a instabilidade do ★/ano nas séries.
+ */
+export async function resolveTmdbMetaWithStatus(
+  ref: TmdbRef,
+): Promise<{ meta: TmdbMeta | null; failed: boolean }> {
   const key = credential();
-  if (!key) return null;
+  if (!key) return { meta: null, failed: false };
   const cleaned = cleanTitle(ref.title);
   const title = cleaned.title;
   /* tudo25: nome só com dígitos ("242310") é um id do painel, não um
      título — nem adianta buscar no TMDB. */
-  if (!title || /^\d+$/.test(title)) return null;
+  if (!title || /^\d+$/.test(title)) return { meta: null, failed: false };
   const year = cleaned.year ?? ref.year;
   /* tudo28 (item 3): versão do cache (v2). Antes do tudo27, uma falha
      transitória do credits era cacheada SEM elenco por 7 dias (disco +
@@ -555,15 +576,15 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
   const cacheKey = `v2|${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
 
   const mem = memCache.get(cacheKey);
-  if (mem && Date.now() - mem.at < CACHE_TTL) return mem.meta;
+  if (mem && Date.now() - mem.at < CACHE_TTL) return { meta: mem.meta, failed: false };
 
   const disk = await readDisk(cacheKey);
   if (disk !== undefined) {
     memSet(cacheKey, disk);
-    return disk;
+    return { meta: disk, failed: false };
   }
 
-  const { meta, skipCache } = await resolveFresh(
+  const { meta, skipCache, failed } = await resolveFresh(
     title,
     year,
     ref.kind,
@@ -575,5 +596,9 @@ export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
     memSet(cacheKey, meta);
     await writeDisk(cacheKey, meta);
   }
-  return meta;
+  return { meta, failed: failed === true };
+}
+
+export async function resolveTmdbMeta(ref: TmdbRef): Promise<TmdbMeta | null> {
+  return (await resolveTmdbMetaWithStatus(ref)).meta;
 }

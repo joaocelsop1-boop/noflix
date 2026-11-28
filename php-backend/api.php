@@ -955,12 +955,18 @@ switch ($action) {
         $repName = trim((string)($repUser['name'] ?? ''));
         $repEmail = trim((string)($repUser['email'] ?? ''));
         $repText = "🎬 Título não funcionou: " . $repWhat . "\n👤 Reportado por: " . ($repName !== '' ? $repName : 'cliente') . " (" . $repEmail . ")\n🕐 " . date('d/m/Y H:i');
+        // tudo35: envio IGUAL ao bot de notificações do dono (bot.py,
+        // enviar_telegram_notificacao): mesmo endpoint, POST form-encoded,
+        // parse_mode=HTML + disable_web_page_preview. O texto é escapado
+        // para HTML — título/nome podem ter "&" ou "<", e sem escape o
+        // Telegram devolve 400 com parse_mode=HTML.
+        $repTextHtml = htmlspecialchars($repText, ENT_QUOTES, 'UTF-8');
         // Envio pela API do Telegram (10s de timeout). O token vai só na
         // URL da chamada servidor→Telegram — nunca em resposta, log ou front.
         $repCh = curl_init();
         curl_setopt($repCh, CURLOPT_URL, 'https://api.telegram.org/bot' . $repToken . '/sendMessage');
         curl_setopt($repCh, CURLOPT_POST, true);
-        curl_setopt($repCh, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $repChat, 'text' => $repText]));
+        curl_setopt($repCh, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $repChat, 'text' => $repTextHtml, 'parse_mode' => 'HTML', 'disable_web_page_preview' => 'true']));
         curl_setopt($repCh, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($repCh, CURLOPT_TIMEOUT, 10);
         curl_setopt($repCh, CURLOPT_CONNECTTIMEOUT, 5);
@@ -982,8 +988,17 @@ switch ($action) {
             echo json_encode(['ok' => true]);
         } else {
             session_write_close();
+            // tudo35: registra o motivo do Telegram (só a descrição do
+            // erro — nunca o token) para o diagnóstico não ficar no escuro.
+            $repDetail = '';
+            if ($repResp !== false && $repResp !== '') {
+                $repDecodedErr = json_decode((string)$repResp, true);
+                if (is_array($repDecodedErr) && !empty($repDecodedErr['description'])) {
+                    $repDetail = (string)$repDecodedErr['description'];
+                }
+            }
             // Sem o token e sem o chat ID no log: só o código HTTP/erro cURL.
-            error_log('report_broken: falha ao enviar para o Telegram (HTTP ' . $repHttp . ($repErr !== '' ? ', cURL: ' . $repErr : '') . ')');
+            error_log('report_broken: falha ao enviar para o Telegram (HTTP ' . $repHttp . ($repErr !== '' ? ', cURL: ' . $repErr : '') . ($repDetail !== '' ? ', Telegram: ' . $repDetail : '') . ')');
             echo json_encode(['ok' => false, 'error' => 'send_failed']);
         }
         break;
