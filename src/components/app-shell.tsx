@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ProfileGate } from "@/components/profile-gate";
 import { TitleModal } from "@/components/title-modal";
 import { SearchOverlay } from "@/components/search-overlay";
@@ -11,6 +11,7 @@ import { CloudSync } from "@/components/cloud-sync";
 import { useStore } from "@/components/store";
 import { ChatIcon } from "@/components/icons";
 import { supportUrl } from "@/lib/support";
+import { isSupportFloatHidden } from "@/lib/support-float";
 import { usePanelMe } from "@/lib/use-panel-me";
 
 /* tudo26: botão flutuante de suporte — SEMPRE visível, em todas as
@@ -19,8 +20,17 @@ import { usePanelMe } from "@/lib/use-panel-me";
    atual — não inventa contato): WhatsApp verde, Telegram azul. */
 function SupportFloat() {
   const { me } = usePanelMe();
+  const pathname = usePathname();
+  /* tudo32: some no player e em tela cheia (ver isSupportFloatHidden). */
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const update = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    update();
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, []);
   const url = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
-  if (!url) return null;
+  if (!url || isSupportFloatHidden(pathname, isFullscreen)) return null;
   const isWhatsApp = url.includes("wa.me");
   return (
     <a

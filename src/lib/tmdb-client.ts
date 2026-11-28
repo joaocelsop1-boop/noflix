@@ -46,11 +46,23 @@ function subscribe(cb: () => void): () => void {
   };
 }
 
+/** Estado da fila — só leitura, exportado para teste (tudo32). */
+export function tmdbQueueSnapshot(): { pending: number; cached: number } {
+  return { pending: pending.size, cached: cache.size };
+}
+
+/** Limpa fila/cache — só para teste (tudo32). Nunca chamar em produção. */
+export function tmdbQueueReset(): void {
+  pending.clear();
+  cache.clear();
+  version = 0;
+}
+
 function getVersion(): number {
   return version;
 }
 
-function enqueue(ref: TmdbRef): void {
+export function enqueue(ref: TmdbRef): void {
   const key = tmdbRefKey(ref);
   if (cache.has(key) || pending.has(key)) return;
   pending.set(key, { ...ref, key });
@@ -62,33 +74,55 @@ function enqueue(ref: TmdbRef): void {
   }
 }
 
-async function flush(): Promise<void> {
-  const batch = Array.from(pending.values()).slice(0, 25);
-  if (batch.length === 0) return;
-  for (const item of batch) pending.delete(item.key);
+/** true enquanto um drain está em voo — evita dois drains concorrentes. */
+let flushing = false;
+
+export async function flush(): Promise<void> {
+  if (flushing) return;
+  flushing = true;
   try {
-    const res = await fetch(apiUrl("/api/tmdb-resolve"), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        items: batch.map(({ key, title, year, kind, details, duration }) => ({
-          key,
-          title,
-          year,
-          kind,
-          details,
-          duration,
-        })),
-      }),
-    });
-    if (!res.ok) throw new Error("resolve failed");
-    const data = (await res.json()) as { results?: Record<string, TmdbMeta | null> };
-    const results = data?.results ?? {};
-    for (const item of batch) cache.set(item.key, results[item.key] ?? null);
-  } catch {
-    for (const item of batch) cache.set(item.key, null);
+    /* tudo32: drena a fila INTEIRA em lotes de 25. Antes, o flush pegava
+       só os 25 primeiros e o resto ficava pendente PARA SEMPRE — só um
+       NOVO enqueue disparava outro flush. Com 96 cards por página (e
+       ~200 enqueues na home), só os ~25 primeiros resolviam: os cards do
+       fim da grade e as séries (que enfileiram por último) nunca
+       mostravam ★/ano. O loop re-checa `pending` a cada lote, então
+       enqueues que chegam durante o drain entram no mesmo drain. */
+    while (pending.size > 0) {
+      const batch = Array.from(pending.values()).slice(0, 25);
+      for (const item of batch) pending.delete(item.key);
+      try {
+        const res = await fetch(apiUrl("/api/tmdb-resolve"), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            items: batch.map(({ key, title, year, kind, details, duration }) => ({
+              key,
+              title,
+              year,
+              kind,
+              details,
+              duration,
+            })),
+          }),
+        });
+        if (!res.ok) throw new Error("resolve failed");
+        const data = (await res.json()) as { results?: Record<string, TmdbMeta | null> };
+        const results = data?.results ?? {};
+        for (const item of batch) cache.set(item.key, results[item.key] ?? null);
+      } catch {
+        for (const item of batch) cache.set(item.key, null);
+      }
+      notify();
+      /* pausa curta entre lotes: a UI pinta os primeiros resultados
+         antes do próximo lote resolver, e o servidor não é martelado. */
+      if (pending.size > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 60));
+      }
+    }
+  } finally {
+    flushing = false;
   }
-  notify();
 }
 
 /** Resolve um título (null = não pedir; undefined = resolvendo). */
