@@ -937,6 +937,12 @@ export function NativePlayer({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      /* tudo34: com a tela de erro de reprodução aberta (failed), nenhum
+         atalho do player pode roubar as teclas — o Espaço era interceptado
+         aqui (preventDefault + toggle) e o botão focado nunca ativava, e
+         o Tab/Enter também não chegava. Com failed, as teclas vão direto
+         para os botões da tela de erro ("Tentar novamente" / "Avisar"). */
+      if (failed) return;
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       switch (event.key.toLowerCase()) {
@@ -986,7 +992,7 @@ export function NativePlayer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [poke, seekBy, toggle, toggleFullscreen, toggleMute]);
+  }, [failed, poke, seekBy, toggle, toggleFullscreen, toggleMute]);
 
   /** start the whole chain again — sources change, tokens expire, CDNs blink */
   const retryAll = useCallback(() => {
@@ -1093,8 +1099,8 @@ export function NativePlayer({
 
       {/* fatal: every source refused */}
       {failed && (
-        <div className="absolute inset-0 grid place-items-center bg-black/85 px-6 text-center">
-          <div>
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/85 px-6 text-center">
+          <div className="w-full max-w-md">
             <p className="text-[15px] font-semibold">Este título não começou no player CinePlus</p>
             <p className="mt-1 text-[12.5px] text-white/55">
               {isPanel
@@ -1105,6 +1111,7 @@ export function NativePlayer({
               <button
                 type="button"
                 onClick={retryAll}
+                autoFocus
                 className="rounded-full bg-white px-4 py-2 text-[12.5px] font-semibold text-black"
               >
                 Tentar novamente

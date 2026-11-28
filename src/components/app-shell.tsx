@@ -9,8 +9,8 @@ import { SearchOverlay } from "@/components/search-overlay";
 import { SoundNotice } from "@/components/sound-notice";
 import { CloudSync } from "@/components/cloud-sync";
 import { useStore } from "@/components/store";
-import { ChatIcon } from "@/components/icons";
-import { supportUrl } from "@/lib/support";
+import { ChatIcon, CloseIcon } from "@/components/icons";
+import { supportOptions } from "@/lib/support";
 import { isSupportFloatHidden } from "@/lib/support-float";
 import { usePanelMe } from "@/lib/use-panel-me";
 
@@ -36,24 +36,64 @@ function SupportFloat() {
     document.addEventListener("fullscreenchange", update);
     return () => document.removeEventListener("fullscreenchange", update);
   }, []);
-  const url = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
-  if (!url || modalOpen || isSupportFloatHidden(pathname, isFullscreen)) return null;
-  const isWhatsApp = url.includes("wa.me");
+  /* tudo34: o botão abre um menu com as DUAS opções (WhatsApp e Telegram)
+     — o cliente escolhe qual quer usar. Só entram as configuradas no admin
+     (support_whatsapp / support_telegram); sem nenhuma, o botão não aparece.
+     O comportamento de sumir continua igual (tudo33): some no player, com
+     modal/busca abertos e em tela cheia. */
+  const options = supportOptions(me?.support?.whatsapp, me?.support?.telegram);
+  const hidden =
+    options.length === 0 || modalOpen || isSupportFloatHidden(pathname, isFullscreen);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (hidden) setMenuOpen(false);
+  }, [hidden]);
+  if (hidden) return null;
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      aria-label="Falar com o suporte"
-      title="Falar com o suporte"
-      className="fixed bottom-5 right-5 z-[130] grid h-14 w-14 place-items-center rounded-full shadow-2xl transition-transform hover:scale-105"
-      style={{
-        backgroundColor: isWhatsApp ? "#25d366" : "#229ED9",
-        color: isWhatsApp ? "#06281a" : "#fff",
-      }}
-    >
-      <ChatIcon width={26} height={26} />
-    </a>
+    <>
+      {menuOpen && (
+        <button
+          type="button"
+          aria-label="Fechar menu de suporte"
+          onClick={() => setMenuOpen(false)}
+          className="fixed inset-0 z-[129] cursor-default"
+        />
+      )}
+      {menuOpen && (
+        <div className="fixed bottom-24 right-5 z-[130] w-60 rounded-2xl border border-white/10 bg-[#141414]/98 p-2 shadow-2xl backdrop-blur-xl">
+          <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
+            Falar com o suporte
+          </p>
+          {options.map((opt) => (
+            <a
+              key={opt.kind}
+              href={opt.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setMenuOpen(false)}
+              className="mt-1 flex items-center gap-3 rounded-xl px-4 py-3 text-[14px] font-bold text-white transition hover:brightness-110 active:scale-[0.99]"
+              style={{
+                backgroundColor: opt.kind === "whatsapp" ? "#25d366" : "#229ED9",
+                color: opt.kind === "whatsapp" ? "#06281a" : "#fff",
+              }}
+            >
+              <ChatIcon width={20} height={20} />
+              {opt.label}
+            </a>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setMenuOpen((v) => !v)}
+        aria-label={menuOpen ? "Fechar menu de suporte" : "Falar com o suporte"}
+        aria-expanded={menuOpen}
+        title="Falar com o suporte"
+        className="fixed bottom-5 right-5 z-[130] grid h-14 w-14 place-items-center rounded-full bg-[#e50914] text-white shadow-2xl transition-transform hover:scale-105"
+      >
+        {menuOpen ? <CloseIcon width={24} height={24} /> : <ChatIcon width={26} height={26} />}
+      </button>
+    </>
   );
 }
 

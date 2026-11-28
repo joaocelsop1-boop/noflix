@@ -20,3 +20,31 @@ export function supportUrl(
   }
   return null;
 }
+
+export type SupportOption = {
+  kind: "whatsapp" | "telegram";
+  label: string;
+  url: string;
+};
+
+/**
+ * tudo34: as DUAS opções de suporte para o botão flutuante — o cliente
+ * escolhe WhatsApp ou Telegram. Só entram as que estão configuradas no
+ * admin (support_whatsapp / support_telegram); sem nenhuma, a lista vem
+ * vazia e o botão não é renderizado. A ordem é WhatsApp primeiro.
+ */
+export function supportOptions(
+  whatsapp?: string | null,
+  telegram?: string | null,
+): SupportOption[] {
+  const options: SupportOption[] = [];
+  const wa = (whatsapp ?? "").trim();
+  if (wa) {
+    options.push({ kind: "whatsapp", label: "WhatsApp", url: `https://wa.me/${wa}` });
+  }
+  const tg = (telegram ?? "").trim().replace(/^@/, "");
+  if (tg) {
+    options.push({ kind: "telegram", label: "Telegram", url: `https://t.me/${tg}` });
+  }
+  return options;
+}

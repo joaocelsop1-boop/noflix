@@ -1617,7 +1617,7 @@ export function Player({
       {/* painel sem stream resolvido (e sem bloqueio de plano): tentar de novo */}
       {!planBlocked && isPanelTitle && nativeMode && nativeState === "none" && (
         <div className="absolute inset-0 z-40 grid place-items-center bg-black/85 px-6 text-center">
-          <div>
+          <div className="w-full max-w-md">
             <p className="text-[15px] font-semibold">Este conteúdo não começou no player</p>
             <p className="mt-1 text-[12.5px] text-white/55">
               {panelError ?? "O painel não devolveu um stream para este título agora."}
@@ -2338,7 +2338,7 @@ export function Player({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             role="dialog"
             aria-label="Episódios"
-            className="absolute inset-x-0 bottom-0 z-40 flex max-h-[46vh] w-full flex-col overflow-hidden rounded-t-2xl border border-t border-white/10 bg-[#141414] shadow-[0_-12px_48px_rgba(0,0,0,0.6)] md:max-h-[52vh]"
+            className="absolute inset-x-0 bottom-0 z-50 flex max-h-[46vh] w-full flex-col overflow-hidden rounded-t-2xl border border-t border-white/10 bg-[#141414] shadow-[0_-12px_48px_rgba(0,0,0,0.6)] md:max-h-[52vh]"
           >
             <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/25" />
             <div className="flex items-start justify-between gap-3 px-4 pb-1 pt-3 md:px-6">

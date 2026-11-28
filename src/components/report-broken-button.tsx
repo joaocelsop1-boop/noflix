@@ -53,6 +53,11 @@ function markReported(info: ReportBrokenInfo): void {
  * (`me.report_broken` = true). Depois do clique vira "Aviso enviado ✓"
  * e não deixa enviar de novo para o mesmo título na mesma sessão.
  *
+ * tudo34: botão GRANDE e chamativo (largura total, texto grande, vermelho
+ * de destaque) com frase clara convidando a avisar o suporte — impossível
+ * de passar despercebido na tela de erro. Depois do clique continua
+ * virando "✓ Aviso enviado".
+ *
  * Se o envio falhar, a página NÃO quebra: mostra "Não foi possível
  * enviar agora" e deixa tentar de novo (nada foi marcado como enviado,
  * nem no front nem no servidor).
@@ -100,24 +105,26 @@ export function ReportBrokenButton({
 
   if (state === "sent") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-[12.5px] font-semibold text-emerald-300">
+      <span className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-3.5 text-[15px] font-bold text-white">
         ✓ Aviso enviado
       </span>
     );
   }
 
   return (
-    <span className="inline-flex flex-col items-center gap-1">
+    <span className="flex w-full flex-col items-center gap-1">
       <button
         type="button"
         onClick={send}
         disabled={state === "sending"}
-        className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold text-white transition hover:bg-white/25 disabled:opacity-60"
+        className="w-full rounded-xl bg-[#e50914] px-5 py-3.5 text-[15px] font-bold leading-snug text-white shadow-lg transition hover:bg-[#f6121d] active:scale-[0.99] disabled:opacity-60"
       >
-        {state === "sending" ? "Enviando aviso…" : "Avisar que não funcionou"}
+        {state === "sending"
+          ? "Enviando aviso…"
+          : "⚠️ Não conseguiu assistir? Toque aqui e avise o suporte!"}
       </button>
       {state === "failed" && (
-        <span className="text-[11px] text-white/50">Não foi possível enviar agora — tente de novo.</span>
+        <span className="text-[12px] text-white/60">Não foi possível enviar agora — tente de novo.</span>
       )}
     </span>
   );

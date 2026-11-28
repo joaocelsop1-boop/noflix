@@ -167,6 +167,51 @@ function migrateProfile(raw: Record<string, unknown>): Profile {
   };
 }
 
+/**
+ * tudo34: login direto para o Início — garante um perfil local ativo.
+ *
+ * O portão de perfis ("Who's watching?" / "Crie sua conta") aparece sempre
+ * que não há perfil local salvo, e ele cobria a Início logo após o login
+ * (o cliente digitava usuário/senha e caía numa tela intermediária em vez
+ * da home). A conta do painel JÁ é a identidade do cliente — o perfil
+ * local é só um resto do clone Netflix. Então, ao entrar, se não houver
+ * perfil nenhum, cria um padrão silencioso ("Você", ou o nome da conta)
+ * e o deixa ativo: o portão nunca aparece e o cliente cai direto no Início.
+ *
+ * Quem já tem perfil não é tocado (nem a lista, nem o ativo). Se houver
+ * lista sem ativo, ativa o primeiro. Função pura de localStorage (sem
+ * depender da hidratação do React) para poder rodar na página de login
+ * antes da navegação — com o reload total, a store hidrata já com ele.
+ */
+export function ensureDefaultProfile(name?: string): Profile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const active = read<Record<string, unknown> | null>("nf.profile", null);
+    if (active && typeof active === "object") return migrateProfile(active);
+    const list = read<Record<string, unknown>[]>("nf.profiles", []);
+    if (list.length > 0) {
+      const first = migrateProfile(list[0]);
+      write("nf.profile", first);
+      return first;
+    }
+    const created: Profile = {
+      id: `p_${Date.now().toString(36)}`,
+      name: (name?.trim() || "Você").slice(0, 18),
+      avatar: "robot",
+      accent: ACCENTS[0].value,
+      kids: false,
+      maturity: "all",
+      autoplay: true,
+      createdAt: Date.now(),
+    };
+    write("nf.profiles", [created]);
+    write("nf.profile", created);
+    return created;
+  } catch {
+    return null;
+  }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [profile, setProfileState] = useState<Profile | null>(null);

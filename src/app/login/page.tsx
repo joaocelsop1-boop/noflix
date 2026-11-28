@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Wordmark } from "@/components/wordmark";
+import { ensureDefaultProfile } from "@/components/store";
 import { fetchPanelMe, panelLogin, panelRegister } from "@/lib/panel";
 import { appUrl } from "@/lib/paths";
 
@@ -11,12 +11,13 @@ type Mode = "login" | "register";
 
 /**
  * Login / cadastro do painel — visual escuro estilo frameXTV/CinePlus.
- * Em sucesso vai para /browse — ou para /planos?plano=<mesmo> quando o
- * cliente veio do site de vendas com um plano escolhido (?plano=<id|nome>).
- * Já logado, nem vê o formulário.
+ * Em sucesso vai DIRETO para a Início (/) — ou para /planos?plano=<mesmo>
+ * quando o cliente veio do site de vendas com um plano escolhido
+ * (?plano=<id|nome>). Já logado, nem vê o formulário.
+ * tudo34: sem tela intermediária — o perfil local padrão é criado aqui
+ * (ensureDefaultProfile) para o portão de perfis nunca aparecer.
  */
 export default function LoginPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,10 +30,10 @@ export default function LoginPage() {
   const [forgot, setForgot] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  /* destino após entrar: /planos com o plano do site de vendas, ou /browse */
+  /* destino após entrar: /planos com o plano do site de vendas, ou a Início */
   const afterAuth = () => {
     const plano = new URLSearchParams(window.location.search).get("plano");
-    return plano ? appUrl(`/planos?plano=${encodeURIComponent(plano)}`) : appUrl("/browse");
+    return plano ? appUrl(`/planos?plano=${encodeURIComponent(plano)}`) : appUrl("/");
   };
 
   useEffect(() => {
@@ -50,13 +51,19 @@ export default function LoginPage() {
     void fetchPanelMe()
       .then((me) => {
         if (!alive) return;
-        if (me?.loggedIn) router.replace(afterAuth());
+        if (me?.loggedIn) {
+          /* tudo34: garante o perfil local antes de sair daqui, e navega
+             por recarregamento total para a store hidratar já com ele —
+             senão o portão de perfis apareceria sobre a Início. */
+          ensureDefaultProfile(me.user?.name);
+          window.location.href = afterAuth();
+        }
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -70,6 +77,9 @@ export default function LoginPage() {
           setError(result.error ?? "E-mail ou senha inválidos.");
           return;
         }
+        // tudo34: perfil local padrão antes de navegar — sem ele, o portão
+        // de perfis ("Who's watching?") cobriria a Início no primeiro acesso.
+        ensureDefaultProfile(result.user?.name);
         // Navegação por recarregamento total: o login cria a sessão no
         // servidor, e o router.replace nem sempre refletia isso de primeira
         // (o usuário ficava na tela de login e só entrava após refresh
@@ -86,6 +96,7 @@ export default function LoginPage() {
           setError(result.error ?? "Não foi possível criar a conta.");
           return;
         }
+        ensureDefaultProfile(name.trim());
         window.location.href = afterAuth();
       }
     } catch {
