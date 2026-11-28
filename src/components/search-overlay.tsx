@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { CloseIcon, SearchIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
 import { fetchPanelMe } from "@/lib/panel";
-import { useTmdbMeta } from "@/lib/tmdb-client";
+import { useInViewOnce, useTmdbMeta } from "@/lib/tmdb-client";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const genreColors = [
@@ -81,23 +81,30 @@ function SearchOverlayMeta({
   entry: CatalogueEntry;
   suffix?: string;
 }) {
-  const meta = useTmdbMeta({
-    key: entry.key,
-    title: entry.name,
-    year: entry.year,
-    kind: entry.kind,
-  });
+  // tudo36: gate de viewport — mesmo motivo do PanelPosterCard (o
+  // resultado só resolve o TMDB quando entra na tela).
+  const { ref: inViewRef, inView } = useInViewOnce<HTMLSpanElement>();
+  const meta = useTmdbMeta(
+    inView
+      ? {
+          key: entry.key,
+          title: entry.name,
+          year: entry.year,
+          kind: entry.kind,
+        }
+      : null,
+  );
   const rating = meta?.rating;
   const year = entry.year ?? meta?.year;
   return (
-    <>
+    <span ref={inViewRef}>
       {rating ? (
         <span className="font-semibold text-[#ffc107]">★ {rating.toFixed(1)} · </span>
       ) : null}
       {year ? `${year} · ` : ""}
       {entry.kind === "series" ? "Série" : "Filme"}
       {suffix ?? ""}
-    </>
+    </span>
   );
 }
 

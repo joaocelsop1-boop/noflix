@@ -7,7 +7,7 @@ import { artUrl } from "@/lib/img";
 import {apiUrl, appUrl} from "@/lib/paths";
 import { fetchPanelMe } from "@/lib/panel";
 import { cleanTitle, titleKey } from "@/lib/title-clean";
-import { useTmdbMeta, useTmdbMetas } from "@/lib/tmdb-client";
+import { useInViewOnce, useTmdbMeta, useTmdbMetas } from "@/lib/tmdb-client";
 import type { TmdbMeta } from "@/lib/tmdb-types";
 import { cn } from "@/lib/cn";
 import { Footer } from "@/components/footer";
@@ -302,14 +302,23 @@ export function PanelPosterCard({
   playUrl?: string;
 }) {
   const router = useRouter();
+  /* tudo36: só resolve o TMDB quando o card entra na tela — a home
+     montava ~200 cards de uma vez e a rajada estourava o limite do TMDB
+     (40 req/10s); os 429 viravam null cacheado e a prateleira "Séries"
+     ficava sem ★/ano. Fora da tela, passa null (não enfileira). */
+  const { ref: inViewRef, inView } = useInViewOnce<HTMLDivElement>();
   /* tudo24: dados de exibição do TMDB (capa, nota) por cima do painel —
      o cartão mostra a arte do TMDB quando há match, senão a do painel. */
-  const meta: TmdbMeta | null | undefined = useTmdbMeta({
-    key: entry.key,
-    title: entry.name,
-    year: entry.year,
-    kind: entry.kind,
-  });
+  const meta: TmdbMeta | null | undefined = useTmdbMeta(
+    inView
+      ? {
+          key: entry.key,
+          title: entry.name,
+          year: entry.year,
+          kind: entry.kind,
+        }
+      : null,
+  );
   const displayName = cleanTitle(entry.name).title;
   const img = artUrl(meta?.poster ?? entry.poster);
   /* tudo27 (item 6): nota SÓ do TMDB — o `entry.rating` do painel é o "8
@@ -327,7 +336,7 @@ export function PanelPosterCard({
   useEffect(() => setBroken(false), [img]);
   const pct = typeof progress === "number" ? Math.min(1, Math.max(0, progress)) : undefined;
   return (
-    <div className="w-[var(--nf-card-w,186px)] shrink-0 snap-start">
+    <div ref={inViewRef} className="w-[var(--nf-card-w,186px)] shrink-0 snap-start">
       <button
         type="button"
         onClick={() => router.push(playUrl ?? panelPlayUrl(entry))}
@@ -410,18 +419,24 @@ export function PanelPosterCard({
  * cartão (mesma chave = cache compartilhado, sem chamada extra).
  */
 function Top10Caption({ entry }: { entry: CatalogueEntry }) {
-  const meta: TmdbMeta | null | undefined = useTmdbMeta({
-    key: entry.key,
-    title: entry.name,
-    year: entry.year,
-    kind: entry.kind,
-  });
+  // tudo36: gate de viewport — mesmo motivo do PanelPosterCard.
+  const { ref: inViewRef, inView } = useInViewOnce<HTMLDivElement>();
+  const meta: TmdbMeta | null | undefined = useTmdbMeta(
+    inView
+      ? {
+          key: entry.key,
+          title: entry.name,
+          year: entry.year,
+          kind: entry.kind,
+        }
+      : null,
+  );
   const displayName = cleanTitle(entry.name).title;
   /* tudo27 (item 6): nota SÓ do TMDB — nunca o "8 falso" do painel. */
   const rating = meta?.rating;
   const year = entry.year ?? meta?.year;
   return (
-    <div className="ml-16 mt-2 w-[var(--nf-card-w,186px)] min-w-0 px-0.5 md:ml-[86px]">
+    <div ref={inViewRef} className="ml-16 mt-2 w-[var(--nf-card-w,186px)] min-w-0 px-0.5 md:ml-[86px]">
       <p className="truncate text-[12.5px] font-medium leading-tight text-white/90">
         {displayName}
       </p>

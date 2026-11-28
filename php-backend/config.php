@@ -216,12 +216,15 @@ function current_user($pdo) {
     return $user;
 }
 
-// O usuário pode assistir? status active ou trial E dentro da validade
+// O usuário pode assistir? SÓ status active E dentro da validade.
+// tudo37: o 'trial' NÃO assiste mais — cadastro novo não ganha teste
+// grátis (antes qualquer cadastro assistia 3h sem pagar). Só o pagamento
+// (pedido aprovado no admin) ou o admin ativam a conta.
 function user_can_watch($user) {
     if (!$user) return false;
     // Admin pode assistir (para testar o player com a conta do admin).
     if (($user['role'] ?? '') === 'admin') return true;
-    if (!in_array($user['status'], ['active', 'trial'], true)) return false;
+    if (($user['status'] ?? '') !== 'active') return false;
     if (empty($user['expires_at'])) return false;
     return strtotime($user['expires_at']) > time();
 }

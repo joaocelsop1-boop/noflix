@@ -8,7 +8,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { PlayIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
-import { useTmdbMeta } from "@/lib/tmdb-client";
+import { useInViewOnce, useTmdbMeta } from "@/lib/tmdb-client";
 import { cn } from "@/lib/cn";
 
 type Tab = "movie" | "series" | "anime";
@@ -405,16 +405,22 @@ export function LiveCatalogue({
  * houver e nenhum ★; sem match, fica só o ano do painel (nunca quebra).
  */
 function CatalogueCardMeta({ item }: { item: Entry }) {
-  const meta = useTmdbMeta({
-    key: item.key,
-    title: item.name,
-    year: item.year,
-    kind: item.kind,
-  });
+  // tudo36: gate de viewport — mesmo motivo do PanelPosterCard.
+  const { ref: inViewRef, inView } = useInViewOnce<HTMLSpanElement>();
+  const meta = useTmdbMeta(
+    inView
+      ? {
+          key: item.key,
+          title: item.name,
+          year: item.year,
+          kind: item.kind,
+        }
+      : null,
+  );
   const rating = meta?.rating;
   const year = item.year ?? meta?.year;
   return (
-    <span className="mt-0.5 flex items-center gap-1 text-[9.5px] text-white/45">
+    <span ref={inViewRef} className="mt-0.5 flex items-center gap-1 text-[9.5px] text-white/45">
       {rating ? (
         <span className="flex items-center gap-0.5 font-semibold text-[#ffc107]">
           ★ {rating.toFixed(1)}

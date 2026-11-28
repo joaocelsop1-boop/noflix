@@ -13,6 +13,7 @@ import {
   VolumeIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { decideSurfaceTap } from "@/lib/surface-tap";
 import { ReportBrokenButton, type ReportBrokenInfo } from "@/components/report-broken-button";
 
 export type NativeSource = {
@@ -1016,18 +1017,44 @@ export function NativePlayer({
    * One surface for taps: a second tap inside 320ms on the left/right third is
    * a double-tap seek (how Netflix behaves on a phone), anything else is
    * play/pause after a short wait so the two do not fight.
+   * tudo37b: a decisão vive em decideSurfaceTap (src/lib/surface-tap.ts) —
+   * vídeo parado toca NA HORA (antes o 1º toque só agendava o play e o 2º
+   * toque cancelava tudo), e toque durante o buffering não agenda pause.
    */
   const onSurfaceTap = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      const video = videoRef.current;
       const rect = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const now = Date.now();
-      const doubled = now - tap.current.at < 320 && Math.abs(x - tap.current.x) < 140;
+      const action = decideSurfaceTap({
+        paused: video ? video.paused || video.ended : false,
+        waiting,
+        lastAt: tap.current.at,
+        lastX: tap.current.x,
+        x,
+        width: rect.width,
+        now,
+      });
 
-      if (doubled) {
+      if (action === "play-now") {
+        window.clearTimeout(tap.current.timer);
+        tap.current = { at: now, x, timer: 0 };
+        toggle();
+        poke();
+        return;
+      }
+
+      if (action === "ignore") {
+        window.clearTimeout(tap.current.timer);
+        tap.current = { at: now, x, timer: 0 };
+        return;
+      }
+
+      if (action === "seek-back" || action === "seek-forward") {
         window.clearTimeout(tap.current.timer);
         tap.current = { at: 0, x, timer: 0 };
-        const back = x < rect.width * 0.38;
+        const back = action === "seek-back";
         seekBy(back ? -10 : 10);
         setFlash(back ? "back" : "forward");
         window.setTimeout(() => setFlash(null), 520);
@@ -1041,7 +1068,7 @@ export function NativePlayer({
         poke();
       }, 250);
     },
-    [poke, seekBy, toggle],
+    [poke, seekBy, toggle, waiting],
   );
 
   const scrub = (event: React.PointerEvent<HTMLDivElement>) => {

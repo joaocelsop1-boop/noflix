@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { apiUrl } from "./paths";
 import { cleanTitle } from "./title-clean";
 import type { TmdbMeta, TmdbRef } from "./tmdb-types";
@@ -173,6 +179,43 @@ export async function flush(): Promise<void> {
   } finally {
     flushing = false;
   }
+}
+
+/** tudo36: observa se o elemento entrou na viewport (uma vez só).
+    A home monta ~200 cards de uma vez e todos enfileiravam resolução no
+    TMDB ao mesmo tempo — a rajada estourava o limite do TMDB (40 req/10s)
+    e os 429 viravam null cacheado (a prateleira "Séries" ficava sem ★/ano
+    enquanto a grade, que resolve poucos itens por vez, funcionava).
+    Com o gate, só o card que entrou na tela (margem de 200px) enfileira;
+    o resto espera a rolagem. Enquanto fora da tela, o componente passa
+    null para useTmdbMeta (que não enfileira nada). */
+export function useInViewOnce<T extends HTMLElement = HTMLDivElement>(): {
+  ref: RefObject<T | null>;
+  inView: boolean;
+} {
+  const ref = useRef<T | null>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (inView) return;
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [inView]);
+  return { ref, inView };
 }
 
 /** Resolve um título (null = não pedir; undefined = resolvendo). */

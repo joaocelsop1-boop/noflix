@@ -1503,13 +1503,33 @@ export function Player({
                             type="button"
                             onClick={() => setSeason(entry.number)}
                             aria-pressed={entry.number === pickerSeason?.number}
+                            style={
+                              entry.number === pickerSeason?.number
+                                ? { backgroundColor: "#fff", color: "#000" }
+                                : {
+                                    backgroundColor: "rgba(255,255,255,0.06)",
+                                    color: "rgba(255,255,255,0.85)",
+                                  }
+                            }
                             className={
                               entry.number === pickerSeason?.number
                                 ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
                                 : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                             }
                           >
-                            {seasonLabel(entry)}
+                            {/* tudo36: cor do rótulo inline — o texto estava no
+                                DOM mas não pintava na tela; estilo inline não
+                                depende da cascata de CSS. */}
+                            <span
+                              style={{
+                                color:
+                                  entry.number === pickerSeason?.number
+                                    ? "#000"
+                                    : "rgba(255,255,255,0.85)",
+                              }}
+                            >
+                              {seasonLabel(entry)}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -2141,13 +2161,32 @@ export function Player({
                               type="button"
                               onClick={() => goTo(entry.number, 1)}
                               aria-pressed={entry.number === season}
+                              style={
+                                entry.number === season
+                                  ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                                  : {
+                                      backgroundColor: "transparent",
+                                      color: "rgba(255,255,255,0.85)",
+                                    }
+                              }
                               className={
                                 entry.number === season
                                   ? "shrink-0 rounded border border-white/70 bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-white"
                                   : "shrink-0 rounded border border-white/10 px-2 py-0.5 text-[11px] text-white/60 transition hover:border-white/40 hover:text-white"
                               }
                             >
-                              {seasonShortLabel(entry)}
+                              {/* tudo36: cor do rótulo inline (mesmo motivo
+                                  do sheet — texto no DOM sem pintar). */}
+                              <span
+                                style={{
+                                  color:
+                                    entry.number === season
+                                      ? "#fff"
+                                      : "rgba(255,255,255,0.85)",
+                                }}
+                              >
+                                {seasonShortLabel(entry)}
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -2418,13 +2457,33 @@ export function Player({
                         type="button"
                         onClick={() => setSheetSeason(entry.number)}
                         aria-pressed={entry.number === sheetSeasonData?.number}
+                        style={
+                          entry.number === sheetSeasonData?.number
+                            ? { backgroundColor: "#fff", color: "#000" }
+                            : {
+                                backgroundColor: "rgba(255,255,255,0.06)",
+                                color: "rgba(255,255,255,0.85)",
+                              }
+                        }
                         className={
                           entry.number === sheetSeasonData?.number
                             ? "shrink-0 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-black"
                             : "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60 transition hover:border-white/40 hover:text-white"
                         }
                       >
-                        {seasonLabel(entry)}
+                        {/* tudo36: cor do rótulo inline — o texto estava no
+                            DOM mas não pintava na tela (pílulas vazias no
+                            Tulsa); estilo inline não depende da cascata. */}
+                        <span
+                          style={{
+                            color:
+                              entry.number === sheetSeasonData?.number
+                                ? "#000"
+                                : "rgba(255,255,255,0.85)",
+                          }}
+                        >
+                          {seasonLabel(entry)}
+                        </span>
                       </button>
                     ))}
                   </div>

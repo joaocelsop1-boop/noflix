@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('client', 'admin') DEFAULT 'client',
   `plan_id` INT DEFAULT NULL,
   `expires_at` DATETIME DEFAULT NULL,
-  `status` ENUM('active', 'expired', 'trial', 'blocked') DEFAULT 'trial',
+  `status` ENUM('active', 'expired', 'trial', 'blocked') DEFAULT 'expired',
   `session_token` VARCHAR(64) NOT NULL DEFAULT '',
   `pix_key` VARCHAR(255) DEFAULT NULL,
   `referral_code` VARCHAR(20) UNIQUE,

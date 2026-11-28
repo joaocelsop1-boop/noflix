@@ -960,25 +960,56 @@ switch ($action) {
         // parse_mode=HTML + disable_web_page_preview. O texto é escapado
         // para HTML — título/nome podem ter "&" ou "<", e sem escape o
         // Telegram devolve 400 com parse_mode=HTML.
+        // tudo35: envio IGUAL ao bot de notificações do dono (bot.py,
+        // enviar_telegram_notificacao): mesmo endpoint, POST form-encoded,
+        // parse_mode=HTML + disable_web_page_preview. O texto é escapado
+        // para HTML — título/nome podem ter "&" ou "<", e sem escape o
+        // Telegram devolve 400 com parse_mode=HTML.
         $repTextHtml = htmlspecialchars($repText, ENT_QUOTES, 'UTF-8');
-        // Envio pela API do Telegram (10s de timeout). O token vai só na
-        // URL da chamada servidor→Telegram — nunca em resposta, log ou front.
-        $repCh = curl_init();
-        curl_setopt($repCh, CURLOPT_URL, 'https://api.telegram.org/bot' . $repToken . '/sendMessage');
-        curl_setopt($repCh, CURLOPT_POST, true);
-        curl_setopt($repCh, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $repChat, 'text' => $repTextHtml, 'parse_mode' => 'HTML', 'disable_web_page_preview' => 'true']));
-        curl_setopt($repCh, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($repCh, CURLOPT_TIMEOUT, 10);
-        curl_setopt($repCh, CURLOPT_CONNECTTIMEOUT, 5);
-        $repResp = curl_exec($repCh);
-        $repHttp = (int)curl_getinfo($repCh, CURLINFO_RESPONSE_CODE);
-        $repErr = curl_error($repCh);
-        curl_close($repCh);
-        $repSent = $repResp !== false && $repHttp === 200;
-        if ($repSent) {
-            $repDecoded = json_decode((string)$repResp, true);
-            $repSent = !empty($repDecoded['ok']);
+        // tudo36: envia ao Telegram — tenta com parse_mode=HTML (igual ao
+        // bot); se o Telegram recusar o HTML (HTTP 400), tenta de novo
+        // como TEXTO PURO (sem parse_mode). A entrega importa mais que a
+        // formatação: um 400 de parse nunca mais pode deixar o dono sem o
+        // aviso. O detalhe do erro volta na resposta (sem o token) para o
+        // diagnóstico no teste ao vivo (aba Network): 401 = token
+        // inválido, 403 = bot bloqueado/chat não encontrado, 400 = pedido
+        // recusado. O token vai só na URL da chamada servidor→Telegram —
+        // nunca em resposta, log ou front.
+        $repSendTelegram = function (string $text, bool $html) use ($repToken, $repChat): array {
+            $fields = ['chat_id' => $repChat, 'text' => $text, 'disable_web_page_preview' => 'true'];
+            if ($html) $fields['parse_mode'] = 'HTML';
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, 'https://api.telegram.org/bot' . $repToken . '/sendMessage');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            $resp = curl_exec($ch);
+            $http = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+            $sent = $resp !== false && $http === 200;
+            $detail = '';
+            if ($resp !== false && $resp !== '') {
+                $dec = json_decode((string)$resp, true);
+                if ($sent) $sent = !empty($dec['ok']);
+                if (is_array($dec) && !empty($dec['description'])) $detail = (string)$dec['description'];
+            }
+            return ['sent' => $sent, 'http' => $http, 'err' => $err, 'detail' => $detail];
+        };
+        $repRes = $repSendTelegram($repTextHtml, true);
+        $repTriedPlain = false;
+        if (!$repRes['sent'] && $repRes['http'] === 400) {
+            // HTML recusado — reenvia como texto puro (o texto original,
+            // sem escape HTML).
+            $repRes = $repSendTelegram($repText, false);
+            $repTriedPlain = true;
         }
+        $repSent = $repRes['sent'];
+        $repHttp = $repRes['http'];
+        $repErr = $repRes['err'];
+        $repDetail = $repRes['detail'];
         if ($repSent) {
             // Só marca como enviado quando o Telegram confirmou — se a
             // entrega falhar, o cliente pode tentar de novo (a notificação
@@ -988,18 +1019,9 @@ switch ($action) {
             echo json_encode(['ok' => true]);
         } else {
             session_write_close();
-            // tudo35: registra o motivo do Telegram (só a descrição do
-            // erro — nunca o token) para o diagnóstico não ficar no escuro.
-            $repDetail = '';
-            if ($repResp !== false && $repResp !== '') {
-                $repDecodedErr = json_decode((string)$repResp, true);
-                if (is_array($repDecodedErr) && !empty($repDecodedErr['description'])) {
-                    $repDetail = (string)$repDecodedErr['description'];
-                }
-            }
             // Sem o token e sem o chat ID no log: só o código HTTP/erro cURL.
-            error_log('report_broken: falha ao enviar para o Telegram (HTTP ' . $repHttp . ($repErr !== '' ? ', cURL: ' . $repErr : '') . ($repDetail !== '' ? ', Telegram: ' . $repDetail : '') . ')');
-            echo json_encode(['ok' => false, 'error' => 'send_failed']);
+            error_log('report_broken: falha ao enviar para o Telegram (HTTP ' . $repHttp . ($repErr !== '' ? ', cURL: ' . $repErr : '') . ($repDetail !== '' ? ', Telegram: ' . $repDetail : '') . ($repTriedPlain ? ', tentou texto puro' : '') . ')');
+            echo json_encode(['ok' => false, 'error' => 'send_failed', 'http' => $repHttp, 'detail' => $repDetail]);
         }
         break;
 
@@ -1091,9 +1113,11 @@ switch ($action) {
 
     case 'register':
         // POST name + email + password (+ whatsapp opcional, ref opcional).
-        // Mesmo comportamento do cadastro de login.php: status 'trial',
-        // expires_at = agora + trial_hours (de settings), referral_code
-        // único ('MINE' + 8 hex) e sessão iniciada em caso de sucesso.
+        // tudo37: cadastro NÃO dá acesso — status 'expired' e sem
+        // validade (mesmo comportamento do cadastro de login.php). Só o
+        // pagamento (pedido aprovado no admin) ou o admin ativam a conta
+        // (status 'active' + expires_at). referral_code único ('MINE' +
+        // 8 hex) e sessão iniciada em caso de sucesso.
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             api_auth_error('Método inválido.', 405);
             break;
@@ -1128,10 +1152,8 @@ switch ($action) {
             $stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ? LIMIT 1");
             $stmt->execute([$myRef]);
         } while ($stmt->fetch());
-        $trialHours = intval($settings['trial_hours'] ?? 3);
-        $regExpires = date('Y-m-d H:i:s', strtotime('+' . $trialHours . ' hours'));
         $regHash = password_hash($regPass, PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO users (name, email, password, whatsapp, role, status, expires_at, referral_code, referred_by) VALUES (?, ?, ?, ?, 'client', 'trial', ?, ?, ?)")->execute([$regName, $regEmail, $regHash, $regWa !== '' ? $regWa : null, $regExpires, $myRef, $referredBy]);
+        $pdo->prepare("INSERT INTO users (name, email, password, whatsapp, role, status, expires_at, referral_code, referred_by) VALUES (?, ?, ?, ?, 'client', 'expired', ?, ?, ?)")->execute([$regName, $regEmail, $regHash, $regWa !== '' ? $regWa : null, null, $myRef, $referredBy]);
         $newId = (int)$pdo->lastInsertId();
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
         $stmt->execute([$newId]);

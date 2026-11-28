@@ -4,7 +4,8 @@
  * - login: e-mail + senha (password_verify)
  * - cadastro: nome, e-mail, senha (password_hash), WhatsApp opcional,
  *   código de indicação opcional (?ref=)
- * - cadastro novo ganha teste: status 'trial', expires_at = agora + trial_hours
+ * - tudo37: cadastro novo NÃO ganha teste — status 'expired', sem
+ *   validade; só o pagamento (pedido aprovado) ou o admin ativam.
  * - "Esqueci minha senha": só mostra a mensagem (não há SMTP no webplayer)
  */
 require_once __DIR__ . '/config.php';
@@ -177,10 +178,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ? LIMIT 1");
                     $stmt->execute([$myRef]);
                 } while ($stmt->fetch());
-                $trialHours = intval($settings['trial_hours'] ?? 3);
-                $expires = date('Y-m-d H:i:s', strtotime('+' . $trialHours . ' hours'));
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (name, email, password, whatsapp, role, status, expires_at, referral_code, referred_by) VALUES (?, ?, ?, ?, 'client', 'trial', ?, ?, ?)")->execute([$name, $email, $hash, $wa !== '' ? $wa : null, $expires, $myRef, $referredBy]);
+                $pdo->prepare("INSERT INTO users (name, email, password, whatsapp, role, status, expires_at, referral_code, referred_by) VALUES (?, ?, ?, ?, 'client', 'expired', ?, ?, ?)")->execute([$name, $email, $hash, $wa !== '' ? $wa : null, null, $myRef, $referredBy]);
                 $newId = (int)$pdo->lastInsertId();
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = $newId;
@@ -296,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="font-hud text-[9px] text-[#8d8a99] tracking-wider">CONTINUE DE ONDE PAROU</p>
         <h2 class="text-2xl font-extrabold text-white mt-2">Criar conta</h2>
         <hr class="border-t border-dashed border-[#34404c] my-4">
-        <p class="text-xs text-[#8d8a99] mb-4">Ganhe um teste grátis de <?= intval($settings['trial_hours'] ?? 3) ?> horas com acesso completo.</p>
+        <p class="text-xs text-[#8d8a99] mb-4">Crie sua conta e escolha um plano para começar a assistir.</p>
         <form method="POST" class="space-y-4">
           <input type="hidden" name="acao" value="cadastro">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">

@@ -175,6 +175,23 @@ type SearchItem = {
   first_air_date?: string;
 };
 
+/* tudo36: ritmo do TMDB. O TMDB limita a 40 req/10s; a home monta
+   ~200 cards de uma vez e a rajada estourava o limite — os 429 viravam
+   null e o cliente cacheava null (a prateleira "Séries" ficava sem ★/ano
+   enquanto a grade, que resolve poucos itens por vez, funcionava). O
+   ritmo espaça os INÍCIOS das requisições em ≥250ms (≤4/seg, folga
+   abaixo de 40/10s) e, num 429, espera o Retry-After (padrão 2s, teto
+   10s) antes de devolver null, para a próxima tentativa não 429 de novo. */
+const TMDB_MIN_GAP_MS = 250;
+let tmdbPace: Promise<void> = Promise.resolve();
+function paceTmdb(): Promise<void> {
+  const wait = tmdbPace.then(
+    () => new Promise<void>((resolve) => setTimeout(resolve, TMDB_MIN_GAP_MS)),
+  );
+  tmdbPace = wait.catch(() => {});
+  return wait;
+}
+
 async function tmdbFetch(
   pathname: string,
   params: Record<string, string>,
@@ -184,12 +201,23 @@ async function tmdbFetch(
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const bearer = isBearerToken(key);
   if (!bearer) url.searchParams.set("api_key", key);
+  await paceTmdb();
   try {
     const res = await fetch(url, {
       headers: bearer ? { authorization: `Bearer ${key}` } : undefined,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 429) {
+        const retryAfter = Number(res.headers.get("retry-after") ?? 2);
+        const waitMs = Math.min(
+          Math.max(Number.isFinite(retryAfter) ? retryAfter * 1000 : 2000, 0),
+          10000,
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+      }
+      return null;
+    }
     return (await res.json()) as unknown;
   } catch {
     return null;
@@ -564,7 +592,7 @@ export async function resolveTmdbMetaWithStatus(
      título — nem adianta buscar no TMDB. */
   if (!title || /^\d+$/.test(title)) return { meta: null, failed: false };
   const year = cleaned.year ?? ref.year;
-  /* tudo28 (item 3): versão do cache (v2). Antes do tudo27, uma falha
+  /* tudo28 (item 3): versão do cache. Antes do tudo27, uma falha
      transitória do credits era cacheada SEM elenco por 7 dias (disco +
      memória) — o tudo27 impede NOVAS entradas envenenadas (skipCache),
      mas as ANTIGAS continuam no volume .tmdb-cache e seguiam sendo
@@ -572,8 +600,12 @@ export async function resolveTmdbMetaWithStatus(
      tudo27, enquanto títulos novos do painel novo — sem entrada no
      cache — mostravam o elenco). Subir a versão invalida tudo de uma
      vez; os títulos voltam a resolver sob demanda (preguiçoso, só o
-     que está na tela). Para subir de novo, basta trocar o prefixo. */
-  const cacheKey = `v2|${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
+     que está na tela). Para subir de novo, basta trocar o prefixo.
+     tudo36: v2 -> v3 — os nulls envenenados pelos 429 pré-tudo35
+     (rajada da home) ainda estavam no disco com a chave v2 e seguiam
+     sendo servidos na prateleira "Séries" (a grade já tinha as
+     entradas boas). */
+  const cacheKey = `v3|${ref.kind}|${title.toLowerCase()}|${year ?? ""}|${ref.details ? "d" : ""}`;
 
   const mem = memCache.get(cacheKey);
   if (mem && Date.now() - mem.at < CACHE_TTL) return { meta: mem.meta, failed: false };
