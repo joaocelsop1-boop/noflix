@@ -155,7 +155,17 @@ export async function fetchPanelMe(): Promise<PanelMe | null> {
   try {
     const res = await fetch(apiUrl("/api/panel/me"), { cache: "no-store" });
     if (!res.ok) return null;
-    return await readJson<PanelMe>(res);
+    const data = await readJson<PanelMe & { report_broken?: boolean }>(res);
+    if (!data) return null;
+    /* tudo33 (c): o PHP antigo devolve 'report_broken' (snake_case) e o
+       novo 'reportBroken' (camelCase) — o player lê me.reportBroken, então
+       o snake_case vinha undefined e o botão "Avisar que não funcionou"
+       nunca aparecia mesmo com o Telegram configurado. Normaliza aqui
+       para funcionar com qualquer versão do PHP deployada. */
+    if (data.reportBroken === undefined && typeof data.report_broken === "boolean") {
+      data.reportBroken = data.report_broken;
+    }
+    return data;
   } catch {
     return null;
   }

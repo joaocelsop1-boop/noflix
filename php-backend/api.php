@@ -902,7 +902,7 @@ switch ($action) {
             // token do bot NUNCA sai do servidor. O app mostra o botão
             // "Avisar que não funcionou" na tela de erro de reprodução só
             // quando o dono configurou token + chat ID no admin.
-            'report_broken' => trim((string)($settings['telegram_notify_token'] ?? '')) !== '' && trim((string)($settings['telegram_notify_chat_id'] ?? '')) !== '',
+            'reportBroken' => trim((string)($settings['telegram_notify_token'] ?? '')) !== '' && trim((string)($settings['telegram_notify_chat_id'] ?? '')) !== '',
         ]);
         break;
 

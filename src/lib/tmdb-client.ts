@@ -77,6 +77,14 @@ export function enqueue(ref: TmdbRef): void {
 /** true enquanto um drain está em voo — evita dois drains concorrentes. */
 let flushing = false;
 
+/** Tentativas de rede por chave (tudo33): uma falha TRANSITÓRIA (rede,
+ *  5xx, timeout do proxy) NÃO pode virar null permanente — antes, o catch
+ *  marcava o lote inteiro como null e os 25 cards ficavam sem ★/ano até
+ *  recarregar a página, mesmo com o servidor bom. Até 3 tentativas por
+ *  chave; depois disso, desiste (null) para não martelar o servidor. */
+const retryCount = new Map<string, number>();
+const MAX_RETRIES = 3;
+
 export async function flush(): Promise<void> {
   if (flushing) return;
   flushing = true;
@@ -91,6 +99,7 @@ export async function flush(): Promise<void> {
     while (pending.size > 0) {
       const batch = Array.from(pending.values()).slice(0, 25);
       for (const item of batch) pending.delete(item.key);
+      let batchFailed = false;
       try {
         const res = await fetch(apiUrl("/api/tmdb-resolve"), {
           method: "POST",
@@ -109,15 +118,37 @@ export async function flush(): Promise<void> {
         if (!res.ok) throw new Error("resolve failed");
         const data = (await res.json()) as { results?: Record<string, TmdbMeta | null> };
         const results = data?.results ?? {};
-        for (const item of batch) cache.set(item.key, results[item.key] ?? null);
+        for (const item of batch) {
+          cache.set(item.key, results[item.key] ?? null);
+          retryCount.delete(item.key);
+        }
       } catch {
-        for (const item of batch) cache.set(item.key, null);
+        /* tudo33: falha de REDE (não "sem match" — o servidor devolve
+           null por chave quando não há match, e isso SIM é cacheado).
+           Re-enfileira para tentar de novo em vez de envenenar o cache:
+           o lote volta para o fim da fila e o drain o retenta depois de
+           uma pausa maior (2s), até MAX_RETRIES vezes. */
+        batchFailed = true;
+        for (const item of batch) {
+          const n = (retryCount.get(item.key) ?? 0) + 1;
+          retryCount.set(item.key, n);
+          if (n <= MAX_RETRIES) {
+            pending.set(item.key, item);
+          } else {
+            retryCount.delete(item.key);
+            cache.set(item.key, null);
+          }
+        }
       }
       notify();
       /* pausa curta entre lotes: a UI pinta os primeiros resultados
-         antes do próximo lote resolver, e o servidor não é martelado. */
+         antes do próximo lote resolver, e o servidor não é martelado.
+         Depois de um lote com falha, a pausa é maior (2s) para o
+         servidor/rede se recuperar antes da retentativa. */
       if (pending.size > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, 60));
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, batchFailed ? 2000 : 60),
+        );
       }
     }
   } finally {

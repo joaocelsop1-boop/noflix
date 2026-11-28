@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { CloseIcon, SearchIcon } from "@/components/icons";
 import { useStore } from "@/components/store";
 import { fetchPanelMe } from "@/lib/panel";
+import { useTmdbMeta } from "@/lib/tmdb-client";
 import type { CatalogueEntry } from "@/lib/catalogue";
 
 const genreColors = [
@@ -62,6 +63,42 @@ function panelPlayUrl(entry: CatalogueEntry): string {
   // tudo22: leva o ano do catálogo na URL (ver panel-home).
   const yearParam = entry.year ? `&year=${entry.year}` : "";
   return appUrl(`/play/0?panel=1&type=${type}&id=${id}&title=${encodeURIComponent(entry.name)}${yearParam}`);
+}
+
+/**
+ * tudo33 (a): nota e ano no resultado da busca (overlay). O overlay
+ * renderizava o nome + ano do painel + tipo ("2023 · Série") e NUNCA
+ * chamava o TMDB — por isso NENHUM resultado de busca exibia ★, nem
+ * filme nem série (ex.: "Silo" aparecia "2023 · Série", sem nota, mesmo
+ * com o TMDB resolvendo 8.2). Mesmo useTmdbMeta dos cards (mesma chave =
+ * cache compartilhado, fila em lote). Nota SÓ do TMDB; ano do painel
+ * quando há, senão do TMDB.
+ */
+function SearchOverlayMeta({
+  entry,
+  suffix,
+}: {
+  entry: CatalogueEntry;
+  suffix?: string;
+}) {
+  const meta = useTmdbMeta({
+    key: entry.key,
+    title: entry.name,
+    year: entry.year,
+    kind: entry.kind,
+  });
+  const rating = meta?.rating;
+  const year = entry.year ?? meta?.year;
+  return (
+    <>
+      {rating ? (
+        <span className="font-semibold text-[#ffc107]">★ {rating.toFixed(1)} · </span>
+      ) : null}
+      {year ? `${year} · ` : ""}
+      {entry.kind === "series" ? "Série" : "Filme"}
+      {suffix ?? ""}
+    </>
+  );
 }
 
 /**
@@ -233,8 +270,7 @@ export function SearchOverlay() {
                               {entry.name}
                             </span>
                             <span className="block truncate text-xs text-white/45">
-                              {entry.year ? `${entry.year} · ` : ""}
-                              {entry.kind === "series" ? "Série" : "Filme"}
+                              <SearchOverlayMeta entry={entry} />
                             </span>
                           </span>
                         </button>
@@ -319,8 +355,7 @@ export function SearchOverlay() {
                         <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 pt-8 text-left opacity-0 transition group-hover:opacity-100">
                           <span className="block text-xs font-medium text-white">{entry.name}</span>
                           <span className="block text-[10px] text-white/60">
-                            {entry.year ? `${entry.year} · ` : ""}
-                            {entry.kind === "series" ? "Série" : "Filme"} · toque para assistir
+                            <SearchOverlayMeta entry={entry} suffix=" · toque para assistir" />
                           </span>
                         </span>
                       </motion.button>

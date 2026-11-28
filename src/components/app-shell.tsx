@@ -21,6 +21,13 @@ import { usePanelMe } from "@/lib/use-panel-me";
 function SupportFloat() {
   const { me } = usePanelMe();
   const pathname = usePathname();
+  /* tudo33 (b): some também quando um modal/overlay está aberto (detalhe
+     do título ou busca) — o flutuante (z-130) fica POR CIMA do modal
+     (z-80) e cobre o botão de fechar / o play. O estado vem da store,
+     não só do pathname: o player vive em rota (/play, /watch), mas o
+     modal abre sem trocar a rota. */
+  const { activeSlug, searchOpen } = useStore();
+  const modalOpen = Boolean(activeSlug) || searchOpen;
   /* tudo32: some no player e em tela cheia (ver isSupportFloatHidden). */
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -30,7 +37,7 @@ function SupportFloat() {
     return () => document.removeEventListener("fullscreenchange", update);
   }, []);
   const url = supportUrl(me?.support?.whatsapp, me?.support?.telegram);
-  if (!url || isSupportFloatHidden(pathname, isFullscreen)) return null;
+  if (!url || modalOpen || isSupportFloatHidden(pathname, isFullscreen)) return null;
   const isWhatsApp = url.includes("wa.me");
   return (
     <a
