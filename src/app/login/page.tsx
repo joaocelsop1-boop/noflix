@@ -27,6 +27,11 @@ export default function LoginPage() {
   /* Sessão única (tudo20): o middleware manda para cá com ?session=ended
      quando outro aparelho entrou e esta sessão foi encerrada. */
   const [sessionNotice, setSessionNotice] = useState(false);
+  /* tudo38: plano escolhido no site de vendas (?plano=Mensal). Quem vem
+     do site veio para COMPRAR (conta nova), então o formulário abre em
+     "Criar conta" e mostra o plano escolhido — antes abria em "Entrar"
+     e não mostrava nem o nome nem o preço do plano. */
+  const [planFromSite, setPlanFromSite] = useState<string | null>(null);
   const [forgot, setForgot] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -37,8 +42,14 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("session") === "ended") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("session") === "ended") {
       setSessionNotice(true);
+    }
+    const plano = params.get("plano");
+    if (plano) {
+      setPlanFromSite(plano);
+      setMode("register");
     }
   }, []);
 
@@ -118,6 +129,12 @@ export default function LoginPage() {
       </p>
 
       <div className="mt-8 w-full max-w-md rounded-xl border border-white/10 bg-[#0f1220] p-6 shadow-2xl md:p-8">
+        {planFromSite && (
+          <div className="mb-6 rounded-md border border-[#e50914]/40 bg-[#e50914]/10 px-4 py-3 text-center text-[14px] leading-relaxed text-white/90">
+            Plano escolhido: <b>{planFromSite}</b>
+            <span className="block text-[12px] text-white/60">Crie sua conta para continuar e pagar via Pix.</span>
+          </div>
+        )}
         {/* abas Entrar / Criar conta */}
         <div className="grid grid-cols-2 rounded-md bg-white/5 p-1">
           {(
